@@ -1,0 +1,65 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper: is the user authenticated?
+    function isAuth() {
+      return request.auth != null;
+    }
+
+    // Helper: is the user a CEO? (role stored in /staff/{uid})
+    function isCEO() {
+      return isAuth() &&
+        get(/databases/$(database)/documents/staff/$(request.auth.uid)).data.role == 'ceo';
+    }
+
+    // Staff profiles — only CEO can create/delete, owner can read/update their own
+    match /staff/{uid} {
+      allow read: if isAuth();
+      allow create, delete: if isCEO();
+      allow update: if isAuth() && (request.auth.uid == uid || isCEO());
+    }
+
+    // Students — all authenticated staff can read/write
+    match /students/{doc} {
+      allow read, write: if isAuth();
+    }
+
+    // Follow-ups — all authenticated staff
+    match /followups/{doc} {
+      allow read, write: if isAuth();
+    }
+
+    // Assessments — all authenticated staff
+    match /assessments/{doc} {
+      allow read, write: if isAuth();
+    }
+
+    // Batches — all authenticated staff
+    match /batches/{doc} {
+      allow read, write: if isAuth();
+    }
+
+    // Tasks — CEO can create/delete, staff can read and update status
+    match /tasks/{doc} {
+      allow read: if isAuth();
+      allow create, delete: if isCEO();
+      allow update: if isAuth();
+    }
+
+    // Daily reports — all staff can create and read
+    match /reports/{doc} {
+      allow read, write: if isAuth();
+    }
+
+    // Concerns — all staff
+    match /concerns/{doc} {
+      allow read, write: if isAuth();
+    }
+
+    // Leads — all staff
+    match /leads/{doc} {
+      allow read, write: if isAuth();
+    }
+  }
+}

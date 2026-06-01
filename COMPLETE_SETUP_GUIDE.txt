@@ -1,0 +1,484 @@
+# ISC Student Management System
+# COMPLETE SETUP GUIDE — READ THIS FULLY BEFORE STARTING
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+## UNDERSTANDING THE SYSTEM FIRST
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Your app has TWO separate systems that must match each other:
+
+  SYSTEM 1 — Firebase Authentication
+  → This handles LOGIN (email + password)
+  → Think of it as the LOCK on the door
+
+  SYSTEM 2 — Firestore Database (staff collection)
+  → This stores WHO the person IS (name, role)
+  → Think of it as the NAME TAG after they enter
+
+WHY BOTH ARE NEEDED:
+  Authentication says "yes this person can log in"
+  Firestore says "this person is the CEO" or "this person is staff"
+
+  Without Authentication → can't log in at all
+  Without Firestore record → logs in but app shows blank/error
+
+WHY THE DOCUMENT ID = UID:
+  When someone logs in, Firebase gives them a unique ID called UID
+  The app uses that UID to find their profile in Firestore
+  So the Firestore document ID MUST equal their Authentication UID
+  That's how the app connects login → role → correct dashboard
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+## PART 1 — EXTRACT AND OPEN THE PROJECT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. Download isc-sms-FINAL.zip
+2. Right click → Extract All → choose C:\isc-sms
+3. You should now have C:\isc-sms\isc-sms folder
+4. Open VS Code
+5. Click File → Open Folder → select C:\isc-sms\isc-sms
+6. You will see all project files on the left panel
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+## PART 2 — FIREBASE PROJECT SETUP (one time only)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+You already created a Firebase project (isc-sms-test).
+Just make sure these 3 services are enabled:
+
+  ✅ Authentication → Email/Password → Enabled
+  ✅ Firestore Database → Created (asia-south1)
+  ✅ Storage → Enabled
+
+If any of these are missing:
+  Go to https://console.firebase.google.com
+  Open your isc-sms-test project
+  Enable each one from the left sidebar
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+## PART 3 — PASTE YOUR FIREBASE CONFIG
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+This connects your app code to your Firebase project.
+
+STEP 1 — Get your config values:
+  → Go to https://console.firebase.google.com
+  → Open project isc-sms-test
+  → Click the gear icon ⚙️ (top left)
+  → Click "Project settings"
+  → Click "General" tab
+  → Scroll down to "Your apps" section
+  → Click your web app
+  → You will see the firebaseConfig object with all values
+
+STEP 2 — Paste into the app:
+  → In VS Code, open: src → firebase → config.js
+  → You will see placeholder text like PASTE_YOUR_apiKey_HERE
+  → Replace each placeholder with your real value
+
+Your config.js should look exactly like this when done:
+
+  import { initializeApp } from 'firebase/app';
+  import { getAuth } from 'firebase/auth';
+  import { getFirestore } from 'firebase/firestore';
+  import { getStorage } from 'firebase/storage';
+
+  const firebaseConfig = {
+    apiKey:            "AIzaSyCj95Mv7stlz-owyiaj4yo_0DH3qzS4l0E",
+    authDomain:        "isc-sms-test.firebaseapp.com",
+    projectId:         "isc-sms-test",
+    storageBucket:     "isc-sms-test.firebasestorage.app",
+    messagingSenderId: "4958345315",
+    appId:             "1:4958345315:web:77c9a7543fb5ae31f74056",
+  };
+
+  const app = initializeApp(firebaseConfig);
+  export const auth    = getAuth(app);
+  export const db      = getFirestore(app);
+  export const storage = getStorage(app);
+  export default app;
+
+  NOTE: Use YOUR values from Firebase, not the example above.
+  Press Ctrl+S to save after pasting.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+## PART 4 — SET UP FIRESTORE SECURITY RULES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+This allows your app to read and write data properly.
+
+  1. Go to Firebase Console → Firestore Database
+  2. Click the "Rules" tab at the top
+  3. Delete everything in the rules editor
+  4. Paste this exactly:
+
+    rules_version = '2';
+    service cloud.firestore {
+      match /databases/{database}/documents {
+        match /{document=**} {
+          allow read, write: if request.auth != null;
+        }
+      }
+    }
+
+  5. Click "Publish"
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+## PART 5 — CREATE YOUR CEO LOGIN ACCOUNT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+This is the most important part. Do it in this exact order.
+
+─────────────────────────────────────────────────
+STEP A — Create the login in Firebase Authentication
+─────────────────────────────────────────────────
+
+  1. Go to Firebase Console → Authentication → Users tab
+  2. Click "Add user"
+  3. Email: your real email (e.g. ceo@internationalskillsclub.com)
+  4. Password: choose a strong password
+  5. Click "Add user"
+
+  After adding, you will see the user in the list.
+  Click on the user to see their full UID.
+  It looks like: riEU98uXNrOZZTavtxZ5xiJ5Bt63
+
+  ⚠️  COPY THIS UID — you need it in the next step
+
+─────────────────────────────────────────────────
+STEP B — Create the profile in Firestore
+─────────────────────────────────────────────────
+
+  This tells the app "this person is the CEO"
+
+  1. Go to Firebase Console → Firestore Database
+  2. Click "+ Start collection"
+  3. Collection ID: staff   (IMPORTANT: all lowercase, no capital S)
+  4. Click Next
+
+  Now you are creating the first document:
+
+  5. Document ID field: PASTE the UID you copied from Authentication
+     Example: riEU98uXNrOZZTavtxZ5xiJ5Bt63
+     DO NOT click "Auto-ID" — paste the UID manually
+
+  6. Now add these fields one by one:
+
+     Field: name      Type: string    Value: Arun Kumar
+     (use the real name of the CEO)
+
+     Click "+ Add field" after each one
+
+     Field: role      Type: string    Value: ceo
+     (must be lowercase: ceo)
+
+     Field: email     Type: string    Value: ceo@internationalskillsclub.com
+     (same email used in Authentication above)
+
+     Field: active    Type: boolean   Value: true
+     (select boolean from the type dropdown, then select true)
+
+  7. Click Save
+
+  When done, your Firestore should look like this:
+
+    staff (collection)
+    └── riEU98uXNrOZZTavtxZ5xiJ5Bt63 (document — this is the UID)
+          name:   "Arun Kumar"
+          role:   "ceo"
+          email:  "ceo@internationalskillsclub.com"
+          active: true
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+## PART 6 — RUN THE APP AND TEST CEO LOGIN
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  1. In VS Code press Ctrl + ` (backtick key, top left of keyboard)
+     This opens the terminal at the bottom
+
+  2. Run these two commands:
+     npm install
+     npm run dev
+
+  3. Open your browser and go to:
+     http://localhost:5173
+
+  4. Login with your CEO email and password
+
+  5. You should see the full CEO Dashboard with all menus
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+## PART 7 — ADD STAFF AND ADMIN MEMBERS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+After you log in as CEO, adding staff is simple.
+You do NOT need to go to Firebase at all for this.
+
+  FROM INSIDE THE APP:
+
+  1. Login as CEO
+  2. Click "Staff Management" in the left sidebar
+  3. Click "Add Staff Member"
+  4. Fill in:
+     - Full Name: Priya Suresh
+     - Email: priya@internationalskillsclub.com
+     - Role: Staff (or Admin)
+  5. Click "Add & Send Email"
+
+  The app automatically:
+  → Creates the login account in Firebase Authentication
+  → Creates the Firestore profile with correct role
+  → Sends a setup email to the staff member
+
+  The staff member clicks the link in their email,
+  sets their own password, and can log in immediately.
+
+  STAFF DASHBOARD will show:
+  → Only their assigned students
+  → Their batches
+  → Their tasks from CEO
+  → Their follow-ups
+
+  ADMIN DASHBOARD will show:
+  → All students (can add/edit)
+  → All batches
+  → Concerns and documents
+  → NOT staff management or financial data
+
+  CEO DASHBOARD shows:
+  → Everything
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+## PART 8 — ASSIGN STUDENTS TO STAFF
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  METHOD 1 — One at a time:
+  → Go to Students → click a student → Edit
+  → Change "Staff Assigned" dropdown to the staff name
+  → Save
+
+  METHOD 2 — Bulk (100 students at once):
+  → Go to Bulk Import
+  → Download the template CSV
+  → Fill in the staffAssigned column with staff names
+  → Upload — all students assigned in one go
+
+  Once assigned:
+  → Staff logs in and sees only their students
+  → CEO can see who is assigned to whom in All Students
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+## PART 9 — HOW EMAIL NOTIFICATIONS WORK
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+The app has TWO notification systems:
+
+  SYSTEM 1 — In-App Bell (works immediately, no setup needed)
+  → Bell icon in top right corner
+  → Shows red badge with unread count
+  → Staff sees it instantly when CEO assigns something
+  → Works as soon as you run the app
+
+  SYSTEM 2 — Email Notifications (needs EmailJS setup)
+  → Staff gets an actual email to their inbox
+  → Setup takes 10 minutes, completely free
+
+  HOW TO SET UP EMAIL NOTIFICATIONS:
+
+  1. Go to https://www.emailjs.com
+  2. Click "Sign Up Free"
+  3. After signup → click "Add New Service"
+  4. Choose Gmail → connect your Gmail account
+  5. Copy the "Service ID" shown (looks like: service_abc123)
+
+  6. Click "Email Templates" → "Create New Template"
+  7. Template name: Task Assigned
+  8. Subject: New Task Assigned to You
+  9. Body:
+       Hi {{to_name}},
+       {{assigned_by}} has assigned you a new task.
+       Task: {{task_title}}
+       Priority: {{priority}}
+       Due Date: {{due_date}}
+       Open the dashboard: {{app_url}}
+  10. Click Save — copy the Template ID (template_task_assigned)
+
+  11. Repeat for Follow-Up template:
+       Subject: Follow-Up Required — {{student_name}}
+       Body:
+       Hi {{to_name}},
+       {{assigned_by}} has assigned a follow-up for {{student_name}}.
+       Instructions: {{note}}
+       Priority: {{priority}}
+       Open the dashboard: {{app_url}}
+  12. Save — Template ID: template_followup_assigned
+
+  13. Click your profile icon (top right) → copy "Public Key"
+
+  14. In VS Code open: src → firebase → emailService.js
+  15. Replace these two lines:
+       const SERVICE_ID = 'YOUR_EMAILJS_SERVICE_ID';
+       const PUBLIC_KEY = 'YOUR_EMAILJS_PUBLIC_KEY';
+  16. With your real values:
+       const SERVICE_ID = 'service_abc123';
+       const PUBLIC_KEY = 'user_xyz789abc';
+  17. Press Ctrl+S to save
+
+  Now when CEO assigns a task, staff gets an email instantly.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+## PART 10 — MAKE IT LIVE (Share with Your Boss)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Right now the app only works on your computer (localhost).
+To share with your boss or staff, deploy it to Vercel (free).
+
+  1. Go to https://vercel.com → Sign up with GitHub (free)
+
+  2. Go to https://github.com → Sign up (free)
+
+  3. In VS Code terminal, run these commands one by one:
+
+     git init
+     git add .
+     git commit -m "ISC SMS first deployment"
+
+  4. Go to GitHub → click "New repository"
+     Name: isc-sms
+     Private (recommended)
+     Click "Create repository"
+
+  5. GitHub will show you commands. Run them in your terminal:
+     git remote add origin https://github.com/YOURNAME/isc-sms.git
+     git push -u origin main
+
+  6. Go to https://vercel.com → "Add New Project"
+     → Import your GitHub repository
+     → Click Deploy
+
+  7. In about 2 minutes you get a live URL like:
+     https://isc-sms-xyz.vercel.app
+
+  Share this URL with your boss and staff.
+  It works on phone, tablet, and desktop.
+  Staff can add it to their phone home screen like an app.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+## PART 11 — MAKING CHANGES AFTER THIS (NO MORE ZIPS)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+From today onwards, no more downloading and extracting zips.
+
+  HOW TO WORK WITH CLAUDE GOING FORWARD:
+
+  1. Keep VS Code open with your project folder
+  2. Keep terminal running: npm run dev
+  3. Keep browser open at http://localhost:5173
+  4. Tell Claude what you want to change in chat
+
+  Claude will say:
+    "Open src/pages/Tasks.jsx — replace with this code:"
+    [code here]
+
+  You:
+  → Click that file on the left panel in VS Code
+  → Press Ctrl+A to select all
+  → Paste the new code
+  → Press Ctrl+S to save
+  → Browser refreshes automatically in 2 seconds
+
+  That's it. 30 seconds per change.
+
+  AFTER MAKING CHANGES, DEPLOY TO PRODUCTION:
+  In terminal run:
+    git add .
+    git commit -m "describe your change here"
+    git push
+
+  Vercel auto-deploys in 2 minutes. Your live URL updates.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+## COMMON PROBLEMS AND FIXES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+PROBLEM: "Invalid email or password" after login
+FIX:
+  → Go to Firebase → Authentication → Users
+  → Make sure the email exists there
+  → Make sure the UID in Firestore matches exactly
+  → Check Firestore collection is named "staff" (lowercase)
+
+PROBLEM: Login works but shows blank dashboard
+FIX:
+  → Go to Firestore → staff collection → your document
+  → Make sure "role" field value is exactly: ceo (lowercase)
+  → Make sure "active" field is boolean true (not string "true")
+
+PROBLEM: Staff logs in but sees CEO data
+FIX:
+  → Check Firestore → staff → their document
+  → role must be: staff (not Staff, not STAFF)
+
+PROBLEM: npm run dev gives error
+FIX:
+  → Make sure Node.js version is 20 or higher
+  → Run: node --version
+  → If below 20, download new version from nodejs.org
+  → Then: npm install and npm run dev again
+
+PROBLEM: "Permission denied" error in browser console
+FIX:
+  → Go to Firestore → Rules tab
+  → Make sure rules allow read/write for authenticated users
+  → Paste the rules from Part 4 above and publish
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+## QUICK REFERENCE — ROLE PERMISSIONS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  CEO (role: "ceo")
+  ✅ Full access to everything
+  ✅ Add / remove / manage staff
+  ✅ See all students across all staff
+  ✅ Assign tasks to any staff member
+  ✅ Assign follow-ups to any staff member
+  ✅ See all daily reports
+  ✅ Lead pipeline, financial data
+  ✅ Revoke staff access
+
+  ADMIN (role: "admin")
+  ✅ Manage students — add, edit, bulk import
+  ✅ Manage batches
+  ✅ View and resolve concerns
+  ✅ Upload documents
+  ✅ View reports submitted by staff
+  ❌ Cannot manage staff members
+  ❌ Cannot see lead pipeline
+
+  STAFF (role: "staff")
+  ✅ See only their assigned students (e.g. 100 students)
+  ✅ View their batch and all students in that batch
+  ✅ Log follow-up notes on their students
+  ✅ Complete tasks assigned to them
+  ✅ Submit daily reports
+  ✅ View student leaderboard
+  ❌ Cannot see other staff's students
+  ❌ Cannot add or delete students
+  ❌ Cannot assign tasks
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+## SUMMARY — SETUP CHECKLIST
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  □ Extract zip to C:\isc-sms
+  □ Open in VS Code
+  □ Paste Firebase config in src/firebase/config.js
+  □ Set Firestore rules (Part 4)
+  □ Create CEO login in Firebase Authentication
+  □ Create CEO Firestore document with matching UID
+  □ Run npm install then npm run dev
+  □ Login at http://localhost:5173
+  □ Add staff from inside the app (Staff Management)
+  □ Set up EmailJS for email notifications (Part 9)
+  □ Deploy to Vercel to share with boss (Part 10)
+  □ Set up Git for future code changes (Part 11)

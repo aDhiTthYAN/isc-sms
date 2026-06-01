@@ -1,0 +1,147 @@
+import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
+import { AuthProvider, useAuth } from './context/AuthContext';
+import { NotifProvider } from './context/NotifContext';
+import Sidebar from './components/layout/Sidebar';
+import Topbar  from './components/layout/Topbar';
+import { Loading } from './components/ui';
+
+import LoginPage       from './pages/Login';
+import Dashboard       from './pages/Dashboard';
+import AdminDashboard  from './pages/AdminDashboard';
+import StaffDashboard  from './pages/StaffDashboard';
+import StudentsPage    from './pages/Students';
+import StudentProfile  from './pages/StudentProfile';
+import FollowUps       from './pages/FollowUps';
+import Concerns        from './pages/Concerns';
+import Assessments     from './pages/Assessments';
+import Batches         from './pages/Batches';
+import Leaderboard     from './pages/Leaderboard';
+import Tasks           from './pages/Tasks';
+import Reports         from './pages/Reports';
+import Leads           from './pages/Leads';
+import Documents       from './pages/Documents';
+import StaffManagement from './pages/StaffManagement';
+import BulkImport      from './pages/BulkImport';
+
+const NAV_BY_ROLE = {
+  ceo: [
+    { section: 'Overview' },
+    { to: '/',            label: 'Dashboard',       icon: 'LayoutDashboard' },
+    { section: 'Students' },
+    { to: '/students',    label: 'All Students',     icon: 'Users'          },
+    { to: '/bulk-import', label: 'Bulk Import',      icon: 'Upload'         },
+    { to: '/followups',   label: 'Follow-Ups',       icon: 'PhoneCall'      },
+    { to: '/concerns',    label: 'Concerns',         icon: 'AlertCircle'    },
+    { section: 'Academic' },
+    { to: '/assessments', label: 'Assessments',      icon: 'ClipboardList'  },
+    { to: '/batches',     label: 'Batches',          icon: 'School'         },
+    { to: '/leaderboard', label: 'Leaderboard',      icon: 'Trophy'         },
+    { section: 'Operations' },
+    { to: '/tasks',       label: 'Staff Tasks',      icon: 'CheckSquare'    },
+    { to: '/reports',     label: 'Daily Reports',    icon: 'FileText'       },
+    { to: '/leads',       label: 'Lead Pipeline',    icon: 'TrendingUp'     },
+    { to: '/documents',   label: 'Documents',        icon: 'FolderOpen'     },
+    { section: 'Settings' },
+    { to: '/staff',       label: 'Staff Management', icon: 'UsersRound'     },
+  ],
+  admin: [
+    { section: 'Overview' },
+    { to: '/',            label: 'Dashboard',        icon: 'LayoutDashboard' },
+    { section: 'Students' },
+    { to: '/students',    label: 'All Students',     icon: 'Users'           },
+    { to: '/bulk-import', label: 'Bulk Import',      icon: 'Upload'          },
+    { to: '/followups',   label: 'Follow-Ups',       icon: 'PhoneCall'       },
+    { to: '/concerns',    label: 'Concerns',         icon: 'AlertCircle'     },
+    { section: 'Academic' },
+    { to: '/assessments', label: 'Assessments',      icon: 'ClipboardList'   },
+    { to: '/batches',     label: 'Batches',          icon: 'School'          },
+    { to: '/leaderboard', label: 'Leaderboard',      icon: 'Trophy'          },
+    { section: 'Operations' },
+    { to: '/reports',     label: 'Daily Reports',    icon: 'FileText'        },
+    { to: '/documents',   label: 'Documents',        icon: 'FolderOpen'      },
+  ],
+  staff: [
+    { section: 'My Work' },
+    { to: '/',            label: 'My Dashboard',     icon: 'LayoutDashboard' },
+    { to: '/students',    label: 'My Students',      icon: 'Users'           },
+    { to: '/followups',   label: 'My Follow-Ups',    icon: 'PhoneCall'       },
+    { to: '/tasks',       label: 'My Tasks',         icon: 'CheckSquare'     },
+    { section: 'Reports' },
+    { to: '/reports',     label: 'Daily Report',     icon: 'FileText'        },
+    { section: 'Resources' },
+    { to: '/leaderboard', label: 'Leaderboard',      icon: 'Trophy'          },
+  ],
+};
+
+const SIDEBAR_COLOR = { ceo: '#1A1A2E', admin: '#1B1B2F', staff: '#0F3460' };
+const ROLE_LABEL    = { ceo: 'CEO · Full access', admin: 'Admin', staff: 'Staff' };
+
+function AppShell() {
+  const { user, profile, loading } = useAuth();
+  if (loading) return <Loading text="Authenticating..." />;
+  if (!user)   return <Navigate to="/login" replace />;
+
+  const role     = profile?.role || 'staff';
+  const navItems = NAV_BY_ROLE[role] || NAV_BY_ROLE.staff;
+  const sbColor  = SIDEBAR_COLOR[role];
+
+  return (
+    <NotifProvider>
+      <div style={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
+        <Sidebar navItems={navItems} sidebarColor={sbColor} roleLabel={ROLE_LABEL[role]} />
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          <Topbar />
+          <main style={{ flex: 1, overflowY: 'auto', padding: 24 }}>
+            <Outlet />
+          </main>
+        </div>
+      </div>
+    </NotifProvider>
+  );
+}
+
+function GuestGuard() {
+  const { user, loading } = useAuth();
+  if (loading) return <Loading />;
+  if (user) return <Navigate to="/" replace />;
+  return <Outlet />;
+}
+
+function HomeDashboard() {
+  const { profile } = useAuth();
+  const role = profile?.role || 'staff';
+  if (role === 'ceo')   return <Dashboard />;
+  if (role === 'admin') return <AdminDashboard />;
+  return <StaffDashboard />;
+}
+
+export default function App() {
+  return (
+    <BrowserRouter>
+      <AuthProvider>
+        <Routes>
+          <Route element={<GuestGuard />}>
+            <Route path="/login" element={<LoginPage />} />
+          </Route>
+          <Route element={<AppShell />}>
+            <Route path="/"              element={<HomeDashboard />}   />
+            <Route path="/students"      element={<StudentsPage />}    />
+            <Route path="/students/:id"  element={<StudentProfile />}  />
+            <Route path="/bulk-import"   element={<BulkImport />}      />
+            <Route path="/followups"     element={<FollowUps />}       />
+            <Route path="/concerns"      element={<Concerns />}        />
+            <Route path="/assessments"   element={<Assessments />}     />
+            <Route path="/batches"       element={<Batches />}         />
+            <Route path="/leaderboard"   element={<Leaderboard />}     />
+            <Route path="/tasks"         element={<Tasks />}           />
+            <Route path="/reports"       element={<Reports />}         />
+            <Route path="/leads"         element={<Leads />}           />
+            <Route path="/documents"     element={<Documents />}       />
+            <Route path="/staff"         element={<StaffManagement />} />
+          </Route>
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </AuthProvider>
+    </BrowserRouter>
+  );
+}
