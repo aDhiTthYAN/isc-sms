@@ -116,14 +116,15 @@ export default function StudentProfile() {
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, fontSize: 13 }}>
               {[
-                { icon: Phone, label: 'Phone', val: student.phone },
-                { icon: Phone, label: 'Parent Phone', val: student.parentPhone },
-                { icon: Mail, label: 'Email', val: student.email },
-                { icon: MapPin, label: 'Location', val: student.location },
-                { icon: BookOpen, label: 'Education', val: student.education },
-                { icon: User, label: 'Staff', val: student.staffAssigned },
-                { icon: Calendar, label: 'Joined', val: student.joiningDate },
-              ].filter(r => r.val).map(row => {
+                  { icon: Phone,    label: 'Child Phone',   val: student.phone },
+                  { icon: User,     label: 'Parent Name',   val: student.parentName },
+                  { icon: Phone,    label: 'Parent Phone',  val: student.parentPhone },
+                  { icon: Mail,     label: 'Email',         val: student.email },
+                  { icon: BookOpen, label: 'Class / Std',   val: student.classStd },
+                  { icon: MapPin,   label: 'Location',      val: student.location },
+                  { icon: User,     label: 'Staff',         val: student.staffAssigned },
+                  { icon: Calendar, label: 'Joined',        val: student.joinDate },
+              ].filter(r => r.val).map((row) => {
                 const Icon = row.icon;
                 return (
                   <div key={row.label}>
@@ -136,6 +137,40 @@ export default function StudentProfile() {
                 );
               })}
             </div>
+            {/* Subscription validity */}
+{student.joinDate && student.courseDurationMonths && (() => {
+              const joinDate = new Date(student.joinDate);
+              const expiryDate = new Date(joinDate);
+              expiryDate.setMonth(expiryDate.getMonth() + Number(student.courseDurationMonths));
+              const today = new Date();
+              const daysLeft = Math.ceil((expiryDate - today) / (1000 * 60 * 60 * 24));
+              const isExpired = daysLeft < 0;
+              const isExpiringSoon = daysLeft >= 0 && daysLeft <= 30;
+              return (
+                <div style={{
+                  marginTop: 12,
+                  padding: '10px 14px',
+                  borderRadius: 8,
+                  background: isExpired ? '#FEE2E2' : isExpiringSoon ? '#FEF3C7' : '#F0FDF4',
+                  border: `1px solid ${isExpired ? '#FECACA' : isExpiringSoon ? '#FDE68A' : '#BBF7D0'}`,
+                  fontSize: 13
+                }}>
+                  <div
+                    style={{
+                      fontWeight: 600,
+                      marginBottom: 2,
+                      color: isExpired ? '#991B1B' : isExpiringSoon ? '#92400E' : '#065F46'
+                    }}
+                  >
+                    📅 Subscription {isExpired ? 'Expired' : `Valid till ${expiryDate.toLocaleDateString('en-IN')}`}
+                  </div>
+                  <div style={{ fontSize: 12, color: '#6B7280' }}>
+                    {student.courseDurationMonths} month course · Joined {new Date(student.joinDate).toLocaleDateString('en-IN')} ·
+                    {isExpired ? ` Expired ${Math.abs(daysLeft)} days ago` : ` ${daysLeft} days remaining`}
+                  </div>
+                </div>
+              );
+            })()}
             {student.notes && (
               <div style={{ marginTop: 16, padding: '10px 14px', background: '#FFF8E1', borderRadius: 8, fontSize: 13, color: '#92400E' }}>
                 📝 {student.notes}

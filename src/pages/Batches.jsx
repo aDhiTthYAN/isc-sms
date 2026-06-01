@@ -51,7 +51,7 @@ export default function Batches() {
   const [importing, setImporting]       = useState(false);
   const fileRef = useRef();
   const [createForm, setCreateForm] = useState({
-    name: '', course: '', mentor: '', startDate: '', endDate: '', status: 'upcoming', maxSeats: ''
+    name: '', course: '', mentor: '', startDate: '', endDate: '', status: 'upcoming', maxSeats: '', courseDurationMonths: ''
   });
   const [studentForm, setStudentForm] = useState({
     name: '', phone: '', parentPhone: '', email: '',
@@ -85,7 +85,7 @@ export default function Batches() {
     await addBatch(createForm);
     setToast({ message: `Batch "${createForm.name}" created! Now add students to it.`, type: 'success' });
     setShowCreateModal(false);
-    setCreateForm({ name: '', course: '', mentor: '', startDate: '', endDate: '', status: 'upcoming', maxSeats: '' });
+    setCreateForm({ name: '', course: '', mentor: '', startDate: '', endDate: '', status: 'upcoming', maxSeats: '', courseDurationMonths: '' });
     await loadBatches();
     setSaving(false);
   };
@@ -98,6 +98,8 @@ export default function Batches() {
       batchId: selectedBatch.id,
       batchName: selectedBatch.name,
       course: selectedBatch.course,
+      courseDurationMonths:
+      selectedBatch.courseDurationMonths || '',
     });
     setToast({ message: 'Student added to batch!', type: 'success' });
     setShowAddStudentModal(false);
@@ -456,6 +458,31 @@ export default function Batches() {
                 </select>
               </div>
             </FormRow>
+            <div className="form-group">
+              <label className="form-label">Course Duration (months) *</label>
+              <input
+                className="form-input"
+                type="number"
+                required
+                placeholder="e.g. 6 — this sets the default subscription length for all students in this batch"
+                value={createForm.courseDurationMonths}
+                onChange={e =>
+                  setCreateForm({
+                    ...createForm,
+                    courseDurationMonths: e.target.value
+                  })
+                }
+              />
+              <div
+                style={{
+                  fontSize: 11,
+                  color: '#6B7280',
+                  marginTop: 4
+                }}
+              >
+                Each student's subscription validity = their personal join date + this duration
+              </div>
+            </div>
             <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
               <button type="button" className="btn btn-ghost" onClick={() => setShowCreateModal(false)}>Cancel</button>
               <button type="submit" className="btn btn-primary" disabled={saving}>{saving ? 'Creating...' : 'Create Batch'}</button>

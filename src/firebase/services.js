@@ -325,3 +325,27 @@ export const getStudents = async () => {
   const result = await getStudentsPaged();
   return result.students;
 };
+// ── Self-assign students (staff assigns themselves) ────────────
+export const selfAssignStudents = async (staffName, studentIds) => {
+  const promises = studentIds.map(id =>
+    updateDoc(doc(db, 'students', id), { staffAssigned: staffName })
+  );
+  await Promise.all(promises);
+};
+
+// ── Get unassigned students ────────────────────────────────────
+export const getUnassignedStudents = async (batchId) => {
+  const q = batchId
+    ? query(studentsRef(), where('batchId', '==', batchId), where('staffAssigned', '==', ''))
+    : query(studentsRef(), where('staffAssigned', '==', ''), limit(100));
+  const snap = await getDocs(q);
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+};
+
+// ── Update student activity status ────────────────────────────
+export const updateStudentActivity = async (id, data) => {
+  return updateDoc(doc(db, 'students', id), {
+    ...data,
+    lastActivityUpdate: serverTimestamp()
+  });
+};
