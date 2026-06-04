@@ -13,25 +13,16 @@ import {
   TrendingUp, TrendingDown, Minus, ChevronDown, ChevronUp
 } from 'lucide-react';
 
-// ── Course Flow Steps ─────────────────────────────────────────
-const COURSE_FLOW = [
-  { key: 'admission',        label: 'Student Admission',                  phase: 'onboarding' },
-  { key: 'parent_onboarding',label: 'Parent Onboarding',                  phase: 'onboarding' },
-  { key: 'group_admission',  label: 'Group Admission',                    phase: 'onboarding' },
-  { key: 'initial_assess',   label: 'Initial Assessment',                 phase: 'onboarding' },
-  { key: 'vark_analysis',    label: 'VARK Analysis',                      phase: 'onboarding' },
-  { key: 'psychologist',     label: 'Psychologist Interaction',           phase: 'onboarding' },
-  { key: 'kit_dispatch',     label: 'Kit Packing & Dispatch',             phase: 'onboarding' },
-  { key: 'instagram_setup',  label: 'Instagram Setup',                    phase: 'onboarding' },
-  { key: 'kit_activities',   label: 'Kit Activities',                     phase: 'course' },
-  { key: 'insta_post',       label: 'Instagram Post & Collaboration',     phase: 'course' },
-  { key: 'faculty_interact', label: 'Faculty Interaction',                phase: 'course' },
-  { key: 'class_start',      label: 'Class Start',                        phase: 'course' },
-  { key: 'first_activity',   label: 'First Activity',                     phase: 'course' },
-  { key: 'quiz_debate',      label: 'Quiz & Debate Sessions',             phase: 'course' },
-  { key: 'skill_activities', label: 'Continuous Skill-Based Activities',  phase: 'course' },
-  { key: 'subject_uploads',  label: 'Subject-wise Activity Uploads',      phase: 'course' },
-  { key: 'insta_showcase',   label: 'Instagram Collaboration & Showcase', phase: 'course' },
+// ── Default Course Flow (fallback if batch has no custom flow) ──
+const DEFAULT_batchCourseFlow = [
+  { key: 'admission',        label: 'Student Admission',                   phase: 'onboarding' },
+  { key: 'parent_onboarding',label: 'Parent Onboarding',                   phase: 'onboarding' },
+  { key: 'group_admission',  label: 'Group Admission',                     phase: 'onboarding' },
+  { key: 'initial_assess',   label: 'Initial Assessment',                  phase: 'onboarding' },
+  { key: 'vark_analysis',    label: 'VARK Analysis',                       phase: 'onboarding' },
+  { key: 'kit_dispatch',     label: 'Kit Packing & Dispatch',              phase: 'onboarding' },
+  { key: 'class_start',      label: 'Class Start',                         phase: 'course' },
+  { key: 'first_activity',   label: 'First Activity',                      phase: 'course' },
   { key: 'followup_monitor', label: 'Regular Follow-up & Progress Monitoring', phase: 'course' },
 ];
 
@@ -54,6 +45,7 @@ export default function StudentProfile() {
 
   const [student,     setStudent]     = useState(null);
   const [batches,     setBatches]     = useState([]);
+  const [batchCourseFlow, setBatchCourseFlow] = useState([]);
   const [followups,   setFollowups]   = useState([]);
   const [assessments, setAssessments] = useState([]);
   const [staffList,   setStaffList]   = useState([]);
@@ -101,6 +93,9 @@ export default function StudentProfile() {
       setStaffList(st.filter(x => x.active !== false));
       setEditForm(s || {});
       setWeakSubjects(s?.weakSubjects || []);
+      const batchDoc = b.find(batch => batch.id === s?.batchId);
+      const flow = batchDoc?.courseFlow || DEFAULT_batchCourseFlow;
+      setBatchCourseFlow(flow);
     } catch (err) {
       console.error('StudentProfile load error:', err);
     } finally {
@@ -129,7 +124,7 @@ export default function StudentProfile() {
 
   // Course flow helpers
   const flowStep = (key) => student?.courseFlow?.[key];
-  const flowDoneCount = () => COURSE_FLOW.filter(s => flowStep(s.key)?.done).length;
+  const flowDoneCount = () => batchCourseFlow.filter(s => flowStep(s.key)?.done).length;
 
   const handleMarkFlow = async (step, done) => {
     if (done) {
@@ -218,7 +213,7 @@ export default function StudentProfile() {
   const firstPct   = assessments.length ? assessments[0].percentage : null;
   const trend      = (latestPct !== null && firstPct !== null && assessments.length > 1) ? latestPct - firstPct : null;
   const flowDone   = flowDoneCount();
-  const flowTotal  = COURSE_FLOW.length;
+  const flowTotal  = batchCourseFlow.length;
 
   return (
     <div>
@@ -363,7 +358,7 @@ export default function StudentProfile() {
                 <div className="progress-fill" style={{ width:`${Math.round(flowDone/flowTotal*100)}%`, background:'#E53935' }}/>
               </div>
               <div style={{ fontSize:12, color:'#6B7280' }}>
-                {COURSE_FLOW.filter(s => !flowStep(s.key)?.done).slice(0,3).map(s => (
+                {batchCourseFlow.filter(s => !flowStep(s.key)?.done).slice(0,3).map(s => (
                   <div key={s.key} style={{ marginBottom:3 }}>⏳ {s.label}</div>
                 ))}
                 <span style={{ color:'#E53935', cursor:'pointer' }} onClick={() => setActiveTab('courseflow')}>
@@ -439,7 +434,7 @@ export default function StudentProfile() {
 
           {/* Phases */}
           {Object.entries(PHASE_LABELS).map(([phase, phaseInfo]) => {
-            const steps    = COURSE_FLOW.filter(s => s.phase === phase);
+            const steps    = batchCourseFlow.filter(s => s.phase === phase);
             const doneHere = steps.filter(s => flowStep(s.key)?.done).length;
             const expanded = flowExpanded[phase];
             return (
