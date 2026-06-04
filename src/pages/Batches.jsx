@@ -18,25 +18,38 @@ const DAYS    = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','
 const PHASES  = ['onboarding', 'course'];
 
 const DEFAULT_COURSE_FLOW = [
-  { key: 'admission',        label: 'Student Admission',                   phase: 'onboarding' },
-  { key: 'parent_onboarding',label: 'Parent Onboarding',                   phase: 'onboarding' },
-  { key: 'group_admission',  label: 'Group Admission',                     phase: 'onboarding' },
-  { key: 'initial_assess',   label: 'Initial Assessment',                  phase: 'onboarding' },
-  { key: 'vark_analysis',    label: 'VARK Analysis',                       phase: 'onboarding' },
-  { key: 'kit_dispatch',     label: 'Kit Packing & Dispatch',              phase: 'onboarding' },
-  { key: 'class_start',      label: 'Class Start',                         phase: 'course' },
-  { key: 'first_activity',   label: 'First Activity',                      phase: 'course' },
-  { key: 'followup_monitor', label: 'Regular Follow-up & Progress Monitoring', phase: 'course' },
+  { key: 'admission',         label: 'Student Admission',                    phase: 'onboarding' },
+  { key: 'parent_onboarding', label: 'Parent Onboarding',                    phase: 'onboarding' },
+  { key: 'group_admission',   label: 'Group Admission',                      phase: 'onboarding' },
+  { key: 'initial_assess',    label: 'Primary Assessment',                   phase: 'onboarding' },
+  { key: 'vark_analysis',     label: 'VARK Analysis',                        phase: 'onboarding' },
+  { key: 'kit_dispatch',      label: 'Kit Packing & Dispatch',               phase: 'onboarding' },
+  { key: 'instagram_setup',   label: 'Instagram Account Open',               phase: 'onboarding' },
+  { key: 'kit_activities',    label: 'Kit Activities',                       phase: 'course'     },
+  { key: 'kit_insta',         label: 'Kit Activity on Instagram',            phase: 'course'     },
+  { key: 'class_start',       label: 'Classes Started',                      phase: 'course'     },
+  { key: 'first_recheck',     label: 'First Recheck on Progress',            phase: 'course'     },
+  { key: 'action_plan',       label: 'Action Plan on First Assessment',      phase: 'course'     },
+  { key: 'malayalam_activity',label: 'Malayalam Activity',                   phase: 'course'     },
+  { key: 'english_activity',  label: 'English Activity',                     phase: 'course'     },
+  { key: 'maths_activity',    label: 'Maths Activity',                       phase: 'course'     },
+  { key: 'science_activity',  label: 'Science Activity',                     phase: 'course'     },
+  { key: 'followup_monitor',  label: 'Regular Follow-up & Progress Monitoring', phase: 'course' },
 ];
 
 const DEFAULT_STUDENT_FIELDS = [
-  { key: 'name',        label: 'Name',         required: true,  type: 'text'  },
-  { key: 'phone',       label: 'Phone',        required: false, type: 'text'  },
-  { key: 'parentName',  label: 'Parent Name',  required: false, type: 'text'  },
-  { key: 'parentPhone', label: 'Parent Phone', required: false, type: 'text'  },
-  { key: 'email',       label: 'Email',        required: false, type: 'email' },
-  { key: 'classStd',    label: 'Class/Std',    required: false, type: 'text'  },
-  { key: 'location',    label: 'Location',     required: false, type: 'text'  },
+  { key: 'name',          label: "Student Name (Kid's Name)", required: true,  type: 'text'  },
+  { key: 'gender',        label: 'Gender',                    required: false, type: 'text'  },
+  { key: 'age',           label: 'Age',                       required: false, type: 'number'},
+  { key: 'classStd',      label: 'Class',                     required: false, type: 'text'  },
+  { key: 'schoolName',    label: 'School Name',               required: false, type: 'text'  },
+  { key: 'fatherName',    label: 'Name of Father',            required: false, type: 'text'  },
+  { key: 'motherName',    label: 'Name of Mother',            required: false, type: 'text'  },
+  { key: 'phone',         label: 'Phone Number',              required: false, type: 'text'  },
+  { key: 'whatsappNumber',label: 'WhatsApp Number',           required: false, type: 'text'  },
+  { key: 'email',         label: 'Parent Email',              required: false, type: 'email' },
+  { key: 'address',       label: 'Address',                   required: false, type: 'text'  },
+  { key: 'occupation',    label: 'Parent Occupation',         required: false, type: 'text'  },
 ];
 
 function generateKey(label) {
@@ -642,6 +655,18 @@ export default function Batches() {
                             <span style={{ padding:'3px 9px', borderRadius:20, fontSize:11, fontWeight:600, background:tc.bg, color:tc.col, border:`1px solid ${tc.col}40` }}>
                               {tc.label}
                             </span>
+                            <button
+                              onClick={async (e) => {
+                                e.stopPropagation();
+                                if (!window.confirm('Delete this schedule slot?')) return;
+                                await deleteBatchSchedule(slot.id);
+                                const sch = await getBatchSchedules(selectedBatch.id);
+                                setSchedules(sch);
+                              }}
+                              style={{ background:'none', border:'none', cursor:'pointer', color:'#EF4444', padding:'4px' }}
+                            >
+                              <Trash2 size={14}/>
+                            </button>
                           </div>
                         );
                       })}

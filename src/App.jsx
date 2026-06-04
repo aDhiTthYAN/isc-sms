@@ -7,7 +7,6 @@ import { Loading } from './components/ui';
 
 import LoginPage       from './pages/Login';
 import Dashboard       from './pages/Dashboard';
-import AdminDashboard  from './pages/AdminDashboard';
 import StaffDashboard  from './pages/StaffDashboard';
 import StudentsPage    from './pages/Students';
 import StudentProfile  from './pages/StudentProfile';
@@ -110,8 +109,7 @@ function GuestGuard() {
 function HomeDashboard() {
   const { profile } = useAuth();
   const role = profile?.role || 'staff';
-  if (role === 'ceo')   return <Dashboard />;
-  if (role === 'admin') return <AdminDashboard />;
+  if (role === 'ceo' || role === 'admin') return <Dashboard />;
   return <StaffDashboard />;
 }
 

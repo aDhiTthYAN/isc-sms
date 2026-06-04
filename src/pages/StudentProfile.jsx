@@ -282,6 +282,14 @@ export default function StudentProfile() {
                   { icon:User,     label:'Staff',        val:student.staffAssigned},
                   { icon:Calendar, label:'Joined',       val:student.joinDate    },
                   { icon:Calendar, label:'Education',    val:student.education   },
+                  { icon:User,     label:'Father',       val:student.fatherName     },
+                  { icon:User,     label:'Mother',       val:student.motherName     },
+                  { icon:BookOpen, label:'School',       val:student.schoolName     },
+                  { icon:Phone,    label:'WhatsApp',     val:student.whatsappNumber },
+                  { icon:MapPin,   label:'Address',      val:student.address        },
+                  { icon:User,     label:'Occupation',   val:student.occupation     },
+                  { icon:User,     label:'Gender',       val:student.gender         },
+                  { icon:Calendar, label:'Age',          val:student.age ? `${student.age} years` : null },
                 ].filter(r => r.val).map(row => {
                   const Icon = row.icon;
                   return (

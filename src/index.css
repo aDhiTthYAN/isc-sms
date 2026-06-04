@@ -124,6 +124,8 @@ input, select, textarea, button {
 .badge-gray   { background: #F3F4F6; color: #374151; }
 .badge-blue   { background: #DBEAFE; color: #1E40AF; }
 .badge-purple { background: #EDE9FE; color: #5B21B6; }
+.badge-orange { background: #FEF3C7; color: #D97706; }
+.badge-pink   { background: #FCE7F3; color: #BE185D; }
 
 /* Table */
 .table-container {

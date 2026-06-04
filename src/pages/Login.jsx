@@ -41,43 +41,21 @@ export default function LoginPage() {
     }}>
       {/* Left panel */}
       <div style={{
-        width: 420, background: '#1A1A2E',
-        display: 'flex', flexDirection: 'column',
-        justifyContent: 'center', padding: '60px 48px',
-        flexShrink: 0
+        flex: 1, background: 'linear-gradient(135deg, #1A1A2E 0%, #16213E 50%, #0F3460 100%)',
+        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+        padding: 48, color: '#fff'
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 48 }}>
-          <div style={{
-            width: 44, height: 44, background: '#E53935',
-            borderRadius: 12, display: 'flex', alignItems: 'center',
-            justifyContent: 'center', fontFamily: 'Space Grotesk',
-            fontWeight: 700, color: '#fff', fontSize: 16
-          }}>ISC</div>
-          <div>
-            <div style={{ color: '#fff', fontFamily: 'Space Grotesk', fontWeight: 600, fontSize: 15 }}>
-              International Skills Club
-            </div>
-            <div style={{ color: 'rgba(255,255,255,0.35)', fontSize: 12 }}>Student Management System</div>
-          </div>
+        <div style={{
+          width: 80, height: 80, borderRadius: 20, background: '#E53935',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontWeight: 900, fontSize: 28, color: '#fff', marginBottom: 24,
+          boxShadow: '0 8px 32px rgba(229,57,53,0.4)'
+        }}>ISC</div>
+        <div style={{ fontSize: 28, fontWeight: 700, marginBottom: 8, textAlign: 'center' }}>
+          International Skills Club
         </div>
-        <h2 style={{ color: '#fff', fontSize: 28, fontWeight: 700, marginBottom: 12 }}>
-          Welcome back
-        </h2>
-        <p style={{ color: 'rgba(255,255,255,0.45)', fontSize: 14, lineHeight: 1.7 }}>
-          Sign in to manage students, track follow-ups, and monitor your team's daily operations.
-        </p>
-        <div style={{ marginTop: 48, display: 'flex', flexDirection: 'column', gap: 16 }}>
-          {[
-            { emoji: '🎓', text: '248 students tracked' },
-            { emoji: '📊', text: 'Real-time CEO dashboard' },
-            { emoji: '📞', text: 'Follow-up management' },
-            { emoji: '📝', text: 'Daily staff reporting' },
-          ].map(item => (
-            <div key={item.text} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <span style={{ fontSize: 18 }}>{item.emoji}</span>
-              <span style={{ color: 'rgba(255,255,255,0.55)', fontSize: 13 }}>{item.text}</span>
-            </div>
-          ))}
+        <div style={{ fontSize: 15, color: 'rgba(255,255,255,0.6)', textAlign: 'center', maxWidth: 320, lineHeight: 1.6 }}>
+          Student Management System — Track progress, manage batches, and monitor onboarding in one place.
         </div>
       </div>
 

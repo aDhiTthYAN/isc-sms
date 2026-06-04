@@ -122,9 +122,10 @@ export const getStudents = async () => {
 
 // ── Follow-ups ─────────────────────────────────────────────────
 export const getFollowUps = async (studentId) => {
-  const q = query(collection(db,'followups'), where('studentId','==',studentId), orderBy('createdAt','desc'));
+  const q = query(collection(db,'followups'), where('studentId','==',studentId));
   const snap = await getDocs(q);
-  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }))
+    .sort((a,b) => (b.createdAt?.seconds||0) - (a.createdAt?.seconds||0));
 };
 
 export const getMyFollowUps = async (staffEmail) => {
@@ -157,15 +158,12 @@ export const getBatch = async (id) => {
   return snap.exists() ? { id: snap.id, ...snap.data() } : null;
 };
 
-export const getBatchStudents = async (batchId, lastDoc = null) => {
-  let q = query(studentsRef(), where('batchId','==',batchId), orderBy('name'), limit(PAGE_SIZE));
-  if (lastDoc) q = query(studentsRef(), where('batchId','==',batchId), orderBy('name'), limit(PAGE_SIZE), startAfter(lastDoc));
+export const getBatchStudents = async (batchId) => {
+  const q = query(studentsRef(), where('batchId','==',batchId), limit(200));
   const snap = await getDocs(q);
-  return {
-    students: snap.docs.map(d => ({ id: d.id, ...d.data() })),
-    lastDoc:  snap.docs[snap.docs.length - 1] || null,
-    hasMore:  snap.docs.length === PAGE_SIZE,
-  };
+  const students = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+    .sort((a,b) => (a.name||'').localeCompare(b.name||''));
+  return { students, lastDoc: snap.docs[snap.docs.length-1]||null, hasMore: false };
 };
 
 export const getBatchStudentCount = async (batchId) => {
@@ -181,9 +179,10 @@ export const updateBatch = async (id, data) =>
 
 // ── Batch Schedules ────────────────────────────────────────────
 export const getBatchSchedules = async (batchId) => {
-  const q = query(collection(db,'schedules'), where('batchId','==',batchId), orderBy('createdAt','asc'));
+  const q = query(collection(db,'schedules'), where('batchId','==',batchId));
   const snap = await getDocs(q);
-  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }))
+    .sort((a,b) => (a.day||'').localeCompare(b.day||'') || (a.time||'').localeCompare(b.time||''));
 };
 
 export const addBatchSchedule = async (data) =>
@@ -197,9 +196,10 @@ export const deleteBatchSchedule = async (id) =>
 
 // ── Batch Tasks ────────────────────────────────────────────────
 export const getBatchTasks = async (batchId) => {
-  const q = query(collection(db,'batchTasks'), where('batchId','==',batchId), orderBy('createdAt','desc'));
+  const q = query(collection(db,'batchTasks'), where('batchId','==',batchId));
   const snap = await getDocs(q);
-  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }))
+    .sort((a,b) => (b.createdAt?.seconds||0) - (a.createdAt?.seconds||0));
 };
 
 export const addBatchTask = async (data) =>
@@ -221,9 +221,10 @@ export const updateBatchTask = async (id, data) =>
 
 // ── Assessments ────────────────────────────────────────────────
 export const getAssessments = async (studentId) => {
-  const q = query(collection(db,'assessments'), where('studentId','==',studentId), orderBy('date','asc'));
+  const q = query(collection(db,'assessments'), where('studentId','==',studentId));
   const snap = await getDocs(q);
-  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }))
+    .sort((a,b) => (a.date||'').localeCompare(b.date||''));
 };
 
 export const getAllAssessments = async () => {
