@@ -279,6 +279,44 @@ export const getMyNotifications = async (email) => {
 export const markNotificationRead = async (id) =>
   updateDoc(doc(db,'notifications', id), { read: true });
 
+export const saveFCMToken = async (userId, token) => {
+  try {
+    await updateDoc(doc(db, 'staff', userId), { fcmToken: token });
+  } catch {}
+};
+
+export const sendPushNotification = async ({ toEmail, title, body }) => {
+  // Fetch target staff's FCM token
+  try {
+    const snap = await getDocs(query(collection(db,'staff'), where('email','==',toEmail)));
+    if (snap.empty) return;
+    const staffDoc = snap.docs[0].data();
+    const token = staffDoc.fcmToken;
+    if (!token) return;
+
+    const serverKey = import.meta.env.VITE_FCM_SERVER_KEY;
+    if (!serverKey) {
+      console.warn('FCM server key not set. Add VITE_FCM_SERVER_KEY to .env');
+      return;
+    }
+
+    await fetch('https://fcm.googleapis.com/fcm/send', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `key=${serverKey}`,
+      },
+      body: JSON.stringify({
+        to: token,
+        notification: { title, body },
+        data: { click_action: 'FLUTTER_NOTIFICATION_CLICK' },
+      }),
+    });
+  } catch (err) {
+    console.warn('Push notification failed:', err.message);
+  }
+};
+
 // ── Daily Reports ──────────────────────────────────────────────
 export const getDailyReports = async () => {
   const q = query(collection(db,'reports'), orderBy('createdAt','desc'), limit(100));

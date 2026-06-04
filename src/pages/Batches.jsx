@@ -96,14 +96,21 @@ export default function Batches() {
   };
 
   const loadBatchDetail = async (batch) => {
-    const [res, sch, tasks] = await Promise.all([
-      getStudentsPaged({ batchId: batch.id }),
-      getBatchSchedules(batch.id),
-      getBatchTasks(batch.id),
-    ]);
-    setBatchStudents(res.students || []);
-    setSchedules(sch || []);
-    setBatchTasks(tasks || []);
+    try {
+      const [res, sch, tasks] = await Promise.all([
+        getStudentsPaged({ batchId: batch.id }).catch(() => ({ students: [] })),
+        getBatchSchedules(batch.id).catch(() => []),
+        getBatchTasks(batch.id).catch(() => []),
+      ]);
+      setBatchStudents(res.students || []);
+      setSchedules(sch || []);
+      setBatchTasks(tasks || []);
+    } catch (err) {
+      console.error('loadBatchDetail error:', err);
+      setBatchStudents([]);
+      setSchedules([]);
+      setBatchTasks([]);
+    }
   };
 
   useEffect(() => { loadBatches(); }, []);

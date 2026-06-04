@@ -88,17 +88,24 @@ export default function StudentProfile() {
   const isCEOorAdmin = profile?.role === 'ceo' || profile?.role === 'admin';
 
   const load = async () => {
-    const [s, b, f, a, st] = await Promise.all([
-      getStudent(id), getBatches(), getFollowUps(id), getAssessments(id), getStaffProfiles()
-    ]);
-    setStudent(s);
-    setBatches(b);
-    setFollowups(f);
-    setAssessments(a);
-    setStaffList(st.filter(x => x.active !== false));
-    setEditForm(s || {});
-    setWeakSubjects(s?.weakSubjects || []);
-    setLoading(false);
+    try {
+      const s  = await getStudent(id).catch(() => null);
+      const b  = await getBatches().catch(() => []);
+      const f  = await getFollowUps(id).catch(() => []);
+      const a  = await getAssessments(id).catch(() => []);
+      const st = await getStaffProfiles().catch(() => []);
+      setStudent(s);
+      setBatches(b);
+      setFollowups(f);
+      setAssessments(a);
+      setStaffList(st.filter(x => x.active !== false));
+      setEditForm(s || {});
+      setWeakSubjects(s?.weakSubjects || []);
+    } catch (err) {
+      console.error('StudentProfile load error:', err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => { load(); }, [id]);
@@ -198,7 +205,13 @@ export default function StudentProfile() {
     setWeakSubjects(prev => prev.includes(sub) ? prev.filter(s => s !== sub) : [...prev, sub]);
   };
 
-  if (loading || !student) return <Loading />;
+  if (loading) return <Loading />;
+  if (!student) return (
+    <div style={{ textAlign:'center', padding:60, color:'#6B7280' }}>
+      <div style={{ fontSize:16, fontWeight:600, marginBottom:8 }}>Student not found</div>
+      <div style={{ fontSize:13 }}>This student may have been deleted or the link is invalid.</div>
+    </div>
+  );
 
   const sub        = subInfo();
   const latestPct  = assessments.length ? assessments[assessments.length - 1].percentage : null;
