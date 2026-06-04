@@ -28,12 +28,11 @@ export default function StudentsPage() {
   const [deleting, setDeleting]       = useState(null);
   const [saving, setSaving]           = useState(false);
   const [form, setForm] = useState({
-  name: '', phone: '', parentName: '', parentPhone: '',
-  email: '', classStd: '', course: '', batchId: '',
-  joinDate: '', location: '', education: '',
-  staffAssigned: '', classplusId: '',
-  courseDurationMonths: '', status: 'active', notes: '',
-});
+    name:'', phone:'', parentPhone:'', email:'',
+    course:'', batchId:'', joiningDate:'', location:'',
+    education:'', staffAssigned:'', classplusId:'',
+    status:'active', notes:'',
+  });
 
   const isCEOorAdmin = profile?.role === 'ceo' || profile?.role === 'admin';
 
@@ -220,181 +219,61 @@ export default function StudentsPage() {
         )}
       </div>
 
-     {/* Add Student Modal */}
-{showModal && (
-  <Modal title="Add New Student" onClose={() => setShowModal(false)} wide>
-    <form onSubmit={handleAdd} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      {/* Add Student Modal */}
+      {showModal && (
+        <Modal title="Add New Student" onClose={() => setShowModal(false)} wide>
+          <form onSubmit={handleAdd} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <FormRow>
+              <div className="form-group"><label className="form-label">Full Name *</label><input className="form-input" required value={form.name} onChange={e => setForm({...form, name: e.target.value})} /></div>
+              <div className="form-group"><label className="form-label">Phone *</label><input className="form-input" required value={form.phone} onChange={e => setForm({...form, phone: e.target.value})} /></div>
+            </FormRow>
+            <FormRow>
+              <div className="form-group"><label className="form-label">Parent Phone</label><input className="form-input" value={form.parentPhone} onChange={e => setForm({...form, parentPhone: e.target.value})} /></div>
+              <div className="form-group"><label className="form-label">Email</label><input className="form-input" type="email" value={form.email} onChange={e => setForm({...form, email: e.target.value})} /></div>
+            </FormRow>
+            <FormRow>
+              <div className="form-group"><label className="form-label">Course *</label>
+                <select className="form-input" required value={form.course} onChange={e => setForm({...form, course: e.target.value})}>
+                  <option value="">Select</option>{COURSES.map(c=><option key={c}>{c}</option>)}
+                </select>
+              </div>
+              <div className="form-group"><label className="form-label">Batch</label>
+                <select className="form-input" value={form.batchId} onChange={e => setForm({...form, batchId: e.target.value})}>
+                  <option value="">Select batch</option>{batches.map(b=><option key={b.id} value={b.id}>{b.name}</option>)}
+                </select>
+              </div>
+            </FormRow>
+            <FormRow>
+              <div className="form-group"><label className="form-label">Location</label><input className="form-input" value={form.location} onChange={e => setForm({...form, location: e.target.value})} /></div>
+              <div className="form-group"><label className="form-label">Staff Assigned</label>
+                <select className="form-input" value={form.staffAssigned} onChange={e => setForm({...form, staffAssigned: e.target.value})}>
+                  <option value="">Select staff</option>{staffList.map(s=><option key={s.id}>{s.name}</option>)}
+                </select>
+              </div>
+            </FormRow>
+            <FormRow>
+              <div className="form-group"><label className="form-label">ClassPlus ID</label><input className="form-input" value={form.classplusId} onChange={e => setForm({...form, classplusId: e.target.value})} /></div>
+              <div className="form-group"><label className="form-label">Joining Date</label><input className="form-input" type="date" value={form.joiningDate} onChange={e => setForm({...form, joiningDate: e.target.value})} /></div>
+            </FormRow>
+            <FormRow>
+              <div className="form-group"><label className="form-label">Education</label><input className="form-input" value={form.education} onChange={e => setForm({...form, education: e.target.value})} /></div>
+              <div className="form-group"><label className="form-label">Status</label>
+                <select className="form-input" value={form.status} onChange={e => setForm({...form, status: e.target.value})}>
+                  {STATUSES.map(s=><option key={s} value={s}>{s}</option>)}
+                </select>
+              </div>
+            </FormRow>
+            <div className="form-group"><label className="form-label">Notes</label><textarea className="form-input" rows={2} value={form.notes} onChange={e => setForm({...form, notes: e.target.value})} /></div>
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 4 }}>
+              <button type="button" className="btn btn-ghost" onClick={() => setShowModal(false)}>Cancel</button>
+              <button type="submit" className="btn btn-primary" disabled={saving}>{saving ? 'Saving...' : 'Add Student'}</button>
+            </div>
+          </form>
+        </Modal>
+      )}
 
-      <FormRow>
-        <div className="form-group">
-          <label className="form-label">Child's Full Name *</label>
-          <input
-            className="form-input"
-            required
-            value={form.name}
-            onChange={e => setForm({ ...form, name: e.target.value })}
-          />
-        </div>
-
-        <div className="form-group">
-          <label className="form-label">Child's Phone</label>
-          <input
-            className="form-input"
-            value={form.phone}
-            onChange={e => setForm({ ...form, phone: e.target.value })}
-          />
-        </div>
-      </FormRow>
-
-      <FormRow>
-        <div className="form-group">
-          <label className="form-label">Parent Name *</label>
-          <input
-            className="form-input"
-            required
-            value={form.parentName}
-            onChange={e => setForm({ ...form, parentName: e.target.value })}
-          />
-        </div>
-
-        <div className="form-group">
-          <label className="form-label">Parent Phone *</label>
-          <input
-            className="form-input"
-            required
-            value={form.parentPhone}
-            onChange={e => setForm({ ...form, parentPhone: e.target.value })}
-          />
-        </div>
-      </FormRow>
-
-      <FormRow>
-        <div className="form-group">
-          <label className="form-label">Class / Standard</label>
-          <input
-            className="form-input"
-            placeholder="e.g. Class 10, Grade 8, 2nd Year"
-            value={form.classStd}
-            onChange={e => setForm({ ...form, classStd: e.target.value })}
-          />
-        </div>
-
-        <div className="form-group">
-          <label className="form-label">Email</label>
-          <input
-            className="form-input"
-            type="email"
-            value={form.email}
-            onChange={e => setForm({ ...form, email: e.target.value })}
-          />
-        </div>
-      </FormRow>
-
-      <FormRow>
-        <div className="form-group">
-          <label className="form-label">Course *</label>
-          <select
-            className="form-input"
-            required
-            value={form.course}
-            onChange={e => setForm({ ...form, course: e.target.value })}
-          >
-            <option value="">Select</option>
-            {COURSES.map(c => (
-              <option key={c}>{c}</option>
-            ))}
-          </select>
-        </div>
-
-        <div className="form-group">
-          <label className="form-label">Batch</label>
-          <select
-            className="form-input"
-            value={form.batchId}
-            onChange={e => setForm({ ...form, batchId: e.target.value })}
-          >
-            <option value="">Select batch</option>
-            {batches.map(b => (
-              <option key={b.id} value={b.id}>
-                {b.name}
-              </option>
-            ))}
-          </select>
-        </div>
-      </FormRow>
-
-      <FormRow>
-        <div className="form-group">
-          <label className="form-label">Join Date</label>
-          <input
-            className="form-input"
-            type="date"
-            value={form.joinDate}
-            onChange={e => setForm({ ...form, joinDate: e.target.value })}
-          />
-        </div>
-
-        <div className="form-group">
-          <label className="form-label">Course Duration (months)</label>
-          <input
-            className="form-input"
-            type="number"
-            placeholder="e.g. 6"
-            value={form.courseDurationMonths}
-            onChange={e => setForm({ ...form, courseDurationMonths: e.target.value })}
-          />
-        </div>
-      </FormRow>
-
-      <FormRow>
-        <div className="form-group">
-          <label className="form-label">Location</label>
-          <input
-            className="form-input"
-            value={form.location}
-            onChange={e => setForm({ ...form, location: e.target.value })}
-          />
-        </div>
-
-        <div className="form-group">
-          <label className="form-label">Staff Assigned</label>
-          <select
-            className="form-input"
-            value={form.staffAssigned}
-            onChange={e => setForm({ ...form, staffAssigned: e.target.value })}
-          >
-            <option value="">Select staff</option>
-            {staffList.map(s => (
-              <option key={s.id}>{s.name}</option>
-            ))}
-          </select>
-        </div>
-      </FormRow>
-
-      <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 4 }}>
-        <button
-          type="button"
-          className="btn btn-ghost"
-          onClick={() => setShowModal(false)}
-        >
-          Cancel
-        </button>
-
-        <button
-          type="submit"
-          className="btn btn-primary"
-          disabled={saving}
-        >
-          {saving ? 'Saving...' : 'Add Student'}
-        </button>
-      </div>
-
-    </form>
-  </Modal>
-)}
-
+      {deleting && <Confirm message="Delete this student? This cannot be undone." onConfirm={handleDelete} onCancel={() => setDeleting(null)} />}
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
-      {deleting && <Confirm title="Delete Student?" message="This action cannot be undone." onConfirm={handleDelete} onCancel={() => setDeleting(null)} />}
     </div>
   );
 }
