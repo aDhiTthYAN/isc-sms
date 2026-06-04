@@ -220,7 +220,7 @@ export default function StudentProfile() {
       {/* Page header */}
       <div className="page-header">
         <div style={{ display:'flex', alignItems:'center', gap:12 }}>
-          <button className="btn btn-ghost btn-sm btn-icon" onClick={() => navigate('/students')}>
+          <button className="btn btn-ghost btn-sm btn-icon" onClick={() => navigate(-1)}>
             <ArrowLeft size={16}/>
           </button>
           <div>
@@ -290,6 +290,8 @@ export default function StudentProfile() {
                   { icon:User,     label:'Occupation',   val:student.occupation     },
                   { icon:User,     label:'Gender',       val:student.gender         },
                   { icon:Calendar, label:'Age',          val:student.age ? `${student.age} years` : null },
+                  { icon:BookOpen, label:'VARK Style',   val:student.varkResult     },
+                  { icon:BookOpen, label:'Syllabus',     val:student.syllabus       },
                 ].filter(r => r.val).map(row => {
                   const Icon = row.icon;
                   return (

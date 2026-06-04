@@ -45,12 +45,7 @@ export default function LoginPage() {
         display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
         padding: 48, color: '#fff'
       }}>
-        <div style={{
-          width: 80, height: 80, borderRadius: 20, background: '#E53935',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontWeight: 900, fontSize: 28, color: '#fff', marginBottom: 24,
-          boxShadow: '0 8px 32px rgba(229,57,53,0.4)'
-        }}>ISC</div>
+        <img src="/logo.svg" alt="ISC" style={{ width:80, height:80, borderRadius:20, marginBottom:24, boxShadow:'0 8px 32px rgba(229,57,53,0.4)' }}/>
         <div style={{ fontSize: 28, fontWeight: 700, marginBottom: 8, textAlign: 'center' }}>
           International Skills Club
         </div>

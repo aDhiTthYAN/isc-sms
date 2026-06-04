@@ -32,15 +32,10 @@ export default function Sidebar({ navItems = [], sidebarColor = '#1A1A2E', roleL
       {/* Logo */}
       <div style={{ padding: '18px 16px 14px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div style={{
-            width: 38, height: 38, background: '#E53935',
-            borderRadius: 10, display: 'flex', alignItems: 'center',
-            justifyContent: 'center', fontFamily: 'Space Grotesk, system-ui',
-            fontWeight: 700, color: '#fff', fontSize: 13, flexShrink: 0,
-          }}>ISC</div>
+          <img src="/logo.svg" alt="ISC" style={{ width:38, height:38, borderRadius:10, flexShrink:0 }} />
           <div>
-            <div style={{ color: '#fff', fontWeight: 600, fontSize: 12.5 }}>Int'l Skills Club</div>
-            <div style={{ color: 'rgba(255,255,255,0.35)', fontSize: 10 }}>Management System</div>
+            <div style={{ fontWeight:700, fontSize:13, color:'#fff', lineHeight:1.2 }}>Int'l Skills Club</div>
+            <div style={{ fontSize:10, color:'rgba(255,255,255,0.5)' }}>Management System</div>
           </div>
         </div>
       </div>

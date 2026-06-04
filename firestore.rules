@@ -76,5 +76,9 @@ service cloud.firestore {
     match /leads/{doc} {
       allow read, write: if isAuth();
     }
+
+    match /attendance/{doc} {
+      allow read, write: if isAuth();
+    }
   }
 }

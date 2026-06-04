@@ -4,7 +4,8 @@ import {
   getBatches, addBatch, updateBatch,
   getBatchStudents, addStudent, bulkAddStudents, getBatchStudentCount,
   getStaffProfiles, getBatchSchedules, addBatchSchedule, deleteBatchSchedule,
-  getBatchTasks, addBatchTask, markTaskSubmitted
+  getBatchTasks, addBatchTask, markTaskSubmitted,
+  updateScheduleStatus, saveAttendance
 } from '../firebase/services';
 import { Modal, Toast, Loading, FormRow, Avatar, StatusBadge } from '../components/ui';
 import { useAuth } from '../context/AuthContext';
@@ -50,6 +51,8 @@ const DEFAULT_STUDENT_FIELDS = [
   { key: 'email',         label: 'Parent Email',              required: false, type: 'email' },
   { key: 'address',       label: 'Address',                   required: false, type: 'text'  },
   { key: 'occupation',    label: 'Parent Occupation',         required: false, type: 'text'  },
+  { key: 'varkResult',   label: 'VARK Learning Style',       required: false, type: 'text'  },
+  { key: 'syllabus',     label: 'Syllabus (CBSE/STATE/ICSE)',required: false, type: 'text'  },
 ];
 
 function generateKey(label) {
@@ -119,6 +122,9 @@ export default function Batches() {
   const [showFlowConfig,  setShowFlowConfig]  = useState(false);
   const [showFieldConfig, setShowFieldConfig] = useState(false);
   const [showSubjectConfig, setShowSubjectConfig] = useState(false);
+  const [showAttendance,  setShowAttendance]  = useState(null);
+  const [attendanceCsv,   setAttendanceCsv]   = useState(null);
+  const attendanceFileRef = useRef();
 
   // Batch create form
   const [createForm, setCreateForm] = useState({
@@ -139,6 +145,11 @@ export default function Batches() {
   const [taskForm, setTaskForm] = useState({
     title:'', subject:'', description:'', dueDate:'', assignedFaculty:''
   });
+
+  // Student search/filter/pagination
+  const [studentSearch, setStudentSearch] = useState('');
+  const [studentStatusFilter, setStudentStatusFilter] = useState('');
+  const [studentPage, setStudentPage] = useState(0);
 
   // Course flow config editor state
   const [editFlow, setEditFlow] = useState([]);
@@ -182,6 +193,9 @@ export default function Batches() {
   const openBatch = async (batch) => {
     setSelectedBatch(batch);
     setActiveTab('students');
+    setStudentSearch('');
+    setStudentStatusFilter('');
+    setStudentPage(0);
     // Init dynamic student form from batch fields
     const fields = batch.studentFields || DEFAULT_STUDENT_FIELDS;
     const initForm = {};
@@ -476,59 +490,112 @@ export default function Batches() {
         </div>
 
         {/* ── STUDENTS TAB ── */}
-        {activeTab === 'students' && (
-          <div className="table-container">
-            <table>
-              <thead>
-                <tr>
-                  {batchFields.map(f => <th key={f.key}>{f.label}</th>)}
-                  <th>Staff</th><th>Status</th><th>Onboarding</th><th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {batchStudents.length === 0 && (
-                  <tr><td colSpan={batchFields.length + 4} style={{ textAlign:'center', padding:40 }}>
-                    <div style={{ color:'#6B7280', fontSize:13, marginBottom:12 }}>No students yet.</div>
-                    <div style={{ display:'flex', gap:8, justifyContent:'center' }}>
-                      <button className="btn btn-ghost" onClick={() => setShowBulk(true)}><Upload size={13}/> Import CSV</button>
-                      {isCEOorAdmin && <button className="btn btn-primary" onClick={() => setShowAddStudent(true)}><UserPlus size={13}/> Add Manually</button>}
-                    </div>
-                  </td></tr>
-                )}
-                {batchStudents.map(s => {
-                  const flowDone = batchFlow.filter(step => s.courseFlow?.[step.key]?.done).length;
-                  const onboardDone = batchFlow.length > 0 && flowDone === batchFlow.length;
-                  return (
-                    <tr key={s.id}>
-                      {batchFields.map(f => (
-                        <td key={f.key} style={{ fontSize:13 }}>
-                          {f.key === 'name'
-                            ? <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-                                <Avatar name={s[f.key]||'?'} size="sm"/>
-                                <div style={{ fontWeight:500 }}>{s[f.key]||'—'}</div>
-                              </div>
-                            : s[f.key]||'—'}
-                        </td>
-                      ))}
-                      <td style={{ fontSize:13 }}>{s.staffAssigned||'—'}</td>
-                      <td><StatusBadge status={s.status}/></td>
-                      <td>
-                        <span style={{
-                          fontSize:11, padding:'2px 8px', borderRadius:10, fontWeight:600,
-                          background: onboardDone ? '#D1FAE5' : '#FEF3C7',
-                          color: onboardDone ? '#065F46' : '#92400E',
-                        }}>
-                          {flowDone}/{batchFlow.length} {onboardDone ? '✅' : '⏳'}
-                        </span>
-                      </td>
-                      <td><button className="btn btn-ghost btn-sm" onClick={() => navigate(`/students/${s.id}`)}>View <ChevronRight size={12}/></button></td>
+        {activeTab === 'students' && (() => {
+          const PAGE = 20;
+          const filtered = batchStudents.filter(s => {
+            const matchSearch = !studentSearch ||
+              s.name?.toLowerCase().includes(studentSearch.toLowerCase()) ||
+              s.phone?.includes(studentSearch) ||
+              s.fatherName?.toLowerCase().includes(studentSearch.toLowerCase()) ||
+              s.motherName?.toLowerCase().includes(studentSearch.toLowerCase());
+            const matchStatus = !studentStatusFilter || s.status === studentStatusFilter;
+            return matchSearch && matchStatus;
+          });
+          const pages = Math.ceil(filtered.length / PAGE);
+          const paginated = filtered.slice(studentPage * PAGE, (studentPage + 1) * PAGE);
+
+          return (
+            <div>
+              {/* Search + filter bar */}
+              <div style={{ display:'flex', gap:10, marginBottom:14, flexWrap:'wrap' }}>
+                <input
+                  className="form-input"
+                  style={{ flex:2, minWidth:200 }}
+                  placeholder="Search by name, phone..."
+                  value={studentSearch}
+                  onChange={e => { setStudentSearch(e.target.value); setStudentPage(0); }}
+                />
+                <select className="form-input" style={{ flex:1, minWidth:140 }}
+                  value={studentStatusFilter}
+                  onChange={e => { setStudentStatusFilter(e.target.value); setStudentPage(0); }}>
+                  <option value="">All Status</option>
+                  <option value="active">Active</option>
+                  <option value="moderate">Moderate</option>
+                  <option value="at-risk">At Risk</option>
+                  <option value="dropped">Dropped</option>
+                </select>
+                <div style={{ display:'flex', alignItems:'center', fontSize:12, color:'#6B7280', whiteSpace:'nowrap' }}>
+                  {filtered.length} of {batchStudents.length} students
+                </div>
+              </div>
+
+              <div className="table-container">
+                <table>
+                  <thead>
+                    <tr>
+                      {batchFields.map(f => <th key={f.key}>{f.label}</th>)}
+                      <th>Staff</th><th>Status</th><th>Onboarding</th><th></th>
                     </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
+                  </thead>
+                  <tbody>
+                    {paginated.length === 0 && (
+                      <tr><td colSpan={batchFields.length + 4} style={{ textAlign:'center', padding:40, color:'#6B7280' }}>
+                        {studentSearch || studentStatusFilter ? 'No students match your filter.' : 'No students yet.'}
+                        {!studentSearch && !studentStatusFilter && (
+                          <div style={{ display:'flex', gap:8, justifyContent:'center', marginTop:12 }}>
+                            <button className="btn btn-ghost" onClick={() => setShowBulk(true)}><Upload size={13}/> Import CSV</button>
+                            {isCEOorAdmin && <button className="btn btn-primary" onClick={() => setShowAddStudent(true)}><UserPlus size={13}/> Add Manually</button>}
+                          </div>
+                        )}
+                      </td></tr>
+                    )}
+                    {paginated.map(s => {
+                      const flowDone = batchFlow.filter(step => s.courseFlow?.[step.key]?.done).length;
+                      const onboardDone = batchFlow.length > 0 && flowDone === batchFlow.length;
+                      return (
+                        <tr key={s.id}>
+                          {batchFields.map(f => (
+                            <td key={f.key} style={{ fontSize:13 }}>
+                              {f.key === 'name'
+                                ? <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                                    <Avatar name={s[f.key]||'?'} size="sm"/>
+                                    <div style={{ fontWeight:500 }}>{s[f.key]||'—'}</div>
+                                  </div>
+                                : s[f.key]||'—'}
+                            </td>
+                          ))}
+                          <td style={{ fontSize:13 }}>{s.staffAssigned||'—'}</td>
+                          <td><StatusBadge status={s.status}/></td>
+                          <td>
+                            <span style={{
+                              fontSize:11, padding:'2px 8px', borderRadius:10, fontWeight:600,
+                              background: onboardDone ? '#D1FAE5' : '#FEF3C7',
+                              color: onboardDone ? '#065F46' : '#92400E',
+                            }}>
+                              {flowDone}/{batchFlow.length} {onboardDone ? '✅' : '⏳'}
+                            </span>
+                          </td>
+                          <td><button className="btn btn-ghost btn-sm" onClick={() => navigate(`/students/${s.id}`)}>View <ChevronRight size={12}/></button></td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Pagination */}
+              {pages > 1 && (
+                <div style={{ display:'flex', justifyContent:'center', gap:6, marginTop:14 }}>
+                  <button className="btn btn-ghost btn-sm" disabled={studentPage===0} onClick={() => setStudentPage(p => p-1)}>← Prev</button>
+                  {Array.from({length:pages}, (_,i) => (
+                    <button key={i} className={`btn btn-sm ${studentPage===i?'btn-primary':'btn-ghost'}`} onClick={() => setStudentPage(i)}>{i+1}</button>
+                  ))}
+                  <button className="btn btn-ghost btn-sm" disabled={studentPage===pages-1} onClick={() => setStudentPage(p => p+1)}>Next →</button>
+                </div>
+              )}
+            </div>
+          );
+        })()}
 
         {/* ── ONBOARDING ANALYTICS TAB ── */}
         {activeTab === 'onboarding' && (
@@ -655,6 +722,39 @@ export default function Batches() {
                             <span style={{ padding:'3px 9px', borderRadius:20, fontSize:11, fontWeight:600, background:tc.bg, color:tc.col, border:`1px solid ${tc.col}40` }}>
                               {tc.label}
                             </span>
+
+                            {/* Status badge */}
+                            <div style={{ display:'flex', gap:6, alignItems:'center', flexShrink:0 }}>
+                              {slot.status === 'completed' && <span style={{ fontSize:10, padding:'2px 8px', borderRadius:10, background:'#D1FAE5', color:'#065F46', fontWeight:600 }}>✅ Done</span>}
+                              {slot.status === 'cancelled' && <span style={{ fontSize:10, padding:'2px 8px', borderRadius:10, background:'#FEE2E2', color:'#991B1B', fontWeight:600 }}>❌ Cancelled</span>}
+                              {slot.status === 'rescheduled' && <span style={{ fontSize:10, padding:'2px 8px', borderRadius:10, background:'#FEF3C7', color:'#92400E', fontWeight:600 }}>🔄 Rescheduled</span>}
+                              {!slot.status && <span style={{ fontSize:10, padding:'2px 8px', borderRadius:10, background:'#DBEAFE', color:'#1E40AF', fontWeight:600 }}>📅 Upcoming</span>}
+
+                              <select
+                                style={{ fontSize:11, padding:'2px 6px', borderRadius:6, border:'1px solid #E5E7EB', background:'#fff' }}
+                                value={slot.status || ''}
+                                onChange={async e => {
+                                  const newStatus = e.target.value;
+                                  if (!newStatus) return;
+                                  await updateScheduleStatus(slot.id, newStatus);
+                                  const sch = await getBatchSchedules(selectedBatch.id);
+                                  setSchedules(sch);
+                                }}
+                              >
+                                <option value="">Mark as...</option>
+                                <option value="completed">✅ Completed</option>
+                                <option value="cancelled">❌ Cancelled</option>
+                                <option value="rescheduled">🔄 Rescheduled</option>
+                              </select>
+
+                              <button
+                                style={{ fontSize:10, padding:'2px 8px', borderRadius:6, background:'#EDE9FE', color:'#6D28D9', border:'none', cursor:'pointer', fontWeight:600 }}
+                                onClick={(e) => { e.stopPropagation(); setShowAttendance(slot); }}
+                              >
+                                📋 Attendance
+                              </button>
+                            </div>
+
                             <button
                               onClick={async (e) => {
                                 e.stopPropagation();
@@ -1228,6 +1328,63 @@ export default function Batches() {
               <button type="submit" className="btn btn-primary" disabled={saving}>{saving?'Creating...':'Create Batch'}</button>
             </div>
           </form>
+        </Modal>
+      )}
+
+      {/* Attendance Modal */}
+      {showAttendance && (
+        <Modal title={`Attendance — ${showAttendance.title}`} onClose={() => { setShowAttendance(null); setAttendanceCsv(null); }}>
+          <div style={{ fontSize:12, color:'#6B7280', marginBottom:14 }}>
+            Upload a CSV with columns: <strong>name, phone, present</strong> (present = yes/no).<br/>
+            Or share a Google Form with students and export the responses as CSV.
+          </div>
+          <input ref={attendanceFileRef} type="file" accept=".csv" style={{ display:'none' }}
+            onChange={async e => {
+              const text = await e.target.files[0]?.text();
+              if (!text) return;
+              const lines = text.trim().split('\n');
+              const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+              const records = lines.slice(1).map(line => {
+                const vals = line.split(',').map(v => v.trim());
+                const obj = {};
+                headers.forEach((h, i) => { obj[h] = vals[i] || ''; });
+                return obj;
+              }).filter(r => r.name || r.phone);
+              setAttendanceCsv(records);
+            }}
+          />
+          <div onClick={() => attendanceFileRef.current.click()} style={{
+            border:'2px dashed #E5E7EB', borderRadius:8, padding:20, textAlign:'center',
+            cursor:'pointer', background:'#FAFAFA', marginBottom:12
+          }}>
+            <div style={{ fontSize:13 }}>{attendanceCsv ? `${attendanceCsv.length} records loaded` : 'Click to upload attendance CSV'}</div>
+          </div>
+          {attendanceCsv && (
+            <div style={{ maxHeight:200, overflow:'auto', marginBottom:12 }}>
+              {attendanceCsv.map((r, i) => (
+                <div key={i} style={{ display:'flex', justifyContent:'space-between', padding:'6px 10px', background: r.present?.toLowerCase()==='yes'?'#F0FDF4':'#FFF8F8', borderRadius:6, marginBottom:4, fontSize:12 }}>
+                  <span>{r.name || r.phone}</span>
+                  <span style={{ fontWeight:600, color: r.present?.toLowerCase()==='yes'?'#10B981':'#EF4444' }}>
+                    {r.present?.toLowerCase()==='yes' ? '✅ Present' : '❌ Absent'}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+          <div style={{ display:'flex', gap:10, justifyContent:'flex-end' }}>
+            <button className="btn btn-ghost" onClick={() => { setShowAttendance(null); setAttendanceCsv(null); }}>Cancel</button>
+            <button className="btn btn-primary" disabled={!attendanceCsv || saving}
+              onClick={async () => {
+                setSaving(true);
+                await saveAttendance(showAttendance.id, selectedBatch.id, attendanceCsv);
+                setToast({ message:'Attendance saved!', type:'success' });
+                setShowAttendance(null);
+                setAttendanceCsv(null);
+                setSaving(false);
+              }}>
+              {saving ? 'Saving...' : 'Save Attendance'}
+            </button>
+          </div>
         </Modal>
       )}
 

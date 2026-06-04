@@ -380,3 +380,19 @@ export const getStaffBySubject = async (subject) => {
     .map(d => ({ id: d.id, ...d.data() }))
     .filter(s => s.subjects?.includes(subject) && s.active !== false);
 };
+// ── Schedule status & Attendance ───────────────────────────────
+export const updateScheduleStatus = async (scheduleId, status, note = '') =>
+  updateDoc(doc(db,'schedules', scheduleId), { status, statusNote: note, statusUpdatedAt: new Date().toISOString() });
+
+export const saveAttendance = async (scheduleId, batchId, attendanceData) =>
+  addDoc(collection(db,'attendance'), {
+    scheduleId, batchId,
+    records: attendanceData,
+    createdAt: serverTimestamp(),
+  });
+
+export const getSessionAttendance = async (scheduleId) => {
+  const q = query(collection(db,'attendance'), where('scheduleId','==',scheduleId));
+  const snap = await getDocs(q);
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+};
