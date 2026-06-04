@@ -63,12 +63,16 @@ const NAV_BY_ROLE = {
     { section: 'My Work' },
     { to: '/',            label: 'My Dashboard',     icon: 'LayoutDashboard' },
     { to: '/students',    label: 'My Students',      icon: 'Users'           },
+    { to: '/batches',     label: 'Batches',          icon: 'School'          },
     { to: '/followups',   label: 'My Follow-Ups',    icon: 'PhoneCall'       },
     { to: '/tasks',       label: 'My Tasks',         icon: 'CheckSquare'     },
+    { to: '/assessments', label: 'Assessments',      icon: 'ClipboardList'   },
+    { to: '/concerns',    label: 'Concerns',         icon: 'AlertCircle'     },
     { section: 'Reports' },
     { to: '/reports',     label: 'Daily Report',     icon: 'FileText'        },
     { section: 'Resources' },
     { to: '/leaderboard', label: 'Leaderboard',      icon: 'Trophy'          },
+    { to: '/documents',   label: 'Documents',        icon: 'FolderOpen'      },
   ],
 };
 
