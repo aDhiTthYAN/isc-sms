@@ -396,3 +396,11 @@ export const getSessionAttendance = async (scheduleId) => {
   const snap = await getDocs(q);
   return snap.docs.map(d => ({ id: d.id, ...d.data() }));
 };
+
+// Save attendance record (new signature for CSV upload modal)
+export const saveAttendanceRecord = async (data) =>
+  addDoc(collection(db,'attendance'), { ...data, savedAt: serverTimestamp() });
+
+// Mark schedule status (update)
+export const markScheduleStatus = async (scheduleId, status) =>
+  updateDoc(doc(db,'schedules', scheduleId), { status, updatedAt: serverTimestamp() });

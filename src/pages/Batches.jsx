@@ -5,13 +5,14 @@ import {
   getBatchStudents, addStudent, bulkAddStudents, getBatchStudentCount,
   getStaffProfiles, getBatchSchedules, addBatchSchedule, deleteBatchSchedule,
   getBatchTasks, addBatchTask, markTaskSubmitted,
-  updateScheduleStatus, saveAttendance
+  updateScheduleStatus, saveAttendance, getSessionAttendance
 } from '../firebase/services';
 import { Modal, Toast, Loading, FormRow, Avatar, StatusBadge } from '../components/ui';
 import { useAuth } from '../context/AuthContext';
 import {
   Plus, Upload, UserPlus, ChevronRight, ArrowLeft,
-  Download, Calendar, CheckSquare, Users, Clock, Trash2, Edit, Settings
+  Download, CheckSquare, Users, Trash2, Settings,
+  AlertTriangle, CheckCircle, X, Search
 } from 'lucide-react';
 
 const COURSES = ['Python','Data Science','Web Development','Machine Learning','Digital Marketing','UI/UX Design','Cyber Security','ISC Level 1','ISC Level 2','AI Batch','Other'];
@@ -51,8 +52,8 @@ const DEFAULT_STUDENT_FIELDS = [
   { key: 'email',         label: 'Parent Email',              required: false, type: 'email' },
   { key: 'address',       label: 'Address',                   required: false, type: 'text'  },
   { key: 'occupation',    label: 'Parent Occupation',         required: false, type: 'text'  },
-  { key: 'varkResult',   label: 'VARK Learning Style',       required: false, type: 'text'  },
-  { key: 'syllabus',     label: 'Syllabus (CBSE/STATE/ICSE)',required: false, type: 'text'  },
+  { key: 'varkResult',    label: 'VARK Learning Style',       required: false, type: 'text'  },
+  { key: 'syllabus',      label: 'Syllabus (CBSE/STATE/ICSE)',required: false, type: 'text'  },
 ];
 
 function generateKey(label) {
@@ -78,11 +79,8 @@ function downloadTemplate(batchName, fields) {
   const example = fields.map(f => {
     if (f.key === 'name') return 'Fathima Aysha';
     if (f.key === 'phone') return '+91 98432 11234';
-    if (f.key === 'parentName') return 'Abdul Raheem';
-    if (f.key === 'parentPhone') return '+91 94432 98765';
     if (f.key === 'email') return 'fathima@email.com';
     if (f.key === 'classStd') return 'Class 10';
-    if (f.key === 'location') return 'Kochi';
     return '';
   });
   const blob = new Blob([headers.join(',')+'\n'+example.join(',')], { type:'text/csv' });
@@ -90,6 +88,82 @@ function downloadTemplate(batchName, fields) {
   a.href = URL.createObjectURL(blob);
   a.download = `${batchName||'batch'}_template.csv`;
   a.click();
+}
+
+// ─── Onboarding Step Side Panel ───────────────────────────────────────────────
+function OnboardingStepPanel({ step, onClose }) {
+  const [tab, setTab] = useState('not');
+  if (!step) return null;
+  return (
+    <div style={{
+      position: 'fixed', top: 0, right: 0, width: 420, height: '100vh',
+      background: '#fff', boxShadow: '-4px 0 24px rgba(0,0,0,0.12)',
+      zIndex: 1000, display: 'flex', flexDirection: 'column',
+    }}>
+      <div style={{ padding: '18px 20px', borderBottom: '1px solid #E5E7EB', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div>
+          <div style={{ fontWeight: 700, fontSize: 15, color: '#1A1A2E' }}>{step.label}</div>
+          <div style={{ fontSize: 12, color: '#9CA3AF', textTransform: 'capitalize' }}>{step.phase} phase</div>
+        </div>
+        <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9CA3AF', padding: 4 }}><X size={18} /></button>
+      </div>
+      <div style={{ display: 'flex', gap: 0, borderBottom: '1px solid #E5E7EB' }}>
+        {[
+          { key: 'completed', label: `Completed (${step.completedStudents?.length || 0})`, color: '#10B981' },
+          { key: 'not',       label: `Not Completed (${step.notCompletedStudents?.length || 0})`, color: '#EF4444' },
+        ].map(t => (
+          <button
+            key={t.key}
+            onClick={() => setTab(t.key)}
+            style={{
+              flex: 1, padding: '10px 0', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+              background: 'none', border: 'none', borderBottom: tab === t.key ? `2px solid ${t.color}` : '2px solid transparent',
+              color: tab === t.key ? t.color : '#9CA3AF', transition: 'all 0.15s',
+            }}
+          >{t.label}</button>
+        ))}
+      </div>
+      <div style={{ flex: 1, overflowY: 'auto', padding: '12px 16px' }}>
+        {tab === 'completed' && (
+          <>
+            {(step.completedStudents || []).length === 0 && (
+              <div style={{ color: '#9CA3AF', fontSize: 13, textAlign: 'center', paddingTop: 40 }}>No students completed yet.</div>
+            )}
+            {(step.completedStudents || []).map(s => (
+              <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 10px', borderRadius: 8, marginBottom: 4, background: '#F0FDF4' }}>
+                <div style={{ width: 28, height: 28, borderRadius: '50%', background: '#D1FAE5', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: '#065F46', flexShrink: 0 }}>
+                  {(s.name || '?').charAt(0).toUpperCase()}
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 13, fontWeight: 500 }}>{s.name}</div>
+                  <div style={{ fontSize: 11, color: '#9CA3AF' }}>{s.phone || '—'}</div>
+                </div>
+                <CheckCircle size={14} style={{ color: '#10B981', flexShrink: 0 }} />
+              </div>
+            ))}
+          </>
+        )}
+        {tab === 'not' && (
+          <>
+            {(step.notCompletedStudents || []).length === 0 && (
+              <div style={{ color: '#9CA3AF', fontSize: 13, textAlign: 'center', paddingTop: 40 }}>All students completed this step!</div>
+            )}
+            {(step.notCompletedStudents || []).map(s => (
+              <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 10px', borderRadius: 8, marginBottom: 4, background: '#FFF8F8' }}>
+                <div style={{ width: 28, height: 28, borderRadius: '50%', background: '#FEE2E2', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: '#E53935', flexShrink: 0 }}>
+                  {(s.name || '?').charAt(0).toUpperCase()}
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 13, fontWeight: 500 }}>{s.name}</div>
+                  <div style={{ fontSize: 11, color: '#9CA3AF' }}>{s.phone || '—'} · Staff: {s.staffAssigned || '—'}</div>
+                </div>
+              </div>
+            ))}
+          </>
+        )}
+      </div>
+    </div>
+  );
 }
 
 export default function Batches() {
@@ -118,13 +192,25 @@ export default function Batches() {
   const [showBulk,        setShowBulk]        = useState(false);
   const [showSchedule,    setShowSchedule]    = useState(false);
   const [showTask,        setShowTask]        = useState(false);
-  const [showTaskDetail,  setShowTaskDetail]  = useState(null);
   const [showFlowConfig,  setShowFlowConfig]  = useState(false);
   const [showFieldConfig, setShowFieldConfig] = useState(false);
   const [showSubjectConfig, setShowSubjectConfig] = useState(false);
   const [showAttendance,  setShowAttendance]  = useState(null);
   const [attendanceCsv,   setAttendanceCsv]   = useState(null);
+  const [attendancePreview, setAttendancePreview] = useState(null);
+  const [attendanceSaved, setAttendanceSaved] = useState({});
   const attendanceFileRef = useRef();
+
+  // Onboarding analytics side panel
+  const [selectedStep, setSelectedStep]     = useState(null);
+
+  // Task split panel
+  const [selectedTask, setSelectedTask]     = useState(null);
+  const [taskFilter, setTaskFilter]         = useState('all');
+  const [taskSearch, setTaskSearch]         = useState('');
+
+  // Overdue class confirmation dialog
+  const [overdueConfirm, setOverdueConfirm] = useState(null);
 
   // Batch create form
   const [createForm, setCreateForm] = useState({
@@ -135,7 +221,6 @@ export default function Batches() {
     subjects: [],
   });
 
-  // Dynamic student form based on batch fields
   const [studentForm, setStudentForm] = useState({});
 
   const [scheduleForm, setScheduleForm] = useState({
@@ -146,18 +231,12 @@ export default function Batches() {
     title:'', subject:'', description:'', dueDate:'', assignedFaculty:''
   });
 
-  // Student search/filter/pagination
   const [studentSearch, setStudentSearch] = useState('');
   const [studentStatusFilter, setStudentStatusFilter] = useState('');
   const [studentPage, setStudentPage] = useState(0);
 
-  // Course flow config editor state
-  const [editFlow, setEditFlow] = useState([]);
-
-  // Student fields config editor state
-  const [editFields, setEditFields] = useState([]);
-
-  // Subject config editor state
+  const [editFlow, setEditFlow]         = useState([]);
+  const [editFields, setEditFields]     = useState([]);
   const [editSubjects, setEditSubjects] = useState([]);
 
   const loadBatches = async () => {
@@ -182,9 +261,7 @@ export default function Batches() {
       setBatchTasks(tasks || []);
     } catch (err) {
       console.error('loadBatchDetail error:', err);
-      setBatchStudents([]);
-      setSchedules([]);
-      setBatchTasks([]);
+      setBatchStudents([]); setSchedules([]); setBatchTasks([]);
     }
   };
 
@@ -196,7 +273,7 @@ export default function Batches() {
     setStudentSearch('');
     setStudentStatusFilter('');
     setStudentPage(0);
-    // Init dynamic student form from batch fields
+    setSelectedTask(null);
     const fields = batch.studentFields || DEFAULT_STUDENT_FIELDS;
     const initForm = {};
     fields.forEach(f => { initForm[f.key] = ''; });
@@ -207,16 +284,14 @@ export default function Batches() {
     await loadBatchDetail(batch);
   };
 
-  // ── Create batch ──────────────────────────────────────────────
+  // ── CRUD handlers ─────────────────────────────────────────────
   const handleCreateBatch = async (e) => {
-    e.preventDefault();
-    setSaving(true);
+    e.preventDefault(); setSaving(true);
     await addBatch(createForm);
-    setToast({ message: `Batch "${createForm.name}" created!`, type:'success' });
+    setToast({ message:`Batch "${createForm.name}" created!`, type:'success' });
     setShowCreate(false);
-    setCreateForm({ name:'', course:'', mentor:'', faculties:[], startDate:'', endDate:'', status:'upcoming', maxSeats:'', courseDurationMonths:'', courseFlow: DEFAULT_COURSE_FLOW, studentFields: DEFAULT_STUDENT_FIELDS, subjects: [] });
-    await loadBatches();
-    setSaving(false);
+    setCreateForm({ name:'', course:'', mentor:'', faculties:[], startDate:'', endDate:'', status:'upcoming', maxSeats:'', courseDurationMonths:'', courseFlow:DEFAULT_COURSE_FLOW, studentFields:DEFAULT_STUDENT_FIELDS, subjects:[] });
+    await loadBatches(); setSaving(false);
   };
 
   const toggleFaculty = (name) => {
@@ -228,25 +303,15 @@ export default function Batches() {
     }));
   };
 
-  // ── Add single student (dynamic fields) ──────────────────────
   const handleAddStudent = async (e) => {
-    e.preventDefault();
-    setSaving(true);
-    await addStudent({
-      ...studentForm,
-      batchId:             selectedBatch.id,
-      batchName:           selectedBatch.name,
-      course:              selectedBatch.course,
-      courseDurationMonths:selectedBatch.courseDurationMonths || '',
-    });
-    setToast({ message:'Student added to batch!', type:'success' });
+    e.preventDefault(); setSaving(true);
+    await addStudent({ ...studentForm, batchId:selectedBatch.id, batchName:selectedBatch.name, course:selectedBatch.course, courseDurationMonths:selectedBatch.courseDurationMonths||'' });
+    setToast({ message:'Student added!', type:'success' });
     setShowAddStudent(false);
     const fields = selectedBatch.studentFields || DEFAULT_STUDENT_FIELDS;
     const initForm = {};
     fields.forEach(f => { initForm[f.key] = ''; });
-    initForm.staffAssigned = '';
-    initForm.joinDate = '';
-    initForm.status = 'active';
+    initForm.staffAssigned = ''; initForm.joinDate = ''; initForm.status = 'active';
     setStudentForm(initForm);
     await loadBatchDetail(selectedBatch);
     const c = await getBatchStudentCount(selectedBatch.id);
@@ -254,102 +319,70 @@ export default function Batches() {
     setSaving(false);
   };
 
-  // ── Bulk import (dynamic fields) ─────────────────────────────
   const handleBulkImport = async () => {
-    if (!csvPreview) return;
-    setImporting(true);
+    if (!csvPreview) return; setImporting(true);
     const fields = selectedBatch.studentFields || DEFAULT_STUDENT_FIELDS;
     const students = csvPreview.map(row => {
-      const obj = {
-        batchId: selectedBatch.id,
-        batchName: selectedBatch.name,
-        course: selectedBatch.course,
-        courseDurationMonths: selectedBatch.courseDurationMonths || '',
-        status: row.status || 'active',
-      };
+      const obj = { batchId:selectedBatch.id, batchName:selectedBatch.name, course:selectedBatch.course, courseDurationMonths:selectedBatch.courseDurationMonths||'', status:row.status||'active' };
       fields.forEach(f => {
-        const csvKey = f.key.toLowerCase().replace(/[^a-z0-9]/g, '');
-        obj[f.key] = row[csvKey] || row[f.key] || '';
+        const csvKey = f.key.toLowerCase().replace(/[^a-z0-9]/g,'');
+        obj[f.key] = row[csvKey]||row[f.key]||'';
       });
       return obj;
     });
     const res = await bulkAddStudents(students);
-    setToast({ message:`Imported ${res.success} students into ${selectedBatch.name}!`, type:'success' });
-    setShowBulk(false);
-    setCsvPreview(null);
-    setImporting(false);
+    setToast({ message:`Imported ${res.success} students!`, type:'success' });
+    setShowBulk(false); setCsvPreview(null); setImporting(false);
     await loadBatchDetail(selectedBatch);
     const c = await getBatchStudentCount(selectedBatch.id);
     setBatchCounts(prev => ({ ...prev, [selectedBatch.id]: c }));
   };
 
-  // ── Save course flow config ───────────────────────────────────
   const handleSaveFlowConfig = async () => {
     setSaving(true);
-    await updateBatch(selectedBatch.id, { courseFlow: editFlow });
-    const updated = { ...selectedBatch, courseFlow: editFlow };
-    setSelectedBatch(updated);
-    setBatches(prev => prev.map(b => b.id === selectedBatch.id ? updated : b));
-    setShowFlowConfig(false);
-    setToast({ message:'Course flow updated!', type:'success' });
-    setSaving(false);
+    await updateBatch(selectedBatch.id, { courseFlow:editFlow });
+    const updated = { ...selectedBatch, courseFlow:editFlow };
+    setSelectedBatch(updated); setBatches(prev => prev.map(b => b.id===selectedBatch.id?updated:b));
+    setShowFlowConfig(false); setToast({ message:'Course flow updated!', type:'success' }); setSaving(false);
   };
 
-  // ── Save student fields config ────────────────────────────────
   const handleSaveFieldConfig = async () => {
     setSaving(true);
-    await updateBatch(selectedBatch.id, { studentFields: editFields });
-    const updated = { ...selectedBatch, studentFields: editFields };
-    setSelectedBatch(updated);
-    setBatches(prev => prev.map(b => b.id === selectedBatch.id ? updated : b));
-    setShowFieldConfig(false);
-    setToast({ message:'Student fields updated!', type:'success' });
-    setSaving(false);
+    await updateBatch(selectedBatch.id, { studentFields:editFields });
+    const updated = { ...selectedBatch, studentFields:editFields };
+    setSelectedBatch(updated); setBatches(prev => prev.map(b => b.id===selectedBatch.id?updated:b));
+    setShowFieldConfig(false); setToast({ message:'Student fields updated!', type:'success' }); setSaving(false);
   };
 
-  // ── Save subject config ───────────────────────────────────────
   const handleSaveSubjectConfig = async () => {
     setSaving(true);
-    await updateBatch(selectedBatch.id, { subjects: editSubjects });
-    const updated = { ...selectedBatch, subjects: editSubjects };
-    setSelectedBatch(updated);
-    setBatches(prev => prev.map(b => b.id === selectedBatch.id ? updated : b));
-    setShowSubjectConfig(false);
-    setToast({ message:'Subjects updated!', type:'success' });
-    setSaving(false);
+    await updateBatch(selectedBatch.id, { subjects:editSubjects });
+    const updated = { ...selectedBatch, subjects:editSubjects };
+    setSelectedBatch(updated); setBatches(prev => prev.map(b => b.id===selectedBatch.id?updated:b));
+    setShowSubjectConfig(false); setToast({ message:'Subjects updated!', type:'success' }); setSaving(false);
   };
 
-  // ── Add schedule slot ─────────────────────────────────────────
   const handleAddSchedule = async (e) => {
-    e.preventDefault();
-    setSaving(true);
-    await addBatchSchedule({ ...scheduleForm, batchId: selectedBatch.id, batchName: selectedBatch.name });
+    e.preventDefault(); setSaving(true);
+    await addBatchSchedule({ ...scheduleForm, batchId:selectedBatch.id, batchName:selectedBatch.name });
     setToast({ message:'Schedule added!', type:'success' });
     setShowSchedule(false);
     setScheduleForm({ title:'', day:'Monday', time:'', duration:'60', type:'live-class', facultyName:'', meetLink:'', notes:'' });
     const sch = await getBatchSchedules(selectedBatch.id);
-    setSchedules(sch);
-    setSaving(false);
+    setSchedules(sch); setSaving(false);
   };
 
-  // ── Add batch task ────────────────────────────────────────────
   const handleAddTask = async (e) => {
-    e.preventDefault();
-    setSaving(true);
-    await addBatchTask({
-      ...taskForm,
-      batchId:   selectedBatch.id,
-      batchName: selectedBatch.name,
-      createdBy: profile?.name,
-    });
-    setToast({ message:'Task created for batch!', type:'success' });
+    e.preventDefault(); setSaving(true);
+    await addBatchTask({ ...taskForm, batchId:selectedBatch.id, batchName:selectedBatch.name, createdBy:profile?.name });
+    setToast({ message:'Task created!', type:'success' });
     setShowTask(false);
     setTaskForm({ title:'', subject:'', description:'', dueDate:'', assignedFaculty:'' });
     const tasks = await getBatchTasks(selectedBatch.id);
-    setBatchTasks(tasks);
-    setSaving(false);
+    setBatchTasks(tasks); setSaving(false);
   };
 
+  // ── Helpers ───────────────────────────────────────────────────
   const progress = (batch) => {
     const s = batch.startDate ? new Date(batch.startDate) : null;
     const e = batch.endDate   ? new Date(batch.endDate)   : null;
@@ -358,16 +391,15 @@ export default function Batches() {
   };
 
   const typeColor = (t) => {
-    if (t==='live-class') return { bg:'#DBEAFE', col:'#1E40AF', label:'🔴 Live Class' };
-    if (t==='recorded')   return { bg:'#D1FAE5', col:'#065F46', label:'📹 Recorded' };
-    if (t==='assignment') return { bg:'#FEF3C7', col:'#92400E', label:'📝 Assignment' };
+    if (t==='live-class') return { bg:'#DBEAFE', col:'#1E40AF', label:'Live Class' };
+    if (t==='recorded')   return { bg:'#D1FAE5', col:'#065F46', label:'Recorded' };
+    if (t==='assignment') return { bg:'#FEF3C7', col:'#92400E', label:'Assignment' };
     return { bg:'#F3F4F6', col:'#374151', label: t };
   };
 
-  // ── Course flow analytics ─────────────────────────────────────
   const getFlowAnalytics = () => {
     const flow = selectedBatch?.courseFlow || DEFAULT_COURSE_FLOW;
-    const analytics = flow.map(step => {
+    return flow.map(step => {
       const completed = batchStudents.filter(s => s.courseFlow?.[step.key]?.done);
       const notCompleted = batchStudents.filter(s => !s.courseFlow?.[step.key]?.done);
       return {
@@ -380,14 +412,24 @@ export default function Batches() {
         notCompletedStudents: notCompleted,
       };
     });
-    return analytics;
+  };
+
+  // detect overdue sessions (scheduled but date/time passed — using schedules with no date we check time vs now)
+  const getOverdueSessions = () => {
+    const now = new Date();
+    return schedules.filter(slot => {
+      if (slot.status && slot.status !== 'scheduled') return false; // already marked
+      if (!slot.scheduledDate && !slot.date) return false; // no date set, can't determine
+      const d = new Date(slot.scheduledDate || slot.date);
+      return d < now;
+    });
   };
 
   if (loading) return <Loading/>;
 
-  // ════════════════════════════════════════════════════════════
+  // ══════════════════════════════════════════════════════════════
   // BATCH DETAIL VIEW
-  // ════════════════════════════════════════════════════════════
+  // ══════════════════════════════════════════════════════════════
   if (selectedBatch) {
     const count = batchCounts[selectedBatch.id] || batchStudents.length;
     const pct   = progress(selectedBatch);
@@ -397,20 +439,33 @@ export default function Batches() {
     const batchFields = selectedBatch.studentFields || DEFAULT_STUDENT_FIELDS;
     const batchSubjects = selectedBatch.subjects || [];
     const flowAnalytics = getFlowAnalytics();
-    const fullyOnboarded = batchStudents.filter(s =>
-      batchFlow.every(step => s.courseFlow?.[step.key]?.done)
-    ).length;
+    const fullyOnboarded = batchStudents.filter(s => batchFlow.every(step => s.courseFlow?.[step.key]?.done)).length;
+    const overdueSessions = getOverdueSessions();
+
+    // Task split panel data
+    const currentTask = selectedTask ? batchTasks.find(t => t.id === selectedTask) : null;
+    const taskStudents = batchStudents.filter(s => {
+      if (!currentTask) return false;
+      const submitted = currentTask.submittedBy?.find(x => x.studentId === s.id);
+      if (taskFilter === 'submitted') return !!submitted;
+      if (taskFilter === 'pending')   return !submitted;
+      return true;
+    }).filter(s => !taskSearch || s.name?.toLowerCase().includes(taskSearch.toLowerCase()) || s.phone?.includes(taskSearch));
 
     return (
-      <div>
+      <div style={{ position: 'relative' }}>
+        {/* Backdrop for step panel */}
+        {selectedStep && (
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.2)', zIndex: 999 }} onClick={() => setSelectedStep(null)} />
+        )}
+        <OnboardingStepPanel step={selectedStep} onClose={() => setSelectedStep(null)} />
+
         {/* Header */}
         <div className="page-header">
           <div style={{ display:'flex', alignItems:'center', gap:12 }}>
-            <button className="btn btn-ghost btn-sm btn-icon" onClick={() => setSelectedBatch(null)}>
-              <ArrowLeft size={16}/>
-            </button>
+            <button className="btn btn-ghost btn-sm btn-icon" onClick={() => setSelectedBatch(null)}><ArrowLeft size={16}/></button>
             <div>
-              <h2>{selectedBatch.name}</h2>
+              <h2 style={{ fontSize: 20, fontWeight: 700 }}>{selectedBatch.name}</h2>
               <div style={{ fontSize:13, color:'#6B7280' }}>
                 {selectedBatch.course}
                 {selectedBatch.courseDurationMonths ? ` · ${selectedBatch.courseDurationMonths} months` : ''}
@@ -421,15 +476,9 @@ export default function Batches() {
           <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
             {isCEOorAdmin && (
               <>
-                <button className="btn btn-ghost btn-sm" onClick={() => { setEditFlow([...batchFlow]); setShowFlowConfig(true); }}>
-                  <Settings size={13}/> Course Flow
-                </button>
-                <button className="btn btn-ghost btn-sm" onClick={() => { setEditFields([...batchFields]); setShowFieldConfig(true); }}>
-                  <Settings size={13}/> Student Fields
-                </button>
-                <button className="btn btn-ghost btn-sm" onClick={() => { setEditSubjects([...batchSubjects]); setShowSubjectConfig(true); }}>
-                  <Settings size={13}/> Subjects
-                </button>
+                <button className="btn btn-ghost btn-sm" onClick={() => { setEditFlow([...batchFlow]); setShowFlowConfig(true); }}><Settings size={13}/> Course Flow</button>
+                <button className="btn btn-ghost btn-sm" onClick={() => { setEditFields([...batchFields]); setShowFieldConfig(true); }}><Settings size={13}/> Student Fields</button>
+                <button className="btn btn-ghost btn-sm" onClick={() => { setEditSubjects([...batchSubjects]); setShowSubjectConfig(true); }}><Settings size={13}/> Subjects</button>
               </>
             )}
             {activeTab === 'students' && (
@@ -450,27 +499,27 @@ export default function Batches() {
         {/* Batch info strip */}
         <div style={{ display:'grid', gridTemplateColumns:'repeat(5,1fr)', gap:10, marginBottom:16 }}>
           {[
-            { label:'Total Students',   value:count,                                                color:'#3B82F6', bg:'#DBEAFE' },
-            { label:'Active',           value:batchStudents.filter(s=>s.status==='active').length,  color:'#10B981', bg:'#D1FAE5' },
-            { label:'At Risk',          value:batchStudents.filter(s=>s.status==='at-risk').length, color:'#EF4444', bg:'#FEE2E2' },
-            { label:'Onboarding Done',  value:fullyOnboarded,                                        color:'#8B5CF6', bg:'#EDE9FE' },
-            { label:'Course Progress',  value:`${pct}%`,                                             color:'#E53935', bg:'#FEE2E2' },
+            { label:'Total Students',  value:count,                                                 color:'#0F3460', bg:'#DBEAFE' },
+            { label:'Active',          value:batchStudents.filter(s=>s.status==='active').length,   color:'#10B981', bg:'#D1FAE5' },
+            { label:'At Risk',         value:batchStudents.filter(s=>s.status==='at-risk').length,  color:'#EF4444', bg:'#FEE2E2' },
+            { label:'Onboarding Done', value:fullyOnboarded,                                         color:'#8B5CF6', bg:'#EDE9FE' },
+            { label:'Course Progress', value:`${pct}%`,                                              color:'#E53935', bg:'#FEE2E2' },
           ].map(c => (
-            <div key={c.label} style={{ background:'#fff', borderRadius:10, border:'1px solid #E5E7EB', padding:'10px 14px' }}>
-              <div style={{ fontSize:11, color:'#6B7280', marginBottom:3 }}>{c.label}</div>
-              <div style={{ fontSize:20, fontWeight:700, color:c.color }}>{c.value}</div>
+            <div key={c.label} style={{ background:'#fff', borderRadius:10, border:'1px solid #E5E7EB', padding:'12px 16px', boxShadow:'0 1px 3px rgba(0,0,0,0.06)' }}>
+              <div style={{ fontSize:11, color:'#6B7280', marginBottom:4, fontWeight:500 }}>{c.label}</div>
+              <div style={{ fontSize:22, fontWeight:700, color:c.color }}>{c.value}</div>
             </div>
           ))}
         </div>
 
         {/* Faculties + subjects */}
         <div style={{ marginBottom:14, display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }}>
-          {batchSubjects.length > 0 && batchSubjects.map((s,i) => (
+          {batchSubjects.map((s,i) => (
             <span key={i} style={{ fontSize:11, padding:'3px 10px', borderRadius:10, background:'#EDE9FE', color:'#6D28D9', fontWeight:600 }}>
-              📚 {s.name}{s.facultyName ? ` → ${s.facultyName}` : ''}
+              {s.name}{s.facultyName ? ` → ${s.facultyName}` : ''}
             </span>
           ))}
-          {selectedBatch.faculties?.length > 0 && selectedBatch.faculties.map((f,i) => (
+          {selectedBatch.faculties?.map((f,i) => (
             <span key={i} className="badge badge-blue">{f}</span>
           ))}
         </div>
@@ -478,12 +527,12 @@ export default function Batches() {
         {/* Tab bar */}
         <div className="tab-bar" style={{ marginBottom:16 }}>
           {[
-            { key:'students',  label:`Students (${count})`                      },
-            { key:'onboarding',label:`Onboarding Analytics`                     },
-            { key:'schedule',  label:`Weekly Schedule (${schedules.length})`    },
-            { key:'tasks',     label:`Assignments (${batchTasks.length})`       },
+            { key:'students',   label:`Students (${count})`               },
+            { key:'onboarding', label:'Onboarding Analytics'              },
+            { key:'schedule',   label:`Schedule (${schedules.length})`    },
+            { key:'tasks',      label:`Assignments (${batchTasks.length})` },
           ].map(t => (
-            <div key={t.key} className={`tab ${activeTab===t.key?'active':''}`} onClick={() => setActiveTab(t.key)}>
+            <div key={t.key} className={`tab ${activeTab===t.key?'active':''}`} onClick={() => { setActiveTab(t.key); setSelectedTask(null); }}>
               {t.label}
             </div>
           ))}
@@ -506,18 +555,11 @@ export default function Batches() {
 
           return (
             <div>
-              {/* Search + filter bar */}
               <div style={{ display:'flex', gap:10, marginBottom:14, flexWrap:'wrap' }}>
-                <input
-                  className="form-input"
-                  style={{ flex:2, minWidth:200 }}
-                  placeholder="Search by name, phone..."
-                  value={studentSearch}
-                  onChange={e => { setStudentSearch(e.target.value); setStudentPage(0); }}
-                />
+                <input className="form-input" style={{ flex:2, minWidth:200 }} placeholder="Search by name, phone..."
+                  value={studentSearch} onChange={e => { setStudentSearch(e.target.value); setStudentPage(0); }}/>
                 <select className="form-input" style={{ flex:1, minWidth:140 }}
-                  value={studentStatusFilter}
-                  onChange={e => { setStudentStatusFilter(e.target.value); setStudentPage(0); }}>
+                  value={studentStatusFilter} onChange={e => { setStudentStatusFilter(e.target.value); setStudentPage(0); }}>
                   <option value="">All Status</option>
                   <option value="active">Active</option>
                   <option value="moderate">Moderate</option>
@@ -567,11 +609,7 @@ export default function Batches() {
                           <td style={{ fontSize:13 }}>{s.staffAssigned||'—'}</td>
                           <td><StatusBadge status={s.status}/></td>
                           <td>
-                            <span style={{
-                              fontSize:11, padding:'2px 8px', borderRadius:10, fontWeight:600,
-                              background: onboardDone ? '#D1FAE5' : '#FEF3C7',
-                              color: onboardDone ? '#065F46' : '#92400E',
-                            }}>
+                            <span style={{ fontSize:11, padding:'2px 8px', borderRadius:10, fontWeight:600, background:onboardDone?'#D1FAE5':'#FEF3C7', color:onboardDone?'#065F46':'#92400E' }}>
                               {flowDone}/{batchFlow.length} {onboardDone ? '✅' : '⏳'}
                             </span>
                           </td>
@@ -583,13 +621,13 @@ export default function Batches() {
                 </table>
               </div>
 
-              {/* Pagination */}
               {pages > 1 && (
                 <div style={{ display:'flex', justifyContent:'center', gap:6, marginTop:14 }}>
                   <button className="btn btn-ghost btn-sm" disabled={studentPage===0} onClick={() => setStudentPage(p => p-1)}>← Prev</button>
-                  {Array.from({length:pages}, (_,i) => (
+                  {Array.from({length:Math.min(pages, 7)}, (_,i) => (
                     <button key={i} className={`btn btn-sm ${studentPage===i?'btn-primary':'btn-ghost'}`} onClick={() => setStudentPage(i)}>{i+1}</button>
                   ))}
+                  {pages > 7 && <span style={{ alignSelf:'center', fontSize:12, color:'#9CA3AF' }}>...{pages} total</span>}
                   <button className="btn btn-ghost btn-sm" disabled={studentPage===pages-1} onClick={() => setStudentPage(p => p+1)}>Next →</button>
                 </div>
               )}
@@ -600,96 +638,99 @@ export default function Batches() {
         {/* ── ONBOARDING ANALYTICS TAB ── */}
         {activeTab === 'onboarding' && (
           <div>
-            {/* Summary cards */}
-            <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:12, marginBottom:20 }}>
-              {[
-                { label:'Fully Onboarded',    value:fullyOnboarded,          color:'#10B981', bg:'#D1FAE5' },
-                { label:'In Progress',         value:count - fullyOnboarded,  color:'#F59E0B', bg:'#FEF3C7' },
-                { label:'Total Flow Steps',    value:batchFlow.length,        color:'#3B82F6', bg:'#DBEAFE' },
-              ].map(c => (
-                <div key={c.label} style={{ background:'#fff', borderRadius:10, border:'1px solid #E5E7EB', padding:'14px 18px', textAlign:'center' }}>
-                  <div style={{ fontSize:28, fontWeight:700, color:c.color }}>{c.value}</div>
-                  <div style={{ fontSize:12, color:'#6B7280', marginTop:2 }}>{c.label}</div>
+            {/* Summary Banner */}
+            <div style={{ background: 'linear-gradient(135deg, #1A1A2E 0%, #0F3460 100%)', borderRadius: 14, padding: '22px 28px', marginBottom: 20, display: 'flex', alignItems: 'center', gap: 24 }}>
+              {/* Progress Ring */}
+              <div style={{ flexShrink: 0 }}>
+                <svg width="90" height="90" viewBox="0 0 90 90">
+                  <circle cx="45" cy="45" r="38" fill="none" stroke="rgba(255,255,255,0.12)" strokeWidth="9"/>
+                  <circle cx="45" cy="45" r="38" fill="none" stroke={count > 0 && fullyOnboarded === count ? '#10B981' : '#E53935'}
+                    strokeWidth="9" strokeLinecap="round"
+                    strokeDasharray={`${2 * Math.PI * 38}`}
+                    strokeDashoffset={`${2 * Math.PI * 38 * (1 - (count > 0 ? fullyOnboarded / count : 0))}`}
+                    transform="rotate(-90 45 45)"
+                    style={{ transition: 'stroke-dashoffset 0.6s ease' }}
+                  />
+                  <text x="45" y="49" textAnchor="middle" fontSize="18" fontWeight="700" fill="#fff">
+                    {count > 0 ? Math.round(fullyOnboarded / count * 100) : 0}%
+                  </text>
+                </svg>
+              </div>
+              <div style={{ color: '#fff' }}>
+                <div style={{ fontSize: 22, fontWeight: 700, marginBottom: 4 }}>
+                  {fullyOnboarded} of {count} students completed full onboarding
                 </div>
-              ))}
-            </div>
-
-            {/* Per-step breakdown */}
-            <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
-              {flowAnalytics.map((step, idx) => (
-                <div key={step.key} className="card">
-                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
-                    <div style={{ display:'flex', alignItems:'center', gap:10 }}>
-                      <span style={{ width:24, height:24, borderRadius:'50%', background:'#E53935', color:'#fff', fontSize:11, fontWeight:700, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>{idx+1}</span>
-                      <div>
-                        <div style={{ fontWeight:600, fontSize:13 }}>{step.label}</div>
-                        <div style={{ fontSize:11, color:'#6B7280', textTransform:'capitalize' }}>{step.phase} phase</div>
-                      </div>
-                    </div>
-                    <div style={{ textAlign:'right' }}>
-                      <div style={{ fontSize:18, fontWeight:700, color: step.pct===100?'#10B981':step.pct>50?'#F59E0B':'#EF4444' }}>{step.pct}%</div>
-                      <div style={{ fontSize:11, color:'#6B7280' }}>{step.completed}/{step.total} done</div>
-                    </div>
-                  </div>
-                  <div className="progress-bar" style={{ marginBottom:10 }}>
-                    <div className="progress-fill" style={{ width:`${step.pct}%`, background: step.pct===100?'#10B981':step.pct>50?'#F59E0B':'#EF4444' }}/>
-                  </div>
-
-                  {/* Not completed students */}
-                  {step.notCompleted > 0 && (
-                    <div>
-                      <div style={{ fontSize:11, fontWeight:600, color:'#EF4444', marginBottom:4 }}>
-                        ⏳ {step.notCompleted} student{step.notCompleted>1?'s':''} yet to complete:
-                      </div>
-                      <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
-                        {step.notCompletedStudents.map(s => (
-                          <span key={s.id} style={{ fontSize:11, padding:'2px 8px', background:'#FEE2E2', color:'#991B1B', borderRadius:10 }}>
-                            {s.name}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-
-            {/* Not onboarded students list */}
-            {count - fullyOnboarded > 0 && (
-              <div className="card" style={{ marginTop:16 }}>
-                <h3 style={{ fontSize:14, fontWeight:600, marginBottom:12, color:'#EF4444' }}>
-                  ⚠️ Students Not Fully Onboarded ({count - fullyOnboarded})
-                </h3>
-                <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
-                  {batchStudents.filter(s => !batchFlow.every(step => s.courseFlow?.[step.key]?.done)).map(s => {
-                    const done = batchFlow.filter(step => s.courseFlow?.[step.key]?.done).length;
-                    const pending = batchFlow.filter(step => !s.courseFlow?.[step.key]?.done).map(st => st.label);
-                    return (
-                      <div key={s.id} style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'8px 12px', background:'#FFF8F8', borderRadius:8, border:'1px solid #FEE2E2' }}>
-                        <div style={{ display:'flex', alignItems:'center', gap:10 }}>
-                          <Avatar name={s.name} size="sm"/>
-                          <div>
-                            <div style={{ fontSize:13, fontWeight:500 }}>{s.name}</div>
-                            <div style={{ fontSize:11, color:'#6B7280' }}>
-                              {done}/{batchFlow.length} steps · Pending: {pending.slice(0,2).join(', ')}{pending.length>2?` +${pending.length-2} more`:''}
-                            </div>
-                          </div>
-                        </div>
-                        <button className="btn btn-ghost btn-sm" onClick={() => navigate(`/students/${s.id}`)}>
-                          View <ChevronRight size={12}/>
-                        </button>
-                      </div>
-                    );
-                  })}
+                <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)' }}>
+                  {count - fullyOnboarded} students still have pending steps · {batchFlow.length} total steps in this batch
                 </div>
               </div>
-            )}
+            </div>
+
+            {/* Step-by-step table */}
+            <div style={{ background: '#fff', borderRadius: 14, border: '1px solid #E5E7EB', overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                <thead>
+                  <tr style={{ background: '#F8FAFC' }}>
+                    {['#', 'Step Name', 'Phase', 'Completed', 'Not Completed', 'Progress', ''].map(h => (
+                      <th key={h} style={{ padding: '11px 14px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.05em', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {flowAnalytics.map((step, idx) => (
+                    <tr key={step.key} style={{ background: idx % 2 === 0 ? '#fff' : '#FAFBFC', transition: 'background 0.12s' }}
+                      onMouseEnter={e => e.currentTarget.style.background = '#F0F4FF'}
+                      onMouseLeave={e => e.currentTarget.style.background = idx % 2 === 0 ? '#fff' : '#FAFBFC'}
+                    >
+                      <td style={{ padding: '11px 14px', color: '#9CA3AF', fontSize: 12 }}>{idx + 1}</td>
+                      <td style={{ padding: '11px 14px', fontWeight: 600 }}>{step.label}</td>
+                      <td style={{ padding: '11px 14px' }}>
+                        <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 20, fontWeight: 600, background: step.phase === 'onboarding' ? '#DBEAFE' : '#EDE9FE', color: step.phase === 'onboarding' ? '#1E40AF' : '#6D28D9', textTransform: 'capitalize' }}>
+                          {step.phase}
+                        </span>
+                      </td>
+                      <td style={{ padding: '11px 14px' }}>
+                        <span style={{ fontWeight: 700, color: '#10B981' }}>{step.completed}</span>
+                        <span style={{ color: '#9CA3AF', fontSize: 11, marginLeft: 4 }}>({step.pct}%)</span>
+                      </td>
+                      <td style={{ padding: '11px 14px' }}>
+                        <span style={{ fontWeight: 600, color: step.notCompleted > 0 ? '#EF4444' : '#10B981' }}>{step.notCompleted}</span>
+                      </td>
+                      <td style={{ padding: '11px 14px', minWidth: 100 }}>
+                        <div style={{ height: 6, background: '#E5E7EB', borderRadius: 4, overflow: 'hidden' }}>
+                          <div style={{ height: '100%', width: `${step.pct}%`, background: step.pct === 100 ? '#10B981' : step.pct > 60 ? '#F59E0B' : '#E53935', transition: 'width 0.3s' }} />
+                        </div>
+                      </td>
+                      <td style={{ padding: '11px 14px' }}>
+                        <button
+                          className="btn btn-ghost btn-sm"
+                          style={{ fontSize: 11, whiteSpace: 'nowrap' }}
+                          onClick={() => setSelectedStep(step)}
+                        >
+                          View Students <ChevronRight size={11} />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
 
         {/* ── SCHEDULE TAB ── */}
         {activeTab === 'schedule' && (
           <div>
+            {/* Overdue warning banner */}
+            {overdueSessions.length > 0 && (
+              <div style={{ padding: '12px 16px', background: '#FEF3C7', borderRadius: 10, border: '1px solid #FDE68A', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 10 }}>
+                <AlertTriangle size={16} style={{ color: '#F59E0B', flexShrink: 0 }} />
+                <div style={{ flex: 1, fontSize: 13, color: '#92400E', fontWeight: 500 }}>
+                  {overdueSessions.length} class{overdueSessions.length > 1 ? 'es' : ''} from the past have not been marked. Please update their status.
+                </div>
+              </div>
+            )}
+
             {schedules.length === 0 && (
               <div className="card" style={{ textAlign:'center', color:'#6B7280', padding:40 }}>
                 No schedule added yet. Click "Add Class" to create the weekly timetable.
@@ -700,70 +741,86 @@ export default function Batches() {
                 const daySlots = schedByDay[day] || [];
                 if (!daySlots.length) return null;
                 return (
-                  <div key={day} className="card">
-                    <div style={{ fontWeight:600, fontSize:14, marginBottom:10, color:'#1A1A2E' }}>{day}</div>
+                  <div key={day} style={{ background: '#fff', borderRadius: 12, border: '1px solid #E5E7EB', padding: '16px 20px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+                    <div style={{ fontWeight:700, fontSize:14, marginBottom:12, color:'#1A1A2E' }}>{day}</div>
                     <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
                       {daySlots.map(slot => {
                         const tc = typeColor(slot.type);
+                        const isOverdue = overdueSessions.find(s => s.id === slot.id);
                         return (
-                          <div key={slot.id} style={{ display:'flex', alignItems:'center', gap:12, padding:'10px 14px', background:tc.bg, borderRadius:9, border:`1px solid ${tc.col}20` }}>
+                          <div key={slot.id} style={{
+                            display:'flex', alignItems:'center', gap:12, padding:'12px 16px',
+                            background: isOverdue ? '#FFFBEB' : tc.bg,
+                            borderRadius:9, border:`1px solid ${isOverdue ? '#FDE68A' : tc.col+'20'}`,
+                          }}>
                             <div style={{ flexShrink:0, textAlign:'center', minWidth:52 }}>
                               <div style={{ fontWeight:700, fontSize:13, color:tc.col }}>{slot.time}</div>
                               <div style={{ fontSize:10, color:'#6B7280' }}>{slot.duration}min</div>
                             </div>
                             <div style={{ flex:1 }}>
-                              <div style={{ fontWeight:500, fontSize:13 }}>{slot.title}</div>
+                              <div style={{ fontWeight:600, fontSize:13 }}>
+                                {isOverdue && <AlertTriangle size={12} style={{ color:'#F59E0B', marginRight:5, display:'inline', verticalAlign:'middle' }}/>}
+                                {slot.title}
+                              </div>
                               <div style={{ fontSize:12, color:'#6B7280', marginTop:2 }}>
-                                {slot.facultyName && `👤 ${slot.facultyName}`}
+                                {slot.facultyName && `${slot.facultyName}`}
                                 {slot.meetLink && <a href={slot.meetLink} target="_blank" rel="noreferrer" style={{ color:'#E53935', marginLeft:8 }}>Join Link →</a>}
                               </div>
                               {slot.notes && <div style={{ fontSize:11, color:'#9CA3AF', marginTop:2 }}>{slot.notes}</div>}
                             </div>
-                            <span style={{ padding:'3px 9px', borderRadius:20, fontSize:11, fontWeight:600, background:tc.bg, color:tc.col, border:`1px solid ${tc.col}40` }}>
+
+                            <span style={{ padding:'3px 9px', borderRadius:20, fontSize:11, fontWeight:600, background:tc.bg, color:tc.col, border:`1px solid ${tc.col}40`, flexShrink:0 }}>
                               {tc.label}
                             </span>
 
-                            {/* Status badge */}
                             <div style={{ display:'flex', gap:6, alignItems:'center', flexShrink:0 }}>
-                              {slot.status === 'completed' && <span style={{ fontSize:10, padding:'2px 8px', borderRadius:10, background:'#D1FAE5', color:'#065F46', fontWeight:600 }}>✅ Done</span>}
-                              {slot.status === 'cancelled' && <span style={{ fontSize:10, padding:'2px 8px', borderRadius:10, background:'#FEE2E2', color:'#991B1B', fontWeight:600 }}>❌ Cancelled</span>}
-                              {slot.status === 'rescheduled' && <span style={{ fontSize:10, padding:'2px 8px', borderRadius:10, background:'#FEF3C7', color:'#92400E', fontWeight:600 }}>🔄 Rescheduled</span>}
-                              {!slot.status && <span style={{ fontSize:10, padding:'2px 8px', borderRadius:10, background:'#DBEAFE', color:'#1E40AF', fontWeight:600 }}>📅 Upcoming</span>}
+                              {slot.status === 'completed'   && <span style={{ fontSize:10, padding:'2px 8px', borderRadius:10, background:'#D1FAE5', color:'#065F46', fontWeight:600 }}>Done</span>}
+                              {slot.status === 'cancelled'   && <span style={{ fontSize:10, padding:'2px 8px', borderRadius:10, background:'#FEE2E2', color:'#991B1B', fontWeight:600 }}>Cancelled</span>}
+                              {slot.status === 'rescheduled' && <span style={{ fontSize:10, padding:'2px 8px', borderRadius:10, background:'#FEF3C7', color:'#92400E', fontWeight:600 }}>Rescheduled</span>}
+                              {!slot.status && <span style={{ fontSize:10, padding:'2px 8px', borderRadius:10, background:'#DBEAFE', color:'#1E40AF', fontWeight:600 }}>Upcoming</span>}
 
-                              <select
-                                style={{ fontSize:11, padding:'2px 6px', borderRadius:6, border:'1px solid #E5E7EB', background:'#fff' }}
-                                value={slot.status || ''}
-                                onChange={async e => {
-                                  const newStatus = e.target.value;
-                                  if (!newStatus) return;
-                                  await updateScheduleStatus(slot.id, newStatus);
-                                  const sch = await getBatchSchedules(selectedBatch.id);
-                                  setSchedules(sch);
-                                }}
-                              >
-                                <option value="">Mark as...</option>
-                                <option value="completed">✅ Completed</option>
-                                <option value="cancelled">❌ Cancelled</option>
-                                <option value="rescheduled">🔄 Rescheduled</option>
-                              </select>
+                              {isOverdue ? (
+                                <button
+                                  style={{ fontSize:11, padding:'4px 10px', borderRadius:7, background:'#F59E0B', color:'#fff', border:'none', cursor:'pointer', fontWeight:600 }}
+                                  onClick={() => setOverdueConfirm(slot)}
+                                >
+                                  Mark
+                                </button>
+                              ) : (
+                                <select
+                                  style={{ fontSize:11, padding:'3px 7px', borderRadius:6, border:'1px solid #E5E7EB', background:'#fff' }}
+                                  value={slot.status || ''}
+                                  onChange={async e => {
+                                    const newStatus = e.target.value;
+                                    if (!newStatus) return;
+                                    await updateScheduleStatus(slot.id, newStatus);
+                                    const sch = await getBatchSchedules(selectedBatch.id);
+                                    setSchedules(sch);
+                                  }}
+                                >
+                                  <option value="">Mark as...</option>
+                                  <option value="completed">Completed</option>
+                                  <option value="cancelled">Cancelled</option>
+                                  <option value="rescheduled">Rescheduled</option>
+                                </select>
+                              )}
 
                               <button
-                                style={{ fontSize:10, padding:'2px 8px', borderRadius:6, background:'#EDE9FE', color:'#6D28D9', border:'none', cursor:'pointer', fontWeight:600 }}
-                                onClick={(e) => { e.stopPropagation(); setShowAttendance(slot); }}
+                                style={{ fontSize:11, padding:'4px 10px', borderRadius:7, background:'#EDE9FE', color:'#6D28D9', border:'none', cursor:'pointer', fontWeight:600 }}
+                                onClick={() => setShowAttendance(slot)}
                               >
-                                📋 Attendance
+                                {attendanceSaved[slot.id] ? 'Attendance ✓' : 'Attendance'}
                               </button>
                             </div>
 
                             <button
-                              onClick={async (e) => {
-                                e.stopPropagation();
+                              onClick={async () => {
                                 if (!window.confirm('Delete this schedule slot?')) return;
                                 await deleteBatchSchedule(slot.id);
                                 const sch = await getBatchSchedules(selectedBatch.id);
                                 setSchedules(sch);
                               }}
-                              style={{ background:'none', border:'none', cursor:'pointer', color:'#EF4444', padding:'4px' }}
+                              style={{ background:'none', border:'none', cursor:'pointer', color:'#EF4444', padding:'4px', flexShrink:0 }}
                             >
                               <Trash2 size={14}/>
                             </button>
@@ -778,100 +835,207 @@ export default function Batches() {
           </div>
         )}
 
-        {/* ── TASKS / ASSIGNMENTS TAB ── */}
+        {/* ── TASKS / ASSIGNMENTS TAB ── Split Panel ── */}
         {activeTab === 'tasks' && (
-          <div>
-            {/* Subject filter tabs */}
-            {batchSubjects.length > 0 && (
-              <div style={{ display:'flex', gap:8, marginBottom:16, flexWrap:'wrap' }}>
-                <span style={{ fontSize:12, color:'#6B7280', alignSelf:'center' }}>Filter by subject:</span>
-                {batchSubjects.map((sub,i) => (
-                  <span key={i} style={{
-                    fontSize:12, padding:'4px 12px', borderRadius:20, cursor:'pointer',
-                    background:'#EDE9FE', color:'#6D28D9', fontWeight:500,
-                  }}>
-                    📚 {sub.name}
-                    {sub.facultyName && <span style={{ fontSize:10, opacity:0.7, marginLeft:4 }}>({sub.facultyName})</span>}
-                  </span>
-                ))}
-              </div>
-            )}
-
-            <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+          <div style={{ display: 'flex', gap: 14, minHeight: 500 }}>
+            {/* Left: Task list */}
+            <div style={{ width: 300, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
               {batchTasks.length === 0 && (
-                <div className="card" style={{ textAlign:'center', color:'#6B7280', padding:40 }}>
-                  No assignments created yet. Click "Add Task" to assign work to students.
+                <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #E5E7EB', padding: 32, textAlign: 'center', color: '#9CA3AF', fontSize: 13 }}>
+                  No assignments yet. Click "Add Task".
                 </div>
               )}
               {batchTasks.map(task => {
-                const submitted   = task.submittedBy?.length || 0;
-                const total       = batchStudents.length || 1;
-                const pctDone     = Math.round(submitted/total*100);
-                const notSubmitted = batchStudents.filter(s => !task.submittedBy?.find(x => x.studentId === s.id));
+                const submitted = task.submittedBy?.length || 0;
+                const total = batchStudents.length || 1;
+                const pctDone = Math.round(submitted / total * 100);
                 const isOverdue = task.dueDate && new Date(task.dueDate) < new Date() && submitted < total;
+                const isSelected = selectedTask === task.id;
                 return (
-                  <div key={task.id} className="card" style={{ cursor:'pointer', border: isOverdue ? '1px solid #FECACA' : '1px solid #E5E7EB' }} onClick={() => setShowTaskDetail(task)}>
-                    <div style={{ display:'flex', justifyContent:'space-between', marginBottom:8 }}>
-                      <div>
-                        <div style={{ fontWeight:600, fontSize:14 }}>{task.title}</div>
-                        <div style={{ fontSize:12, color:'#6B7280', marginTop:2 }}>
-                          {task.subject && <span style={{ background:'#EDE9FE', color:'#6D28D9', padding:'1px 7px', borderRadius:10, marginRight:6, fontSize:11 }}>📚 {task.subject}</span>}
-                          {task.assignedFaculty && `👤 ${task.assignedFaculty}`}
-                          {task.dueDate && ` · Due: ${task.dueDate}`}
-                          {isOverdue && <span style={{ color:'#EF4444', fontWeight:600, marginLeft:6 }}>⚠️ Overdue</span>}
-                        </div>
+                  <div
+                    key={task.id}
+                    onClick={() => { setSelectedTask(task.id); setTaskFilter('all'); setTaskSearch(''); }}
+                    style={{
+                      background: isSelected ? '#1A1A2E' : '#fff',
+                      borderRadius: 10, border: `2px solid ${isSelected ? '#E53935' : isOverdue ? '#FECACA' : '#E5E7EB'}`,
+                      padding: '12px 14px', cursor: 'pointer', transition: 'all 0.15s',
+                    }}
+                  >
+                    <div style={{ fontSize: 13, fontWeight: 600, color: isSelected ? '#fff' : '#1A1A2E', marginBottom: 4 }}>{task.title}</div>
+                    {task.subject && (
+                      <span style={{ fontSize: 10, padding: '1px 7px', borderRadius: 10, background: isSelected ? 'rgba(255,255,255,0.15)' : '#EDE9FE', color: isSelected ? '#fff' : '#6D28D9', fontWeight: 600, marginBottom: 4, display: 'inline-block' }}>
+                        {task.subject}
+                      </span>
+                    )}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 6 }}>
+                      <div style={{ height: 4, flex: 1, background: isSelected ? 'rgba(255,255,255,0.15)' : '#E5E7EB', borderRadius: 2, overflow: 'hidden', marginRight: 8 }}>
+                        <div style={{ height: '100%', width: `${pctDone}%`, background: pctDone === 100 ? '#10B981' : '#F59E0B' }} />
                       </div>
-                      <div style={{ textAlign:'right' }}>
-                        <div style={{ fontWeight:700, fontSize:16, color: pctDone===100?'#10B981':'#F59E0B' }}>{submitted}/{total}</div>
-                        <div style={{ fontSize:11, color:'#6B7280' }}>submitted</div>
-                      </div>
+                      <span style={{ fontSize: 11, fontWeight: 700, color: isSelected ? '#fff' : (pctDone === 100 ? '#10B981' : '#F59E0B'), whiteSpace: 'nowrap' }}>
+                        {submitted}/{total}
+                      </span>
                     </div>
-                    <div className="progress-bar">
-                      <div className="progress-fill" style={{ width:`${pctDone}%`, background:pctDone===100?'#10B981':'#F59E0B' }}/>
-                    </div>
-                    {task.description && <div style={{ fontSize:13, color:'#6B7280', marginTop:8 }}>{task.description}</div>}
-                    <div style={{ fontSize:12, color:'#E53935', marginTop:8 }}>
-                      {notSubmitted.length>0 ? `${notSubmitted.length} not submitted — click to see` : '✅ All submitted!'}
-                    </div>
+                    {isOverdue && <div style={{ fontSize: 10, color: isSelected ? '#FCA5A5' : '#EF4444', marginTop: 4, fontWeight: 600 }}>Overdue</div>}
                   </div>
                 );
               })}
+            </div>
+
+            {/* Right: Task detail */}
+            <div style={{ flex: 1, background: '#fff', borderRadius: 12, border: '1px solid #E5E7EB', padding: '18px 20px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+              {!currentTask ? (
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#9CA3AF', gap: 12 }}>
+                  <CheckSquare size={40} style={{ color: '#E5E7EB' }} />
+                  <div style={{ fontSize: 14 }}>Select a task to view details</div>
+                </div>
+              ) : (
+                <>
+                  {/* Task header */}
+                  <div style={{ marginBottom: 16, paddingBottom: 14, borderBottom: '1px solid #F3F4F6' }}>
+                    <div style={{ fontWeight: 700, fontSize: 17, color: '#1A1A2E', marginBottom: 4 }}>{currentTask.title}</div>
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
+                      {currentTask.subject && <span style={{ fontSize: 11, padding: '2px 9px', borderRadius: 10, background: '#EDE9FE', color: '#6D28D9', fontWeight: 600 }}>{currentTask.subject}</span>}
+                      {currentTask.assignedFaculty && <span style={{ fontSize: 11, padding: '2px 9px', borderRadius: 10, background: '#DBEAFE', color: '#1E40AF', fontWeight: 600 }}>{currentTask.assignedFaculty}</span>}
+                      {currentTask.dueDate && <span style={{ fontSize: 11, color: '#9CA3AF' }}>Due: {currentTask.dueDate}</span>}
+                    </div>
+                    {currentTask.description && <div style={{ fontSize: 13, color: '#6B7280', lineHeight: 1.6 }}>{currentTask.description}</div>}
+                    {/* Submission stats */}
+                    <div style={{ display: 'flex', gap: 16, marginTop: 12 }}>
+                      {[
+                        { label: 'Submitted', value: currentTask.submittedBy?.length || 0, color: '#10B981', bg: '#D1FAE5' },
+                        { label: 'Pending',   value: batchStudents.length - (currentTask.submittedBy?.length || 0), color: '#F59E0B', bg: '#FEF3C7' },
+                        { label: 'Total',     value: batchStudents.length, color: '#0F3460', bg: '#DBEAFE' },
+                      ].map(s => (
+                        <div key={s.label} style={{ padding: '8px 16px', borderRadius: 8, background: s.bg, textAlign: 'center' }}>
+                          <div style={{ fontSize: 20, fontWeight: 700, color: s.color }}>{s.value}</div>
+                          <div style={{ fontSize: 11, color: '#6B7280' }}>{s.label}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Filters + search + bulk */}
+                  <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+                    {['all', 'pending', 'submitted'].map(f => (
+                      <button
+                        key={f}
+                        onClick={() => setTaskFilter(f)}
+                        style={{
+                          padding: '5px 12px', borderRadius: 20, fontSize: 12, fontWeight: 600, cursor: 'pointer', border: 'none',
+                          background: taskFilter === f ? '#1A1A2E' : '#F3F4F6',
+                          color: taskFilter === f ? '#fff' : '#6B7280',
+                          textTransform: 'capitalize',
+                        }}
+                      >{f === 'all' ? 'Show All' : f}</button>
+                    ))}
+                    <div style={{ flex: 1, position: 'relative', minWidth: 160 }}>
+                      <Search size={13} style={{ position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)', color: '#9CA3AF' }} />
+                      <input
+                        className="form-input"
+                        style={{ paddingLeft: 28, fontSize: 12 }}
+                        placeholder="Search student..."
+                        value={taskSearch}
+                        onChange={e => setTaskSearch(e.target.value)}
+                      />
+                    </div>
+                    <button
+                      className="btn btn-sm"
+                      style={{ background: '#E53935', color: '#fff', border: 'none', fontSize: 12, whiteSpace: 'nowrap' }}
+                      onClick={async () => {
+                        const pending = batchStudents.filter(s => !currentTask.submittedBy?.find(x => x.studentId === s.id));
+                        for (const s of pending) {
+                          await markTaskSubmitted(currentTask.id, s.id, s.name);
+                        }
+                        const tasks = await getBatchTasks(selectedBatch.id);
+                        setBatchTasks(tasks);
+                        setSelectedTask(currentTask.id);
+                        setToast({ message: 'All students marked!', type: 'success' });
+                      }}
+                    >
+                      Mark All Submitted
+                    </button>
+                  </div>
+
+                  {/* Student table */}
+                  <div style={{ overflowY: 'auto', maxHeight: 340 }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                      <thead>
+                        <tr style={{ background: '#F8FAFC', position: 'sticky', top: 0 }}>
+                          {['Student', 'Phone', 'Status', ''].map(h => (
+                            <th key={h} style={{ padding: '8px 10px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.05em', borderBottom: '1px solid #E5E7EB' }}>{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {taskStudents.length === 0 && (
+                          <tr><td colSpan={4} style={{ textAlign: 'center', padding: 24, color: '#9CA3AF' }}>No students match.</td></tr>
+                        )}
+                        {taskStudents.map((s, idx) => {
+                          const submittedEntry = currentTask.submittedBy?.find(x => x.studentId === s.id);
+                          return (
+                            <tr key={s.id} style={{ background: idx % 2 === 0 ? '#fff' : '#FAFBFC' }}>
+                              <td style={{ padding: '9px 10px', fontWeight: 500 }}>{s.name}</td>
+                              <td style={{ padding: '9px 10px', color: '#6B7280' }}>{s.phone || '—'}</td>
+                              <td style={{ padding: '9px 10px' }}>
+                                <span style={{
+                                  fontSize: 11, padding: '2px 9px', borderRadius: 20, fontWeight: 600,
+                                  background: submittedEntry ? '#D1FAE5' : '#FEF3C7',
+                                  color: submittedEntry ? '#065F46' : '#92400E',
+                                }}>
+                                  {submittedEntry ? 'Submitted' : 'Pending'}
+                                </span>
+                              </td>
+                              <td style={{ padding: '9px 10px' }}>
+                                {!submittedEntry ? (
+                                  <button
+                                    className="btn btn-sm"
+                                    style={{ fontSize: 11, background: '#D1FAE5', color: '#065F46', border: 'none' }}
+                                    onClick={async () => {
+                                      await markTaskSubmitted(currentTask.id, s.id, s.name);
+                                      const tasks = await getBatchTasks(selectedBatch.id);
+                                      setBatchTasks(tasks);
+                                    }}
+                                  >Mark Done</button>
+                                ) : (
+                                  <span style={{ fontSize: 11, color: '#9CA3AF' }}>{submittedEntry.submittedAt?.slice(0, 10)}</span>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         )}
 
         {/* ── MODALS ── */}
 
-        {/* Add Student — dynamic fields */}
+        {/* Add Student */}
         {showAddStudent && (
           <Modal title={`Add Student to ${selectedBatch.name}`} onClose={() => setShowAddStudent(false)} wide>
-            <div style={{ padding:'8px 12px', background:'#EFF6FF', borderRadius:8, fontSize:12, color:'#1E40AF', marginBottom:14 }}>
-              Student will be placed in <strong>{selectedBatch.name}</strong> ({selectedBatch.course}).
-            </div>
             <form onSubmit={handleAddStudent} style={{ display:'flex', flexDirection:'column', gap:12 }}>
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
                 {batchFields.map(f => (
                   <div key={f.key} className="form-group">
                     <label className="form-label">{f.label}{f.required?' *':''}</label>
-                    <input
-                      className="form-input"
-                      type={f.type || 'text'}
-                      required={f.required}
-                      value={studentForm[f.key] || ''}
-                      onChange={e => setStudentForm({...studentForm, [f.key]: e.target.value})}
-                    />
+                    <input className="form-input" type={f.type||'text'} required={f.required}
+                      value={studentForm[f.key]||''} onChange={e => setStudentForm({...studentForm,[f.key]:e.target.value})}/>
                   </div>
                 ))}
                 <div className="form-group">
                   <label className="form-label">Staff Assigned</label>
-                  <select className="form-input" value={studentForm.staffAssigned||''} onChange={e => setStudentForm({...studentForm, staffAssigned: e.target.value})}>
+                  <select className="form-input" value={studentForm.staffAssigned||''} onChange={e => setStudentForm({...studentForm,staffAssigned:e.target.value})}>
                     <option value="">Select</option>
                     {staffList.map(s=><option key={s.id}>{s.name}</option>)}
                   </select>
                 </div>
                 <div className="form-group">
                   <label className="form-label">Join Date</label>
-                  <input className="form-input" type="date" value={studentForm.joinDate||''} onChange={e => setStudentForm({...studentForm, joinDate: e.target.value})}/>
+                  <input className="form-input" type="date" value={studentForm.joinDate||''} onChange={e => setStudentForm({...studentForm,joinDate:e.target.value})}/>
                 </div>
               </div>
               <div style={{ display:'flex', gap:10, justifyContent:'flex-end' }}>
@@ -882,23 +1046,20 @@ export default function Batches() {
           </Modal>
         )}
 
-        {/* Bulk Import — dynamic fields */}
+        {/* Bulk Import */}
         {showBulk && (
           <Modal title={`Bulk Import into ${selectedBatch.name}`} onClose={() => { setShowBulk(false); setCsvPreview(null); }} wide>
             <div style={{ padding:'8px 12px', background:'#EFF6FF', borderRadius:8, fontSize:12, color:'#1E40AF', marginBottom:14 }}>
-              CSV columns for this batch: <strong>{batchFields.map(f=>f.key).join(', ')}</strong>
+              CSV columns: <strong>{batchFields.map(f=>f.key).join(', ')}</strong>
             </div>
             <button className="btn btn-ghost btn-sm" style={{ marginBottom:14 }} onClick={() => downloadTemplate(selectedBatch.name, batchFields)}>
               <Download size={13}/> Download CSV Template
             </button>
             <input ref={fileRef} type="file" accept=".csv" style={{ display:'none' }}
               onChange={async e => { const t = await e.target.files[0]?.text(); if(t) setCsvPreview(parseCSV(t)); }}/>
-            <div onClick={() => fileRef.current.click()} style={{
-              border:'2px dashed #E5E7EB', borderRadius:10, padding:'24px', textAlign:'center',
-              cursor:'pointer', background:'#FAFAFA', marginBottom:14
-            }}>
+            <div onClick={() => fileRef.current.click()} style={{ border:'2px dashed #E5E7EB', borderRadius:10, padding:'24px', textAlign:'center', cursor:'pointer', background:'#FAFAFA', marginBottom:14 }}>
               <Upload size={22} style={{ color:'#9CA3AF', marginBottom:6 }}/>
-              <div style={{ fontSize:13, fontWeight:500 }}>{csvPreview?`${csvPreview.length} rows loaded — ready to import`:'Click to upload CSV'}</div>
+              <div style={{ fontSize:13, fontWeight:500 }}>{csvPreview?`${csvPreview.length} rows loaded`:'Click to upload CSV'}</div>
             </div>
             {csvPreview && (
               <div className="table-container" style={{ maxHeight:180, overflow:'auto', marginBottom:12 }}>
@@ -906,12 +1067,9 @@ export default function Batches() {
                   <thead><tr><th>#</th>{batchFields.slice(0,4).map(f=><th key={f.key}>{f.label}</th>)}</tr></thead>
                   <tbody>
                     {csvPreview.slice(0,6).map((r,i)=>(
-                      <tr key={i}>
-                        <td style={{ color:'#9CA3AF' }}>{i+1}</td>
-                        {batchFields.slice(0,4).map(f=><td key={f.key} style={{ fontSize:12 }}>{r[f.key]||r[f.key.toLowerCase().replace(/[^a-z0-9]/g,'')]||'—'}</td>)}
-                      </tr>
+                      <tr key={i}><td style={{ color:'#9CA3AF' }}>{i+1}</td>{batchFields.slice(0,4).map(f=><td key={f.key} style={{ fontSize:12 }}>{r[f.key]||'—'}</td>)}</tr>
                     ))}
-                    {csvPreview.length>6&&<tr><td colSpan={5} style={{ textAlign:'center', color:'#6B7280', padding:8 }}>...and {csvPreview.length-6} more</td></tr>}
+                    {csvPreview.length>6&&<tr><td colSpan={5} style={{ textAlign:'center', color:'#6B7280', padding:8 }}>...{csvPreview.length-6} more</td></tr>}
                   </tbody>
                 </table>
               </div>
@@ -925,39 +1083,24 @@ export default function Batches() {
           </Modal>
         )}
 
-        {/* Course Flow Config Modal */}
+        {/* Course Flow Config */}
         {showFlowConfig && (
           <Modal title={`Configure Course Flow — ${selectedBatch.name}`} onClose={() => setShowFlowConfig(false)} wide>
-            <div style={{ fontSize:12, color:'#6B7280', marginBottom:14 }}>
-              Define the onboarding and course steps for this batch. Students will track their progress through these steps.
-            </div>
             <div style={{ display:'flex', flexDirection:'column', gap:8, marginBottom:16 }}>
               {editFlow.map((step, idx) => (
                 <div key={idx} style={{ display:'flex', gap:8, alignItems:'center', padding:'8px 12px', background:'#F9FAFB', borderRadius:8 }}>
                   <span style={{ width:24, height:24, borderRadius:'50%', background:'#E53935', color:'#fff', fontSize:11, fontWeight:700, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>{idx+1}</span>
                   <input className="form-input" style={{ flex:2 }} value={step.label}
-                    onChange={e => {
-                      const updated = [...editFlow];
-                      updated[idx] = { ...updated[idx], label: e.target.value };
-                      setEditFlow(updated);
-                    }}/>
+                    onChange={e => { const u=[...editFlow]; u[idx]={...u[idx],label:e.target.value}; setEditFlow(u); }}/>
                   <select className="form-input" style={{ flex:1 }} value={step.phase}
-                    onChange={e => {
-                      const updated = [...editFlow];
-                      updated[idx] = { ...updated[idx], phase: e.target.value };
-                      setEditFlow(updated);
-                    }}>
+                    onChange={e => { const u=[...editFlow]; u[idx]={...u[idx],phase:e.target.value}; setEditFlow(u); }}>
                     {PHASES.map(p => <option key={p} value={p}>{p}</option>)}
                   </select>
-                  <button className="btn btn-ghost btn-sm" style={{ color:'#EF4444' }}
-                    onClick={() => setEditFlow(editFlow.filter((_,i) => i !== idx))}>
-                    <Trash2 size={13}/>
-                  </button>
+                  <button className="btn btn-ghost btn-sm" style={{ color:'#EF4444' }} onClick={() => setEditFlow(editFlow.filter((_,i)=>i!==idx))}><Trash2 size={13}/></button>
                 </div>
               ))}
             </div>
-            <button className="btn btn-ghost btn-sm" style={{ marginBottom:16 }}
-              onClick={() => setEditFlow([...editFlow, { key: generateKey('step'), label: 'New Step', phase: 'course' }])}>
+            <button className="btn btn-ghost btn-sm" style={{ marginBottom:16 }} onClick={() => setEditFlow([...editFlow, { key:generateKey('step'), label:'New Step', phase:'course' }])}>
               <Plus size={13}/> Add Step
             </button>
             <div style={{ display:'flex', gap:10, justifyContent:'flex-end' }}>
@@ -967,51 +1110,27 @@ export default function Batches() {
           </Modal>
         )}
 
-        {/* Student Fields Config Modal */}
+        {/* Student Fields Config */}
         {showFieldConfig && (
           <Modal title={`Configure Student Fields — ${selectedBatch.name}`} onClose={() => setShowFieldConfig(false)} wide>
-            <div style={{ fontSize:12, color:'#6B7280', marginBottom:14 }}>
-              Define what data to collect for students in this batch. These fields appear in the Add Student form and CSV import template.
-            </div>
             <div style={{ display:'flex', flexDirection:'column', gap:8, marginBottom:16 }}>
               {editFields.map((field, idx) => (
                 <div key={idx} style={{ display:'flex', gap:8, alignItems:'center', padding:'8px 12px', background:'#F9FAFB', borderRadius:8 }}>
-                  <input className="form-input" style={{ flex:2 }} placeholder="Label (e.g. Parent Name)"
-                    value={field.label}
-                    onChange={e => {
-                      const updated = [...editFields];
-                      updated[idx] = { ...updated[idx], label: e.target.value };
-                      setEditFields(updated);
-                    }}/>
+                  <input className="form-input" style={{ flex:2 }} placeholder="Label" value={field.label}
+                    onChange={e => { const u=[...editFields]; u[idx]={...u[idx],label:e.target.value}; setEditFields(u); }}/>
                   <select className="form-input" style={{ flex:1 }} value={field.type||'text'}
-                    onChange={e => {
-                      const updated = [...editFields];
-                      updated[idx] = { ...updated[idx], type: e.target.value };
-                      setEditFields(updated);
-                    }}>
-                    <option value="text">Text</option>
-                    <option value="email">Email</option>
-                    <option value="tel">Phone</option>
-                    <option value="number">Number</option>
-                    <option value="date">Date</option>
+                    onChange={e => { const u=[...editFields]; u[idx]={...u[idx],type:e.target.value}; setEditFields(u); }}>
+                    {['text','email','tel','number','date'].map(t=><option key={t}>{t}</option>)}
                   </select>
                   <label style={{ display:'flex', alignItems:'center', gap:4, fontSize:12, whiteSpace:'nowrap' }}>
                     <input type="checkbox" checked={field.required||false}
-                      onChange={e => {
-                        const updated = [...editFields];
-                        updated[idx] = { ...updated[idx], required: e.target.checked };
-                        setEditFields(updated);
-                      }}/> Required
+                      onChange={e => { const u=[...editFields]; u[idx]={...u[idx],required:e.target.checked}; setEditFields(u); }}/> Required
                   </label>
-                  <button className="btn btn-ghost btn-sm" style={{ color:'#EF4444' }}
-                    onClick={() => setEditFields(editFields.filter((_,i) => i !== idx))}>
-                    <Trash2 size={13}/>
-                  </button>
+                  <button className="btn btn-ghost btn-sm" style={{ color:'#EF4444' }} onClick={() => setEditFields(editFields.filter((_,i)=>i!==idx))}><Trash2 size={13}/></button>
                 </div>
               ))}
             </div>
-            <button className="btn btn-ghost btn-sm" style={{ marginBottom:16 }}
-              onClick={() => setEditFields([...editFields, { key: generateKey('field'), label: 'New Field', required: false, type: 'text' }])}>
+            <button className="btn btn-ghost btn-sm" style={{ marginBottom:16 }} onClick={() => setEditFields([...editFields, { key:generateKey('field'), label:'New Field', required:false, type:'text' }])}>
               <Plus size={13}/> Add Field
             </button>
             <div style={{ display:'flex', gap:10, justifyContent:'flex-end' }}>
@@ -1021,41 +1140,25 @@ export default function Batches() {
           </Modal>
         )}
 
-        {/* Subject-Faculty Config Modal */}
+        {/* Subject Config */}
         {showSubjectConfig && (
           <Modal title={`Configure Subjects — ${selectedBatch.name}`} onClose={() => setShowSubjectConfig(false)} wide>
-            <div style={{ fontSize:12, color:'#6B7280', marginBottom:14 }}>
-              Assign subjects to faculties. Faculty can then create subject-specific tasks for students.
-            </div>
             <div style={{ display:'flex', flexDirection:'column', gap:8, marginBottom:16 }}>
               {editSubjects.map((sub, idx) => (
                 <div key={idx} style={{ display:'flex', gap:8, alignItems:'center', padding:'8px 12px', background:'#F9FAFB', borderRadius:8 }}>
-                  <input className="form-input" style={{ flex:2 }} placeholder="Subject name (e.g. Python, Mathematics)"
-                    value={sub.name}
-                    onChange={e => {
-                      const updated = [...editSubjects];
-                      updated[idx] = { ...updated[idx], name: e.target.value };
-                      setEditSubjects(updated);
-                    }}/>
+                  <input className="form-input" style={{ flex:2 }} placeholder="Subject name" value={sub.name}
+                    onChange={e => { const u=[...editSubjects]; u[idx]={...u[idx],name:e.target.value}; setEditSubjects(u); }}/>
                   <select className="form-input" style={{ flex:2 }} value={sub.facultyName||''}
-                    onChange={e => {
-                      const updated = [...editSubjects];
-                      updated[idx] = { ...updated[idx], facultyName: e.target.value };
-                      setEditSubjects(updated);
-                    }}>
+                    onChange={e => { const u=[...editSubjects]; u[idx]={...u[idx],facultyName:e.target.value}; setEditSubjects(u); }}>
                     <option value="">Select Faculty</option>
                     {(selectedBatch.faculties||[]).map((f,i)=><option key={i}>{f}</option>)}
                     {staffList.map(s=><option key={s.id}>{s.name}</option>)}
                   </select>
-                  <button className="btn btn-ghost btn-sm" style={{ color:'#EF4444' }}
-                    onClick={() => setEditSubjects(editSubjects.filter((_,i) => i !== idx))}>
-                    <Trash2 size={13}/>
-                  </button>
+                  <button className="btn btn-ghost btn-sm" style={{ color:'#EF4444' }} onClick={() => setEditSubjects(editSubjects.filter((_,i)=>i!==idx))}><Trash2 size={13}/></button>
                 </div>
               ))}
             </div>
-            <button className="btn btn-ghost btn-sm" style={{ marginBottom:16 }}
-              onClick={() => setEditSubjects([...editSubjects, { name: '', facultyName: '' }])}>
+            <button className="btn btn-ghost btn-sm" style={{ marginBottom:16 }} onClick={() => setEditSubjects([...editSubjects, { name:'', facultyName:'' }])}>
               <Plus size={13}/> Add Subject
             </button>
             <div style={{ display:'flex', gap:10, justifyContent:'flex-end' }}>
@@ -1083,9 +1186,9 @@ export default function Batches() {
                 <div className="form-group">
                   <label className="form-label">Type</label>
                   <select className="form-input" value={scheduleForm.type} onChange={e=>setScheduleForm({...scheduleForm,type:e.target.value})}>
-                    <option value="live-class">🔴 Live Class</option>
-                    <option value="recorded">📹 Recorded Session</option>
-                    <option value="assignment">📝 Assignment</option>
+                    <option value="live-class">Live Class</option>
+                    <option value="recorded">Recorded Session</option>
+                    <option value="assignment">Assignment</option>
                   </select>
                 </div>
                 <div className="form-group"><label className="form-label">Duration (min)</label><input className="form-input" type="number" value={scheduleForm.duration} onChange={e=>setScheduleForm({...scheduleForm,duration:e.target.value})}/></div>
@@ -1099,7 +1202,7 @@ export default function Batches() {
                     {staffList.map(s=><option key={s.id}>{s.name}</option>)}
                   </select>
                 </div>
-                <div className="form-group"><label className="form-label">Meet / Zoom Link</label><input className="form-input" type="url" placeholder="https://meet.google.com/..." value={scheduleForm.meetLink} onChange={e=>setScheduleForm({...scheduleForm,meetLink:e.target.value})}/></div>
+                <div className="form-group"><label className="form-label">Meet / Zoom Link</label><input className="form-input" type="url" placeholder="https://..." value={scheduleForm.meetLink} onChange={e=>setScheduleForm({...scheduleForm,meetLink:e.target.value})}/></div>
               </FormRow>
               <div className="form-group"><label className="form-label">Notes</label><textarea className="form-input" rows={2} value={scheduleForm.notes} onChange={e=>setScheduleForm({...scheduleForm,notes:e.target.value})}/></div>
               <div style={{ display:'flex', gap:10, justifyContent:'flex-end' }}>
@@ -1142,47 +1245,154 @@ export default function Batches() {
           </Modal>
         )}
 
-        {/* Task detail — who submitted */}
-        {showTaskDetail && (
-          <Modal title={showTaskDetail.title} onClose={() => setShowTaskDetail(null)} wide>
-            <div style={{ marginBottom:14 }}>
-              {showTaskDetail.subject && <span style={{ background:'#EDE9FE', color:'#6D28D9', padding:'2px 10px', borderRadius:10, fontSize:12, marginRight:8 }}>📚 {showTaskDetail.subject}</span>}
-              {showTaskDetail.assignedFaculty && <span style={{ background:'#DBEAFE', color:'#1E40AF', padding:'2px 10px', borderRadius:10, fontSize:12 }}>👤 {showTaskDetail.assignedFaculty}</span>}
-              {showTaskDetail.description && <div style={{ fontSize:13, lineHeight:1.6, marginTop:10 }}>{showTaskDetail.description}</div>}
-              {showTaskDetail.dueDate && <div style={{ fontSize:12, color:'#9CA3AF', marginTop:6 }}>Due: {showTaskDetail.dueDate}</div>}
+        {/* Attendance CSV Upload Modal */}
+        {showAttendance && (
+          <Modal title={`Upload Attendance — ${showAttendance.title}`} onClose={() => { setShowAttendance(null); setAttendanceCsv(null); setAttendancePreview(null); }}>
+            <div style={{ padding:'10px 14px', background:'#EFF6FF', borderRadius:8, fontSize:12, color:'#1E40AF', marginBottom:14 }}>
+              <strong>Instructions:</strong> Upload a CSV or Excel file with columns:
+              <code style={{ background:'#DBEAFE', padding:'1px 6px', borderRadius:4, marginLeft:4 }}>Name, Phone, Present</code>
+              <br/>The Present column should be <strong>Yes</strong> or <strong>No</strong>. Students are matched by phone number.
             </div>
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14 }}>
-              <div>
-                <div style={{ fontWeight:600, fontSize:13, marginBottom:8, color:'#10B981' }}>
-                  ✅ Submitted ({showTaskDetail.submittedBy?.length||0})
-                </div>
-                {(showTaskDetail.submittedBy||[]).map((s,i)=>(
-                  <div key={i} style={{ padding:'6px 10px', background:'#F0FDF4', borderRadius:7, marginBottom:4, fontSize:13 }}>
-                    {s.studentName}
-                    <span style={{ fontSize:11, color:'#6B7280', marginLeft:8 }}>{s.submittedAt?.slice(0,10)}</span>
-                  </div>
-                ))}
-                {!showTaskDetail.submittedBy?.length && <div style={{ fontSize:12, color:'#9CA3AF' }}>Nobody yet</div>}
+            <input ref={attendanceFileRef} type="file" accept=".csv" style={{ display:'none' }}
+              onChange={async e => {
+                const text = await e.target.files[0]?.text();
+                if (!text) return;
+                const lines = text.trim().split('\n');
+                const headers = lines[0].split(',').map(h => h.trim().toLowerCase().replace(/\s+/g,''));
+                const rawRecords = lines.slice(1).map(line => {
+                  const vals = line.split(',').map(v => v.trim().replace(/^"|"$/g,''));
+                  const obj = {};
+                  headers.forEach((h, i) => { obj[h] = vals[i] || ''; });
+                  return obj;
+                }).filter(r => r.name || r.phone);
+                // Match to batch students by phone
+                const enriched = rawRecords.map(r => {
+                  const phone = r.phone || r.phonenumber || r.phone_number || '';
+                  const matched = batchStudents.find(s => s.phone === phone || s.whatsappNumber === phone);
+                  return {
+                    studentId: matched?.id || null,
+                    name: matched?.name || r.name || r.studentname || '?',
+                    phone,
+                    present: (r.present || r.attendance || '').toLowerCase() === 'yes',
+                    matched: !!matched,
+                  };
+                });
+                setAttendanceCsv(rawRecords);
+                setAttendancePreview(enriched);
+              }}
+            />
+            <div onClick={() => attendanceFileRef.current.click()} style={{
+              border:'2px dashed #E5E7EB', borderRadius:10, padding:'28px 20px', textAlign:'center',
+              cursor:'pointer', background:'#FAFAFA', marginBottom:14, transition:'border-color 0.15s',
+            }}
+              onMouseEnter={e => e.currentTarget.style.borderColor = '#E53935'}
+              onMouseLeave={e => e.currentTarget.style.borderColor = '#E5E7EB'}
+            >
+              <Upload size={26} style={{ color:'#D1D5DB', marginBottom:8 }}/>
+              <div style={{ fontSize:13, fontWeight:500, color:'#374151' }}>
+                {attendancePreview ? `${attendancePreview.length} records loaded` : 'Click to upload attendance CSV'}
               </div>
-              <div>
-                <div style={{ fontWeight:600, fontSize:13, marginBottom:8, color:'#EF4444' }}>
-                  ⏳ Not Submitted ({batchStudents.filter(s=>!showTaskDetail.submittedBy?.find(x=>x.studentId===s.id)).length})
+              {!attendancePreview && <div style={{ fontSize:11, color:'#9CA3AF', marginTop:4 }}>Supports .csv format</div>}
+            </div>
+
+            {attendancePreview && (
+              <div style={{ marginBottom:14 }}>
+                <div style={{ fontSize:12, fontWeight:600, marginBottom:8, color:'#374151' }}>
+                  Preview ({attendancePreview.filter(r=>r.present).length} present / {attendancePreview.filter(r=>!r.present).length} absent)
                 </div>
-                {batchStudents.filter(s=>!showTaskDetail.submittedBy?.find(x=>x.studentId===s.id)).map(s=>(
-                  <div key={s.id} style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'6px 10px', background:'#FFF8F8', borderRadius:7, marginBottom:4 }}>
-                    <span style={{ fontSize:13 }}>{s.name}</span>
-                    <button className="btn btn-ghost btn-sm" style={{ fontSize:11 }}
-                      onClick={async () => {
-                        await markTaskSubmitted(showTaskDetail.id, s.id, s.name);
-                        const tasks = await getBatchTasks(selectedBatch.id);
-                        setBatchTasks(tasks);
-                        setShowTaskDetail(tasks.find(t=>t.id===showTaskDetail.id)||null);
-                      }}>
-                      Mark Done
-                    </button>
-                  </div>
-                ))}
+                <div style={{ maxHeight:240, overflowY:'auto', border:'1px solid #E5E7EB', borderRadius:8 }}>
+                  <table style={{ width:'100%', borderCollapse:'collapse', fontSize:12 }}>
+                    <thead>
+                      <tr style={{ background:'#F8FAFC', position:'sticky', top:0 }}>
+                        {['Name','Phone','Status','Matched'].map(h=>(
+                          <th key={h} style={{ padding:'7px 10px', textAlign:'left', fontSize:11, fontWeight:700, color:'#6B7280', textTransform:'uppercase', letterSpacing:'0.05em', borderBottom:'1px solid #E5E7EB' }}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {attendancePreview.map((r, i) => (
+                        <tr key={i} style={{ background: r.present ? '#F0FDF4' : '#FFF8F8' }}>
+                          <td style={{ padding:'7px 10px', fontWeight:500 }}>{r.name}</td>
+                          <td style={{ padding:'7px 10px', color:'#6B7280' }}>{r.phone || '—'}</td>
+                          <td style={{ padding:'7px 10px' }}>
+                            <span style={{ fontWeight:600, fontSize:11, color: r.present ? '#10B981' : '#EF4444' }}>
+                              {r.present ? '✅ Present' : '❌ Absent'}
+                            </span>
+                          </td>
+                          <td style={{ padding:'7px 10px' }}>
+                            <span style={{ fontSize:10, padding:'1px 7px', borderRadius:10, fontWeight:600,
+                              background: r.matched ? '#D1FAE5' : '#FEF3C7', color: r.matched ? '#065F46' : '#92400E' }}>
+                              {r.matched ? 'Matched' : 'No match'}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
+            )}
+
+            <div style={{ display:'flex', gap:10, justifyContent:'flex-end' }}>
+              <button className="btn btn-ghost" onClick={() => { setShowAttendance(null); setAttendanceCsv(null); setAttendancePreview(null); }}>Cancel</button>
+              <button
+                className="btn btn-primary"
+                disabled={!attendancePreview || saving}
+                onClick={async () => {
+                  setSaving(true);
+                  await saveAttendance(showAttendance.id, selectedBatch.id, attendancePreview.map(r => ({
+                    studentId: r.studentId,
+                    name: r.name,
+                    phone: r.phone,
+                    present: r.present,
+                  })));
+                  setAttendanceSaved(prev => ({ ...prev, [showAttendance.id]: true }));
+                  setToast({ message:'Attendance saved successfully!', type:'success' });
+                  setShowAttendance(null);
+                  setAttendanceCsv(null);
+                  setAttendancePreview(null);
+                  setSaving(false);
+                }}
+              >
+                {saving ? 'Saving...' : `Save Attendance (${attendancePreview?.length || 0} records)`}
+              </button>
+            </div>
+          </Modal>
+        )}
+
+        {/* Overdue class confirmation dialog */}
+        {overdueConfirm && (
+          <Modal title="Mark Overdue Class" onClose={() => setOverdueConfirm(null)}>
+            <div style={{ marginBottom:16, fontSize:14, color:'#374151', lineHeight:1.6 }}>
+              Did the class <strong>"{overdueConfirm.title}"</strong> ({overdueConfirm.day} at {overdueConfirm.time}) take place?
+              <br/>Please mark it as completed or cancelled, and optionally upload attendance.
+            </div>
+            <div style={{ display:'flex', gap:10 }}>
+              <button
+                className="btn btn-primary" style={{ flex:1 }}
+                onClick={async () => {
+                  await updateScheduleStatus(overdueConfirm.id, 'completed');
+                  const sch = await getBatchSchedules(selectedBatch.id);
+                  setSchedules(sch);
+                  setOverdueConfirm(null);
+                  setShowAttendance(overdueConfirm);
+                  setToast({ message:'Marked as completed. Upload attendance now.', type:'success' });
+                }}
+              >
+                Yes — Mark Completed
+              </button>
+              <button
+                className="btn btn-danger" style={{ flex:1 }}
+                onClick={async () => {
+                  await updateScheduleStatus(overdueConfirm.id, 'cancelled');
+                  const sch = await getBatchSchedules(selectedBatch.id);
+                  setSchedules(sch);
+                  setOverdueConfirm(null);
+                  setToast({ message:'Marked as cancelled.', type:'success' });
+                }}
+              >
+                No — Mark Cancelled
+              </button>
             </div>
           </Modal>
         )}
@@ -1192,9 +1402,9 @@ export default function Batches() {
     );
   }
 
-  // ════════════════════════════════════════════════════════════
+  // ══════════════════════════════════════════════════════════════
   // BATCH LIST VIEW
-  // ════════════════════════════════════════════════════════════
+  // ══════════════════════════════════════════════════════════════
   const grouped = { active:[], upcoming:[], completed:[] };
   batches.forEach(b => { (grouped[b.status]||grouped.completed).push(b); });
 
@@ -1229,19 +1439,24 @@ export default function Batches() {
             </h3>
             <div className="grid-3">
               {grouped[group].map(b => (
-                <div key={b.id} className="card" style={{ cursor:'pointer' }}
+                <div
+                  key={b.id}
+                  className="card"
+                  style={{ cursor:'pointer', transition:'box-shadow 0.15s, transform 0.15s' }}
                   onClick={() => openBatch(b)}
-                  onMouseEnter={e => e.currentTarget.style.boxShadow='0 4px 16px rgba(0,0,0,0.1)'}
-                  onMouseLeave={e => e.currentTarget.style.boxShadow=''}>
+                  onMouseEnter={e => { e.currentTarget.style.boxShadow='0 8px 24px rgba(0,0,0,0.1)'; e.currentTarget.style.transform='translateY(-2px)'; }}
+                  onMouseLeave={e => { e.currentTarget.style.boxShadow=''; e.currentTarget.style.transform=''; }}
+                >
                   <div style={{ display:'flex', justifyContent:'space-between', marginBottom:8 }}>
                     <div>
-                      <div style={{ fontWeight:600, fontSize:14 }}>{b.name}</div>
+                      <div style={{ fontWeight:700, fontSize:14 }}>{b.name}</div>
                       <div style={{ fontSize:12, color:'#6B7280' }}>{b.course}{b.courseDurationMonths?` · ${b.courseDurationMonths}mo`:''}</div>
                     </div>
                     <span className={`badge ${b.status==='active'?'badge-green':b.status==='upcoming'?'badge-blue':'badge-gray'}`}>{b.status}</span>
                   </div>
                   <div style={{ fontSize:13, marginBottom:8 }}>
-                    <span style={{ color:'#6B7280' }}>Students: </span><strong>{batchCounts[b.id]||0}</strong>
+                    <span style={{ color:'#6B7280' }}>Students: </span>
+                    <strong style={{ color:'#0F3460', fontSize:16 }}>{batchCounts[b.id]||0}</strong>
                     {b.mentor && <><span style={{ color:'#6B7280', marginLeft:10 }}>Mentor: </span>{b.mentor}</>}
                   </div>
                   {b.subjects?.length > 0 && (
@@ -1260,11 +1475,11 @@ export default function Batches() {
                     </div>
                   )}
                   {b.status==='active' && (
-                    <div className="progress-bar" style={{ marginTop:4 }}>
-                      <div className="progress-fill" style={{ width:`${progress(b)}%`, background:'#E53935' }}/>
+                    <div style={{ height:4, background:'#E5E7EB', borderRadius:2, overflow:'hidden', marginTop:4 }}>
+                      <div style={{ height:'100%', width:`${progress(b)}%`, background:'#E53935', transition:'width 0.3s' }}/>
                     </div>
                   )}
-                  <div style={{ marginTop:10, paddingTop:8, borderTop:'1px solid var(--border)', fontSize:12, color:'#E53935', display:'flex', alignItems:'center', gap:4 }}>
+                  <div style={{ marginTop:10, paddingTop:8, borderTop:'1px solid #F3F4F6', fontSize:12, color:'#E53935', display:'flex', alignItems:'center', gap:4 }}>
                     {b.courseFlow?.length || DEFAULT_COURSE_FLOW.length} flow steps · {b.studentFields?.length || DEFAULT_STUDENT_FIELDS.length} fields <ChevronRight size={12}/>
                   </div>
                 </div>
@@ -1288,7 +1503,7 @@ export default function Batches() {
               </div>
               <div className="form-group">
                 <label className="form-label">Course Duration (months) *</label>
-                <input className="form-input" type="number" required placeholder="e.g. 6" value={createForm.courseDurationMonths} onChange={e=>setCreateForm({...createForm,courseDurationMonths:e.target.value})}/>
+                <input className="form-input" type="number" required placeholder="6" value={createForm.courseDurationMonths} onChange={e=>setCreateForm({...createForm,courseDurationMonths:e.target.value})}/>
               </div>
             </FormRow>
             <FormRow>
@@ -1302,8 +1517,9 @@ export default function Batches() {
                   <div key={s.id} onClick={() => toggleFaculty(s.name)} style={{
                     padding:'5px 12px', borderRadius:20, fontSize:12, cursor:'pointer', fontWeight:500,
                     background: createForm.faculties.includes(s.name)?'#E53935':'var(--white)',
-                    color:      createForm.faculties.includes(s.name)?'#fff':'var(--text)',
-                    border:     `1px solid ${createForm.faculties.includes(s.name)?'#E53935':'var(--border)'}`,
+                    color: createForm.faculties.includes(s.name)?'#fff':'var(--text)',
+                    border: `1px solid ${createForm.faculties.includes(s.name)?'#E53935':'var(--border)'}`,
+                    transition:'all 0.12s',
                   }}>
                     {s.name} <span style={{ fontSize:10, opacity:0.7 }}>({s.role})</span>
                   </div>
@@ -1321,70 +1537,13 @@ export default function Batches() {
               </div>
             </FormRow>
             <div style={{ padding:'10px 12px', background:'#EFF6FF', borderRadius:8, fontSize:12, color:'#1E40AF' }}>
-              💡 After creating the batch, click "Course Flow", "Student Fields", and "Subjects" buttons inside the batch to customize them.
+              After creating the batch, use "Course Flow", "Student Fields", and "Subjects" buttons inside to customize them.
             </div>
             <div style={{ display:'flex', gap:10, justifyContent:'flex-end' }}>
               <button type="button" className="btn btn-ghost" onClick={() => setShowCreate(false)}>Cancel</button>
               <button type="submit" className="btn btn-primary" disabled={saving}>{saving?'Creating...':'Create Batch'}</button>
             </div>
           </form>
-        </Modal>
-      )}
-
-      {/* Attendance Modal */}
-      {showAttendance && (
-        <Modal title={`Attendance — ${showAttendance.title}`} onClose={() => { setShowAttendance(null); setAttendanceCsv(null); }}>
-          <div style={{ fontSize:12, color:'#6B7280', marginBottom:14 }}>
-            Upload a CSV with columns: <strong>name, phone, present</strong> (present = yes/no).<br/>
-            Or share a Google Form with students and export the responses as CSV.
-          </div>
-          <input ref={attendanceFileRef} type="file" accept=".csv" style={{ display:'none' }}
-            onChange={async e => {
-              const text = await e.target.files[0]?.text();
-              if (!text) return;
-              const lines = text.trim().split('\n');
-              const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
-              const records = lines.slice(1).map(line => {
-                const vals = line.split(',').map(v => v.trim());
-                const obj = {};
-                headers.forEach((h, i) => { obj[h] = vals[i] || ''; });
-                return obj;
-              }).filter(r => r.name || r.phone);
-              setAttendanceCsv(records);
-            }}
-          />
-          <div onClick={() => attendanceFileRef.current.click()} style={{
-            border:'2px dashed #E5E7EB', borderRadius:8, padding:20, textAlign:'center',
-            cursor:'pointer', background:'#FAFAFA', marginBottom:12
-          }}>
-            <div style={{ fontSize:13 }}>{attendanceCsv ? `${attendanceCsv.length} records loaded` : 'Click to upload attendance CSV'}</div>
-          </div>
-          {attendanceCsv && (
-            <div style={{ maxHeight:200, overflow:'auto', marginBottom:12 }}>
-              {attendanceCsv.map((r, i) => (
-                <div key={i} style={{ display:'flex', justifyContent:'space-between', padding:'6px 10px', background: r.present?.toLowerCase()==='yes'?'#F0FDF4':'#FFF8F8', borderRadius:6, marginBottom:4, fontSize:12 }}>
-                  <span>{r.name || r.phone}</span>
-                  <span style={{ fontWeight:600, color: r.present?.toLowerCase()==='yes'?'#10B981':'#EF4444' }}>
-                    {r.present?.toLowerCase()==='yes' ? '✅ Present' : '❌ Absent'}
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
-          <div style={{ display:'flex', gap:10, justifyContent:'flex-end' }}>
-            <button className="btn btn-ghost" onClick={() => { setShowAttendance(null); setAttendanceCsv(null); }}>Cancel</button>
-            <button className="btn btn-primary" disabled={!attendanceCsv || saving}
-              onClick={async () => {
-                setSaving(true);
-                await saveAttendance(showAttendance.id, selectedBatch.id, attendanceCsv);
-                setToast({ message:'Attendance saved!', type:'success' });
-                setShowAttendance(null);
-                setAttendanceCsv(null);
-                setSaving(false);
-              }}>
-              {saving ? 'Saving...' : 'Save Attendance'}
-            </button>
-          </div>
         </Modal>
       )}
 

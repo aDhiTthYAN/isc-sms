@@ -1,50 +1,116 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { getStudents, getTasks, getAllFollowUps, getBatches, getBatchTasks, getBatchStudentCount } from '../firebase/services';
-import { Loading, Avatar, StatusBadge } from '../components/ui';
-import { TrendingUp, Users, AlertTriangle, School, ChevronRight, AlertCircle, CheckSquare, Clock } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+import {
+  getBatches, getBatchStudentCount, getTasks, getAllFollowUps,
+  getStudentCount, getBatchTasks
+} from '../firebase/services';
+import { query, collection, where, limit, getDocs, getCountFromServer } from 'firebase/firestore';
+import { db } from '../firebase/config';
+import { Loading, StatusBadge } from '../components/ui';
+import {
+  Users, AlertTriangle, School, CheckSquare, TrendingUp,
+  Calendar, ChevronRight, Clock, Activity, ArrowRight
+} from 'lucide-react';
+
+const KPI_STYLE = {
+  card: {
+    background: '#fff',
+    borderRadius: 14,
+    border: '1px solid #E5E7EB',
+    padding: '20px 22px',
+    boxShadow: '0 1px 3px rgba(0,0,0,0.08), 0 4px 12px rgba(0,0,0,0.04)',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 4,
+  }
+};
+
+function KPICard({ label, value, sub, color, bg, icon: Icon, link }) {
+  const navigate = useNavigate();
+  return (
+    <div
+      style={{ ...KPI_STYLE.card, cursor: link ? 'pointer' : 'default' }}
+      onClick={() => link && navigate(link)}
+    >
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <div>
+          <div style={{ fontSize: 12, color: '#6B7280', fontWeight: 500, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</div>
+          <div style={{ fontSize: 32, fontWeight: 700, color, lineHeight: 1, marginBottom: 6 }}>{value}</div>
+          {sub && <div style={{ fontSize: 12, color: '#9CA3AF' }}>{sub}</div>}
+        </div>
+        <div style={{ width: 44, height: 44, borderRadius: 12, background: bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          <Icon size={22} style={{ color }} />
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function Dashboard() {
-  const [students,  setStudents]  = useState([]);
-  const [tasks,     setTasks]     = useState([]);
-  const [followups, setFollowups] = useState([]);
-  const [batches,   setBatches]   = useState([]);
-  const [batchStats, setBatchStats] = useState([]);
-  const [loading,   setLoading]   = useState(true);
+  const navigate = useNavigate();
+  const [loading, setLoading]           = useState(true);
+  const [totalStudents, setTotalStudents] = useState(0);
+  const [atRiskCount, setAtRiskCount]   = useState(0);
+  const [batches, setBatches]           = useState([]);
+  const [batchRows, setBatchRows]       = useState([]);
+  const [recentActivity, setRecentActivity] = useState([]);
+  const [pendingTasks, setPendingTasks] = useState([]);
+  const [atRiskStudents, setAtRiskStudents] = useState([]);
+  const [actPage, setActPage]           = useState(0);
+  const ACT_PAGE = 10;
 
   useEffect(() => {
     const load = async () => {
       try {
-        const [s, t, f, b] = await Promise.all([
-          getStudents().catch(() => []),
-          getTasks().catch(() => []),
-          getAllFollowUps().catch(() => []),
-          getBatches().catch(() => []),
-        ]);
-        setStudents(s); setTasks(t); setFollowups(f); setBatches(b);
+        // KPI: total students count (server-side, no full scan)
+        const totalSnap = await getCountFromServer(collection(db, 'students'));
+        const total = totalSnap.data().count;
+        setTotalStudents(total);
 
-        // Load task + student stats per active batch
-        const activeBatches = b.filter(batch => batch.status === 'active');
-        const stats = await Promise.all(activeBatches.map(async (batch) => {
-          const [tasks, count] = await Promise.all([
-            getBatchTasks(batch.id).catch(() => []),
-            getBatchStudentCount(batch.id).catch(() => 0),
-          ]);
+        // At-risk count
+        const arSnap = await getCountFromServer(query(collection(db, 'students'), where('status', '==', 'at-risk')));
+        setAtRiskCount(arSnap.data().count);
 
-          // Course flow completion across all students — not stored per-batch easily
-          // Use task completion as primary metric
-          const totalSubmissions = tasks.reduce((sum, t) => sum + (t.submittedBy?.length || 0), 0);
-          const totalExpected    = tasks.length * (count || 1);
-          const completionPct    = totalExpected > 0 ? Math.round(totalSubmissions / totalExpected * 100) : 0;
+        // At-risk students preview (first 10 for table)
+        const arStudentsSnap = await getDocs(query(collection(db, 'students'), where('status', '==', 'at-risk'), limit(10)));
+        setAtRiskStudents(arStudentsSnap.docs.map(d => ({ id: d.id, ...d.data() })));
 
-          const overdueTasks = tasks.filter(t => {
-            if (!t.dueDate) return false;
-            return new Date(t.dueDate) < new Date() && (t.submittedBy?.length || 0) < count;
-          });
+        // Batches
+        const batchList = await getBatches();
+        setBatches(batchList);
 
-          return { batch, tasks, count, totalSubmissions, totalExpected, completionPct, overdueTasks };
+        // Pending tasks (limit 50)
+        const tasks = await getTasks().catch(() => []);
+        setPendingTasks(tasks.filter(t => t.status !== 'completed'));
+
+        // Recent activity (follow-ups, limit 50 then sort)
+        const fups = await getAllFollowUps().catch(() => []);
+        const combined = [
+          ...fups.map(f => ({ ...f, _type: 'followup', _ts: f.createdAt?.seconds || 0 })),
+          ...tasks.map(t => ({ ...t, _type: 'task', _ts: t.createdAt?.seconds || 0 })),
+        ].sort((a, b) => b._ts - a._ts);
+        setRecentActivity(combined);
+
+        // Batch rows with stats
+        const rows = await Promise.all(batchList.map(async (batch) => {
+          const count = await getBatchStudentCount(batch.id).catch(() => 0);
+
+          // onboarding %: count students with any courseFlow data vs total
+          let onboardedCount = 0;
+          try {
+            const batchStudentsSnap = await getDocs(query(collection(db, 'students'), where('batchId', '==', batch.id), limit(200)));
+            const students = batchStudentsSnap.docs.map(d => d.data());
+            const flow = batch.courseFlow || [];
+            if (flow.length > 0) {
+              onboardedCount = students.filter(s =>
+                flow.every(step => s.courseFlow?.[step.key]?.done)
+              ).length;
+            }
+          } catch {}
+
+          return { batch, count, onboardedCount };
         }));
-        setBatchStats(stats);
+        setBatchRows(rows);
       } catch (err) {
         console.error('Dashboard load error:', err);
       } finally {
@@ -56,241 +122,226 @@ export default function Dashboard() {
 
   if (loading) return <Loading text="Loading dashboard..." />;
 
-  const active   = students.filter(s => s.status === 'active').length;
-  const atRisk   = students.filter(s => s.status === 'at-risk').length;
-  const moderate = students.filter(s => s.status === 'moderate').length;
-  const dropped  = students.filter(s => s.status === 'dropped').length;
-  const total    = students.length;
+  const activeBatches = batches.filter(b => b.status === 'active');
+  const totalPages = Math.ceil(recentActivity.length / ACT_PAGE);
+  const pageActivity = recentActivity.slice(actPage * ACT_PAGE, (actPage + 1) * ACT_PAGE);
 
-  const weakSubjectStudents = students.filter(s => s.weakSubjects?.length > 0);
-
-  const expiringSoon = students.filter(s => {
-    if (!s.joinDate || !s.courseDurationMonths) return false;
-    const exp = new Date(s.joinDate);
-    exp.setMonth(exp.getMonth() + Number(s.courseDurationMonths));
-    const days = Math.ceil((exp - Date.now()) / 86400000);
-    return days >= 0 && days <= 30;
-  });
-
-  const recentFollowups = followups.slice(0, 4);
-  const activeBatches   = batches.filter(b => b.status === 'active');
-
-  const statsCards = [
-    { label:'Total Students', value:total, sub:`+${students.filter(s => { if (!s.createdAt) return false; const d = s.createdAt.toDate?s.createdAt.toDate():new Date(s.createdAt); const now=new Date(); return d.getMonth()===now.getMonth()&&d.getFullYear()===now.getFullYear(); }).length} this month`, color:'#E53935', bg:'#FEE2E2', icon:Users },
-    { label:'Active Students', value:active, sub:`${total?Math.round(active/total*100):0}% active rate`, color:'#10B981', bg:'#D1FAE5', icon:TrendingUp },
-    { label:'At Risk', value:atRisk, sub:'Needs attention', color:'#F59E0B', bg:'#FEF3C7', icon:AlertTriangle },
-    { label:'Active Batches', value:activeBatches.length, sub:`${batches.filter(b=>b.status==='upcoming').length} starting soon`, color:'#3B82F6', bg:'#DBEAFE', icon:School },
+  const kpis = [
+    { label: 'Total Students',     value: totalStudents,      sub: 'All enrolled',          color: '#E53935', bg: '#FEE2E2', icon: Users,          link: '/students' },
+    { label: 'Active Batches',     value: activeBatches.length, sub: `${batches.filter(b=>b.status==='upcoming').length} upcoming`, color: '#0F3460', bg: '#DBEAFE', icon: School, link: '/batches' },
+    { label: 'At-Risk Students',   value: atRiskCount,        sub: 'Needs attention',       color: '#EF4444', bg: '#FEE2E2', icon: AlertTriangle,  link: '/students' },
+    { label: 'Pending Tasks',      value: pendingTasks.length, sub: 'Open tasks',           color: '#F59E0B', bg: '#FEF3C7', icon: CheckSquare,    link: '/tasks'    },
+    { label: 'Total Batches',      value: batches.length,     sub: 'Across all programs',   color: '#10B981', bg: '#D1FAE5', icon: TrendingUp,     link: '/batches'  },
+    { label: 'Recent Activity',    value: recentActivity.length, sub: 'Follow-ups + tasks',color: '#8B5CF6', bg: '#EDE9FE', icon: Activity,       link: null        },
   ];
+
+  const sectionHead = (title, linkTo, linkLabel = 'View all') => (
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+      <h3 style={{ fontSize: 15, fontWeight: 700, color: '#1A1A2E' }}>{title}</h3>
+      {linkTo && (
+        <Link to={linkTo} style={{ fontSize: 12, color: '#E53935', display: 'flex', alignItems: 'center', gap: 3, fontWeight: 500 }}>
+          {linkLabel} <ChevronRight size={13} />
+        </Link>
+      )}
+    </div>
+  );
 
   return (
     <div>
-      {expiringSoon.length > 0 && (
-        <div style={{ padding:'10px 14px', background:'#FEE2E2', borderRadius:8, fontSize:12, color:'#991B1B', marginBottom:14, display:'flex', alignItems:'center', gap:8 }}>
-          📅 <strong>{expiringSoon.length} student subscriptions</strong> expire within 30 days.
-          <Link to="/students" style={{ marginLeft:'auto', color:'#E53935', fontSize:12 }}>View →</Link>
-        </div>
-      )}
-
-      {/* Stats */}
-      <div className="grid-4" style={{ marginBottom:16 }}>
-        {statsCards.map(card => {
-          const Icon = card.icon;
-          return (
-            <div key={card.label} className="stat-card">
-              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
-                <div>
-                  <div className="stat-label">{card.label}</div>
-                  <div className="stat-value" style={{ color:card.color }}>{card.value}</div>
-                  <div className="stat-sub" style={{ color:card.color }}>{card.sub}</div>
-                </div>
-                <div style={{ width:38, height:38, borderRadius:10, background:card.bg, display:'flex', alignItems:'center', justifyContent:'center' }}>
-                  <Icon size={19} style={{ color:card.color }} />
-                </div>
-              </div>
-            </div>
-          );
-        })}
+      {/* KPI Cards */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14, marginBottom: 24 }}>
+        {kpis.map(k => <KPICard key={k.label} {...k} />)}
       </div>
 
-      <div className="grid-2" style={{ marginBottom:14 }}>
-        {/* Activity overview */}
-        <div className="card">
-          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:14 }}>
-            <h3 style={{ fontSize:14, fontWeight:600 }}>Student Activity Overview</h3>
-          </div>
-          {[
-            { label:'Active',   count:active,   color:'#10B981', total },
-            { label:'Moderate', count:moderate, color:'#F59E0B', total },
-            { label:'At Risk',  count:atRisk,   color:'#EF4444', total },
-            { label:'Dropped',  count:dropped,  color:'#9CA3AF', total },
-          ].map(row => (
-            <div key={row.label} style={{ display:'flex', alignItems:'center', gap:10, marginBottom:10 }}>
-              <div style={{ width:9, height:9, borderRadius:'50%', background:row.color, flexShrink:0 }}/>
-              <span style={{ fontSize:13, width:72 }}>{row.label}</span>
-              <div className="progress-bar" style={{ flex:1 }}>
-                <div className="progress-fill" style={{ width:`${row.total?Math.round(row.count/row.total*100):0}%`, background:row.color }}/>
-              </div>
-              <span style={{ fontSize:13, fontWeight:600, width:28, textAlign:'right' }}>{row.count}</span>
-            </div>
-          ))}
-          {weakSubjectStudents.length > 0 && (
-            <div style={{ marginTop:12, padding:'10px 12px', background:'#FEF3C7', borderRadius:8, display:'flex', alignItems:'center', gap:8 }}>
-              <AlertCircle size={14} style={{ color:'#F59E0B' }}/>
-              <span style={{ fontSize:12, color:'#92400E' }}>
-                <strong>{weakSubjectStudents.length} students</strong> have weak subjects flagged
-              </span>
-              <Link to="/students" style={{ marginLeft:'auto', fontSize:12, color:'#E53935' }}>View →</Link>
-            </div>
-          )}
-        </div>
-
-        {/* Recent follow-ups */}
-        <div className="card">
-          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:14 }}>
-            <h3 style={{ fontSize:14, fontWeight:600 }}>Recent Follow-Ups</h3>
-            <Link to="/followups" style={{ fontSize:12, color:'#E53935', display:'flex', alignItems:'center', gap:2 }}>
-              View all <ChevronRight size={13}/>
-            </Link>
-          </div>
-          {recentFollowups.length === 0 && (
-            <p style={{ color:'#6B7280', fontSize:13 }}>No follow-ups recorded yet.</p>
-          )}
-          {recentFollowups.map(fu => (
-            <div key={fu.id} style={{ display:'flex', alignItems:'flex-start', gap:10, marginBottom:10 }}>
-              <Avatar name={fu.studentName||'?'} size="sm"/>
-              <div style={{ flex:1, minWidth:0 }}>
-                <div style={{ fontSize:13, fontWeight:500 }}>{fu.studentName}</div>
-                <div style={{ fontSize:12, color:'#6B7280', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{fu.note}</div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Batch Assignment Completion */}
-      {batchStats.length > 0 && (
-        <div className="card" style={{ marginBottom:14 }}>
-          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:14 }}>
-            <h3 style={{ fontSize:14, fontWeight:600 }}>📊 Batch Assignment Tracker</h3>
-            <Link to="/batches" style={{ fontSize:12, color:'#E53935', display:'flex', alignItems:'center', gap:2 }}>
-              Manage <ChevronRight size={13}/>
-            </Link>
-          </div>
-          <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
-            {batchStats.map(({ batch, tasks, count, completionPct, overdueTasks }) => (
-              <div key={batch.id} style={{ padding:'12px 14px', background:'#FAFAFA', borderRadius:10, border:'1px solid #E5E7EB' }}>
-                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:8 }}>
-                  <div>
-                    <div style={{ fontWeight:600, fontSize:13 }}>{batch.name}</div>
-                    <div style={{ fontSize:11, color:'#6B7280' }}>{count} students · {tasks.length} tasks</div>
-                  </div>
-                  <div style={{ textAlign:'right' }}>
-                    <div style={{ fontSize:18, fontWeight:700, color: completionPct >= 80 ? '#10B981' : completionPct >= 50 ? '#F59E0B' : '#EF4444' }}>
-                      {completionPct}%
-                    </div>
-                    <div style={{ fontSize:10, color:'#6B7280' }}>submitted</div>
-                  </div>
-                </div>
-                <div className="progress-bar" style={{ marginBottom:8 }}>
-                  <div className="progress-fill" style={{ width:`${completionPct}%`, background: completionPct >= 80 ? '#10B981' : completionPct >= 50 ? '#F59E0B' : '#EF4444' }}/>
-                </div>
-                <div style={{ display:'flex', gap:16, fontSize:11 }}>
-                  {tasks.slice(0, 3).map(task => {
-                    const submitted = task.submittedBy?.length || 0;
-                    const pct = count > 0 ? Math.round(submitted/count*100) : 0;
-                    const overdue = task.dueDate && new Date(task.dueDate) < new Date() && submitted < count;
-                    return (
-                      <div key={task.id} style={{ flex:1, padding:'6px 8px', background: overdue ? '#FEF3C7' : '#F0FDF4', borderRadius:6 }}>
-                        <div style={{ fontWeight:500, marginBottom:2, color:'#374151', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>
-                          {overdue ? '⚠️ ' : '✅ '}{task.title}
+      {/* Batches Overview Table */}
+      <div style={{ background: '#fff', borderRadius: 14, border: '1px solid #E5E7EB', padding: '20px 22px', boxShadow: '0 1px 3px rgba(0,0,0,0.08), 0 4px 12px rgba(0,0,0,0.04)', marginBottom: 20 }}>
+        {sectionHead('Batches Overview', '/batches', 'Manage Batches')}
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+            <thead>
+              <tr style={{ background: '#F8FAFC' }}>
+                {['Batch Name', 'Total Students', 'Onboarding %', 'Status', 'Course', ''].map(h => (
+                  <th key={h} style={{ padding: '10px 12px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.06em', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {batchRows.length === 0 && (
+                <tr><td colSpan={6} style={{ textAlign: 'center', padding: 32, color: '#9CA3AF' }}>No batches yet.</td></tr>
+              )}
+              {batchRows.map(({ batch, count, onboardedCount }, idx) => {
+                const flow = batch.courseFlow || [];
+                const onboardPct = count > 0 && flow.length > 0 ? Math.round(onboardedCount / count * 100) : 0;
+                return (
+                  <tr
+                    key={batch.id}
+                    style={{ background: idx % 2 === 0 ? '#fff' : '#FAFBFC', cursor: 'pointer', transition: 'background 0.12s' }}
+                    onMouseEnter={e => e.currentTarget.style.background = '#F0F4FF'}
+                    onMouseLeave={e => e.currentTarget.style.background = idx % 2 === 0 ? '#fff' : '#FAFBFC'}
+                    onClick={() => navigate('/batches')}
+                  >
+                    <td style={{ padding: '11px 12px', fontWeight: 600, color: '#1A1A2E' }}>{batch.name}</td>
+                    <td style={{ padding: '11px 12px' }}><span style={{ fontWeight: 700, fontSize: 15, color: '#0F3460' }}>{count}</span></td>
+                    <td style={{ padding: '11px 12px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <div style={{ flex: 1, height: 6, background: '#E5E7EB', borderRadius: 4, overflow: 'hidden', minWidth: 60 }}>
+                          <div style={{ height: '100%', width: `${onboardPct}%`, background: onboardPct === 100 ? '#10B981' : onboardPct > 60 ? '#F59E0B' : '#E53935', transition: 'width 0.3s' }} />
                         </div>
-                        <div style={{ color: submitted === count ? '#10B981' : '#6B7280' }}>
-                          {submitted}/{count} done {overdue && <span style={{ color:'#92400E' }}>· overdue</span>}
-                        </div>
+                        <span style={{ fontSize: 12, fontWeight: 600, color: onboardPct === 100 ? '#10B981' : '#374151', minWidth: 34 }}>{onboardPct}%</span>
                       </div>
-                    );
-                  })}
-                  {tasks.length > 3 && (
-                    <div style={{ display:'flex', alignItems:'center', fontSize:11, color:'#6B7280' }}>+{tasks.length-3} more</div>
-                  )}
-                </div>
-                {overdueTasks.length > 0 && (
-                  <div style={{ marginTop:8, padding:'6px 10px', background:'#FEE2E2', borderRadius:6, fontSize:11, color:'#991B1B' }}>
-                    ⚠️ {overdueTasks.length} overdue task{overdueTasks.length > 1 ? 's' : ''} need attention
+                    </td>
+                    <td style={{ padding: '11px 12px' }}>
+                      <span style={{
+                        fontSize: 11, padding: '3px 10px', borderRadius: 20, fontWeight: 600,
+                        background: batch.status === 'active' ? '#D1FAE5' : batch.status === 'upcoming' ? '#DBEAFE' : '#F3F4F6',
+                        color: batch.status === 'active' ? '#065F46' : batch.status === 'upcoming' ? '#1E40AF' : '#374151',
+                      }}>{batch.status}</span>
+                    </td>
+                    <td style={{ padding: '11px 12px', color: '#6B7280' }}>{batch.course || '—'}</td>
+                    <td style={{ padding: '11px 12px' }}>
+                      <span style={{ color: '#E53935', fontSize: 12, fontWeight: 500, display: 'flex', alignItems: 'center', gap: 3 }}>
+                        Open <ArrowRight size={12} />
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: 16, marginBottom: 20 }}>
+        {/* Recent Activity Feed */}
+        <div style={{ background: '#fff', borderRadius: 14, border: '1px solid #E5E7EB', padding: '20px 22px', boxShadow: '0 1px 3px rgba(0,0,0,0.08), 0 4px 12px rgba(0,0,0,0.04)' }}>
+          {sectionHead('Recent Activity', null)}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minHeight: 280 }}>
+            {pageActivity.length === 0 && (
+              <div style={{ color: '#9CA3AF', fontSize: 13, textAlign: 'center', paddingTop: 40 }}>No activity yet.</div>
+            )}
+            {pageActivity.map((item, i) => {
+              const isFollowup = item._type === 'followup';
+              const ts = item.createdAt?.seconds
+                ? new Date(item.createdAt.seconds * 1000).toLocaleDateString()
+                : '';
+              return (
+                <div key={item.id || i} style={{
+                  display: 'flex', alignItems: 'flex-start', gap: 10, padding: '9px 10px',
+                  borderRadius: 8, transition: 'background 0.12s',
+                }}
+                  onMouseEnter={e => e.currentTarget.style.background = '#F8FAFC'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                >
+                  <div style={{
+                    width: 28, height: 28, borderRadius: 8, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    background: isFollowup ? '#D1FAE5' : '#FEF3C7',
+                  }}>
+                    {isFollowup ? <Activity size={13} style={{ color: '#10B981' }} /> : <CheckSquare size={13} style={{ color: '#F59E0B' }} />}
                   </div>
-                )}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {isFollowup ? (item.studentName || 'Unknown student') : (item.title || 'Task')}
+                    </div>
+                    <div style={{ fontSize: 11, color: '#9CA3AF', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: 1 }}>
+                      {isFollowup ? item.note : `Assigned: ${item.assignedTo || '—'}`}
+                    </div>
+                  </div>
+                  <div style={{ fontSize: 11, color: '#9CA3AF', whiteSpace: 'nowrap', flexShrink: 0, marginTop: 2 }}>{ts}</div>
+                </div>
+              );
+            })}
+          </div>
+          {totalPages > 1 && (
+            <div style={{ display: 'flex', justifyContent: 'center', gap: 6, marginTop: 12, paddingTop: 12, borderTop: '1px solid #F3F4F6' }}>
+              <button className="btn btn-ghost btn-sm" disabled={actPage === 0} onClick={() => setActPage(p => p - 1)}>← Prev</button>
+              <span style={{ fontSize: 12, color: '#6B7280', alignSelf: 'center' }}>Page {actPage + 1} of {totalPages}</span>
+              <button className="btn btn-ghost btn-sm" disabled={actPage === totalPages - 1} onClick={() => setActPage(p => p + 1)}>Next →</button>
+            </div>
+          )}
+        </div>
+
+        {/* At-Risk Students */}
+        <div style={{ background: '#fff', borderRadius: 14, border: '1px solid #E5E7EB', padding: '20px 22px', boxShadow: '0 1px 3px rgba(0,0,0,0.08), 0 4px 12px rgba(0,0,0,0.04)' }}>
+          {sectionHead('At-Risk Students', '/students', 'View all')}
+          {atRiskStudents.length === 0 && (
+            <div style={{ color: '#9CA3AF', fontSize: 13, textAlign: 'center', paddingTop: 40 }}>
+              <AlertTriangle size={28} style={{ color: '#D1D5DB', marginBottom: 8, display: 'block', margin: '0 auto 8px' }} />
+              No at-risk students
+            </div>
+          )}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {atRiskStudents.map(s => (
+              <div
+                key={s.id}
+                onClick={() => navigate(`/students/${s.id}`)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 10, padding: '9px 10px',
+                  borderRadius: 8, cursor: 'pointer', transition: 'background 0.12s',
+                }}
+                onMouseEnter={e => e.currentTarget.style.background = '#FFF8F8'}
+                onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+              >
+                <div style={{
+                  width: 32, height: 32, borderRadius: '50%', background: '#FEE2E2', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 12, fontWeight: 700, color: '#E53935', flexShrink: 0,
+                }}>
+                  {(s.name || '?').charAt(0).toUpperCase()}
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.name}</div>
+                  <div style={{ fontSize: 11, color: '#9CA3AF' }}>{s.batchName || '—'}</div>
+                </div>
+                <button
+                  className="btn btn-sm"
+                  style={{ fontSize: 11, background: '#FEE2E2', color: '#991B1B', border: 'none', padding: '4px 10px' }}
+                  onClick={e => { e.stopPropagation(); navigate(`/students/${s.id}`); }}
+                >
+                  Review
+                </button>
               </div>
             ))}
           </div>
-        </div>
-      )}
-
-      <div className="grid-2">
-        {/* Tasks */}
-        <div className="card">
-          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:14 }}>
-            <h3 style={{ fontSize:14, fontWeight:600 }}>Today's Staff Tasks</h3>
-            <Link to="/tasks" style={{ fontSize:12, color:'#E53935', display:'flex', alignItems:'center', gap:2 }}>
-              View all <ChevronRight size={13}/>
+          {atRiskCount > 10 && (
+            <Link to="/students" style={{ display: 'block', textAlign: 'center', marginTop: 12, fontSize: 12, color: '#E53935', fontWeight: 500 }}>
+              +{atRiskCount - 10} more at-risk students →
             </Link>
-          </div>
-          {tasks.slice(0, 4).map(task => (
-            <div key={task.id} style={{ display:'flex', alignItems:'center', gap:10, marginBottom:10 }}>
-              <div style={{ width:17, height:17, borderRadius:4, flexShrink:0,
-                background: task.status==='completed'?'#10B981':'#E5E7EB',
-                display:'flex', alignItems:'center', justifyContent:'center' }}>
-                {task.status==='completed' && <span style={{ color:'#fff', fontSize:11 }}>✓</span>}
-              </div>
-              <div style={{ flex:1, minWidth:0 }}>
-                <div style={{ fontSize:13, textDecoration:task.status==='completed'?'line-through':'none', color:task.status==='completed'?'#9CA3AF':'inherit' }}>{task.title}</div>
-                <div style={{ fontSize:11, color:'#9CA3AF' }}>{task.assignedTo}</div>
-              </div>
-              <span className={`badge ${task.status==='completed'?'badge-green':task.status==='in-progress'?'badge-amber':'badge-gray'}`} style={{ fontSize:10 }}>
-                {task.status==='in-progress'?'In Progress':task.status==='completed'?'Done':'Pending'}
-              </span>
-            </div>
-          ))}
-          {tasks.length === 0 && <p style={{ color:'#6B7280', fontSize:13 }}>No tasks yet.</p>}
-        </div>
-
-        {/* Batches */}
-        <div className="card">
-          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:14 }}>
-            <h3 style={{ fontSize:14, fontWeight:600 }}>Active Batches</h3>
-            <Link to="/batches" style={{ fontSize:12, color:'#E53935', display:'flex', alignItems:'center', gap:2 }}>
-              View all <ChevronRight size={13}/>
-            </Link>
-          </div>
-          {batches.slice(0, 4).map(batch => {
-            const start = batch.startDate ? new Date(batch.startDate) : null;
-            const end   = batch.endDate   ? new Date(batch.endDate)   : null;
-            const pct   = start && end
-              ? Math.min(100, Math.max(0, Math.round((Date.now()-start)/(end-start)*100)))
-              : 0;
-            return (
-              <div key={batch.id} style={{ marginBottom:12 }}>
-                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:4 }}>
-                  <div>
-                    <div style={{ fontSize:13, fontWeight:500 }}>{batch.name}</div>
-                    <div style={{ fontSize:11, color:'#6B7280' }}>
-                      {batch.faculties?.length > 0 ? batch.faculties.join(', ') : batch.mentor || '—'}
-                    </div>
-                  </div>
-                  <span className={`badge ${batch.status==='active'?'badge-green':batch.status==='upcoming'?'badge-blue':'badge-gray'}`}>
-                    {batch.status}
-                  </span>
-                </div>
-                {batch.status === 'active' && (
-                  <div className="progress-bar">
-                    <div className="progress-fill" style={{ width:`${pct}%`, background:'#E53935' }}/>
-                  </div>
-                )}
-              </div>
-            );
-          })}
-          {batches.length === 0 && <p style={{ color:'#6B7280', fontSize:13 }}>No batches yet.</p>}
+          )}
         </div>
       </div>
+
+      {/* Pending Tasks Quick View */}
+      {pendingTasks.length > 0 && (
+        <div style={{ background: '#fff', borderRadius: 14, border: '1px solid #E5E7EB', padding: '20px 22px', boxShadow: '0 1px 3px rgba(0,0,0,0.08), 0 4px 12px rgba(0,0,0,0.04)' }}>
+          {sectionHead('Pending Staff Tasks', '/tasks', 'View all tasks')}
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+              <thead>
+                <tr style={{ background: '#F8FAFC' }}>
+                  {['Task', 'Assigned To', 'Priority', 'Status'].map(h => (
+                    <th key={h} style={{ padding: '9px 12px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.06em', borderBottom: '1px solid #E5E7EB' }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {pendingTasks.slice(0, 8).map((task, idx) => (
+                  <tr key={task.id} style={{ background: idx % 2 === 0 ? '#fff' : '#FAFBFC' }}>
+                    <td style={{ padding: '10px 12px', fontWeight: 500 }}>{task.title}</td>
+                    <td style={{ padding: '10px 12px', color: '#6B7280' }}>{task.assignedTo || '—'}</td>
+                    <td style={{ padding: '10px 12px' }}>
+                      <span style={{
+                        fontSize: 11, padding: '2px 8px', borderRadius: 20, fontWeight: 600,
+                        background: task.priority === 'high' ? '#FEE2E2' : task.priority === 'medium' ? '#FEF3C7' : '#F3F4F6',
+                        color: task.priority === 'high' ? '#991B1B' : task.priority === 'medium' ? '#92400E' : '#374151',
+                      }}>{task.priority || 'normal'}</span>
+                    </td>
+                    <td style={{ padding: '10px 12px' }}><StatusBadge status={task.status} /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
