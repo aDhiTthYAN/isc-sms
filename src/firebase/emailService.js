@@ -1,120 +1,147 @@
-import emailjs from '@emailjs/browser';
+import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
+import { AuthProvider, useAuth } from './context/AuthContext';
+import { NotifProvider } from './context/NotifContext';
+import Sidebar from './components/layout/Sidebar';
+import Topbar  from './components/layout/Topbar';
+import { Loading } from './components/ui';
 
-// ─────────────────────────────────────────────────────────────
-// SETUP INSTRUCTIONS (one-time, free):
-// 1. Go to https://www.emailjs.com — sign up free
-// 2. Add Email Service → connect your Gmail
-// 3. Create Email Template (see templates below)
-// 4. Replace the 3 values below with yours
-// ─────────────────────────────────────────────────────────────
-const SERVICE_ID  = 'YOUR_EMAILJS_SERVICE_ID';   // e.g. service_abc123
-const PUBLIC_KEY  = 'YOUR_EMAILJS_PUBLIC_KEY';   // e.g. user_xyz789
+import LoginPage       from './pages/Login';
+import Dashboard       from './pages/Dashboard';
+import AdminDashboard  from './pages/AdminDashboard';
+import StaffDashboard  from './pages/StaffDashboard';
+import StudentsPage    from './pages/Students';
+import StudentProfile  from './pages/StudentProfile';
+import FollowUps       from './pages/FollowUps';
+import Concerns        from './pages/Concerns';
+import Assessments     from './pages/Assessments';
+import Batches         from './pages/Batches';
+import Leaderboard     from './pages/Leaderboard';
+import Tasks           from './pages/Tasks';
+import Reports         from './pages/Reports';
+import Leads           from './pages/Leads';
+import Documents       from './pages/Documents';
+import StaffManagement from './pages/StaffManagement';
+import BulkImport      from './pages/BulkImport';
 
-// Template IDs — create these in EmailJS dashboard
-const TEMPLATES = {
-  task:     'template_task_assigned',
-  followup: 'template_followup_assigned',
-  concern:  'template_concern_assigned',
-  welcome:  'template_welcome',
+const NAV_BY_ROLE = {
+  ceo: [
+    { section: 'Overview' },
+    { to: '/',            label: 'Dashboard',       icon: 'LayoutDashboard' },
+    { section: 'Students' },
+    { to: '/students',    label: 'All Students',     icon: 'Users'          },
+    { to: '/bulk-import', label: 'Bulk Import',      icon: 'Upload'         },
+    { to: '/followups',   label: 'Follow-Ups',       icon: 'PhoneCall'      },
+    { to: '/concerns',    label: 'Concerns',         icon: 'AlertCircle'    },
+    { section: 'Academic' },
+    { to: '/assessments', label: 'Assessments',      icon: 'ClipboardList'  },
+    { to: '/batches',     label: 'Batches',          icon: 'School'         },
+    { to: '/leaderboard', label: 'Leaderboard',      icon: 'Trophy'         },
+    { section: 'Operations' },
+    { to: '/tasks',       label: 'Staff Tasks',      icon: 'CheckSquare'    },
+    { to: '/reports',     label: 'Daily Reports',    icon: 'FileText'       },
+    { to: '/leads',       label: 'Lead Pipeline',    icon: 'TrendingUp'     },
+    { to: '/documents',   label: 'Documents',        icon: 'FolderOpen'     },
+    { section: 'Settings' },
+    { to: '/staff',       label: 'Staff Management', icon: 'UsersRound'     },
+  ],
+  admin: [
+    { section: 'Overview' },
+    { to: '/',            label: 'Dashboard',        icon: 'LayoutDashboard' },
+    { section: 'Students' },
+    { to: '/students',    label: 'All Students',     icon: 'Users'           },
+    { to: '/bulk-import', label: 'Bulk Import',      icon: 'Upload'          },
+    { to: '/followups',   label: 'Follow-Ups',       icon: 'PhoneCall'       },
+    { to: '/concerns',    label: 'Concerns',         icon: 'AlertCircle'     },
+    { section: 'Academic' },
+    { to: '/assessments', label: 'Assessments',      icon: 'ClipboardList'   },
+    { to: '/batches',     label: 'Batches',          icon: 'School'          },
+    { to: '/leaderboard', label: 'Leaderboard',      icon: 'Trophy'          },
+    { section: 'Operations' },
+    { to: '/reports',     label: 'Daily Reports',    icon: 'FileText'        },
+    { to: '/documents',   label: 'Documents',        icon: 'FolderOpen'      },
+  ],
+  staff: [
+    { section: 'My Work' },
+    { to: '/',            label: 'My Dashboard',     icon: 'LayoutDashboard' },
+    { to: '/students',    label: 'My Students',      icon: 'Users'           },
+    { to: '/followups',   label: 'My Follow-Ups',    icon: 'PhoneCall'       },
+    { to: '/tasks',       label: 'My Tasks',         icon: 'CheckSquare'     },
+    { section: 'Reports' },
+    { to: '/reports',     label: 'Daily Report',     icon: 'FileText'        },
+    { section: 'Resources' },
+    { to: '/leaderboard', label: 'Leaderboard',      icon: 'Trophy'          },
+  ],
 };
 
-// Initialize EmailJS
-emailjs.init(PUBLIC_KEY);
+const SIDEBAR_COLOR = { ceo: '#1A1A2E', admin: '#1B1B2F', staff: '#0F3460' };
+const ROLE_LABEL    = { ceo: 'CEO · Full access', admin: 'Admin', staff: 'Staff' };
 
-// ── Send email when CEO assigns a task ────────────────────────
-export const sendTaskEmail = async ({ toEmail, toName, taskTitle, dueDate, priority, assignedBy }) => {
-  if (SERVICE_ID === 'YOUR_EMAILJS_SERVICE_ID') {
-    console.log('📧 [DEV MODE] Task email would send to:', toEmail, { taskTitle, dueDate });
-    return { status: 'dev-mode' };
-  }
-  try {
-    await emailjs.send(SERVICE_ID, TEMPLATES.task, {
-      to_email:    toEmail,
-      to_name:     toName,
-      task_title:  taskTitle,
-      due_date:    dueDate || 'No due date',
-      priority:    priority || 'Normal',
-      assigned_by: assignedBy,
-      app_url:     window.location.origin,
-    });
-    return { status: 'sent' };
-  } catch (err) {
-    console.error('Email failed:', err);
-    return { status: 'failed', error: err };
-  }
-};
+function AppShell() {
+  const { user, profile, loading } = useAuth();
+  if (loading) return <Loading text="Authenticating..." />;
+  if (!user)   return <Navigate to="/login" replace />;
 
-// ── Send email when CEO assigns a follow-up ───────────────────
-export const sendFollowUpEmail = async ({ toEmail, toName, studentName, note, priority, assignedBy }) => {
-  if (SERVICE_ID === 'YOUR_EMAILJS_SERVICE_ID') {
-    console.log('📧 [DEV MODE] Follow-up email would send to:', toEmail, { studentName, note });
-    return { status: 'dev-mode' };
-  }
-  try {
-    await emailjs.send(SERVICE_ID, TEMPLATES.followup, {
-      to_email:     toEmail,
-      to_name:      toName,
-      student_name: studentName,
-      note:         note,
-      priority:     priority || 'Normal',
-      assigned_by:  assignedBy,
-      app_url:      window.location.origin,
-    });
-    return { status: 'sent' };
-  } catch (err) {
-    console.error('Email failed:', err);
-    return { status: 'failed', error: err };
-  }
-};
+  const role     = profile?.role || 'staff';
+  const navItems = NAV_BY_ROLE[role] || NAV_BY_ROLE.staff;
+  const sbColor  = SIDEBAR_COLOR[role];
 
-// ── Send email when a concern is assigned ─────────────────────
-export const sendConcernEmail = async ({ toEmail, toName, studentName, concernType, description, assignedBy }) => {
-  if (SERVICE_ID === 'YOUR_EMAILJS_SERVICE_ID') {
-    console.log('📧 [DEV MODE] Concern email would send to:', toEmail);
-    return { status: 'dev-mode' };
-  }
-  try {
-    await emailjs.send(SERVICE_ID, TEMPLATES.concern, {
-      to_email:     toEmail,
-      to_name:      toName,
-      student_name: studentName,
-      concern_type: concernType,
-      description:  description,
-      assigned_by:  assignedBy,
-      app_url:      window.location.origin,
-    });
-    return { status: 'sent' };
-  } catch (err) {
-    console.error('Email failed:', err);
-    return { status: 'failed', error: err };
-  }
-};
+  return (
+    <NotifProvider>
+      <div style={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
+        <Sidebar navItems={navItems} sidebarColor={sbColor} roleLabel={ROLE_LABEL[role]} />
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          <Topbar />
+          <main style={{ flex: 1, overflowY: 'auto', padding: 24 }}>
+            <Outlet />
+          </main>
+        </div>
+      </div>
+    </NotifProvider>
+  );
+}
 
-// ── Email templates to paste in EmailJS dashboard ─────────────
-// TASK TEMPLATE (template_task_assigned):
-// Subject: New Task Assigned — {{task_title}}
-// Body:
-// Hi {{to_name}},
-// {{assigned_by}} has assigned you a new task.
-// Task: {{task_title}}
-// Priority: {{priority}}
-// Due: {{due_date}}
-// Open the dashboard: {{app_url}}
-//
-// FOLLOW-UP TEMPLATE (template_followup_assigned):
-// Subject: Follow-Up Required — {{student_name}}
-// Body:
-// Hi {{to_name}},
-// {{assigned_by}} has assigned you a follow-up for student {{student_name}}.
-// Note: {{note}}
-// Priority: {{priority}}
-// Please log your follow-up at: {{app_url}}
-//
-// CONCERN TEMPLATE (template_concern_assigned):
-// Subject: Student Concern — {{student_name}}
-// Body:
-// Hi {{to_name}},
-// A {{concern_type}} concern has been raised for {{student_name}}.
-// Details: {{description}}
-// Assigned by: {{assigned_by}}
-// View in dashboard: {{app_url}}
+function GuestGuard() {
+  const { user, loading } = useAuth();
+  if (loading) return <Loading />;
+  if (user) return <Navigate to="/" replace />;
+  return <Outlet />;
+}
+
+function HomeDashboard() {
+  const { profile } = useAuth();
+  const role = profile?.role || 'staff';
+  if (role === 'ceo')   return <Dashboard />;
+  if (role === 'admin') return <AdminDashboard />;
+  return <StaffDashboard />;
+}
+
+export default function App() {
+  return (
+    <BrowserRouter>
+      <AuthProvider>
+        <Routes>
+          <Route element={<GuestGuard />}>
+            <Route path="/login" element={<LoginPage />} />
+          </Route>
+          <Route element={<AppShell />}>
+            <Route path="/"              element={<HomeDashboard />}   />
+            <Route path="/students"      element={<StudentsPage />}    />
+            <Route path="/students/:id"  element={<StudentProfile />}  />
+            <Route path="/bulk-import"   element={<BulkImport />}      />
+            <Route path="/followups"     element={<FollowUps />}       />
+            <Route path="/concerns"      element={<Concerns />}        />
+            <Route path="/assessments"   element={<Assessments />}     />
+            <Route path="/batches"       element={<Batches />}         />
+            <Route path="/leaderboard"   element={<Leaderboard />}     />
+            <Route path="/tasks"         element={<Tasks />}           />
+            <Route path="/reports"       element={<Reports />}         />
+            <Route path="/leads"         element={<Leads />}           />
+            <Route path="/documents"     element={<Documents />}       />
+            <Route path="/staff"         element={<StaffManagement />} />
+          </Route>
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </AuthProvider>
+    </BrowserRouter>
+  );
+}

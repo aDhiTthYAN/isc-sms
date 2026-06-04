@@ -1,8 +1,12 @@
 import { useEffect, useState } from 'react';
-import { collection, getDocs, doc, setDoc, updateDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, updateDoc } from 'firebase/firestore';
 import { db } from '../firebase/config';
+import { createStaffAccount } from '../firebase/adminAuth';
 import { Modal, Toast, Loading, Confirm, FormRow } from '../components/ui';
-import { Plus, ShieldOff, RefreshCw, Shield, Copy, Check, BookOpen, Edit } from 'lucide-react';
+import {
+  Plus, ShieldOff, RefreshCw, Shield,
+  BookOpen, Edit, CheckCircle, Mail, Key
+} from 'lucide-react';
 
 const ALL_SUBJECTS = [
   'Mathematics','Science','English','Hindi','Social Science',
@@ -12,28 +16,29 @@ const ALL_SUBJECTS = [
 ];
 
 const ROLE_INFO = {
-  ceo:   { label:'CEO',   badgeCls:'badge-red',    color:'#E53935', desc:'Full access — all modules, assign tasks, manage staff, view all reports' },
-  admin: { label:'Admin', badgeCls:'badge-purple',  color:'#8B5CF6', desc:'Manage students, batches, documents, concerns. Cannot manage staff.' },
-  staff: { label:'Staff', badgeCls:'badge-blue',    color:'#3B82F6', desc:'View assigned students, log follow-ups, submit daily reports, complete tasks.' },
+  ceo:   {
+    label:'CEO', badgeCls:'badge-red', color:'#E53935',
+    desc:'Full access — all modules, assign tasks, manage all staff and reports'
+  },
+  admin: {
+    label:'Admin', badgeCls:'badge-purple', color:'#8B5CF6',
+    desc:'Manage students, batches, documents, concerns. Cannot manage staff.'
+  },
+  staff: {
+    label:'Staff', badgeCls:'badge-blue', color:'#3B82F6',
+    desc:'View assigned students, log follow-ups, submit reports, complete tasks.'
+  },
 };
 
-function generateTempPassword() {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789@#';
-  let pass = '';
-  for (let i = 0; i < 10; i++) pass += chars[Math.floor(Math.random() * chars.length)];
-  return pass;
-}
-
 export default function StaffManagement() {
-  const [staffList, setStaffList]   = useState([]);
-  const [loading, setLoading]       = useState(true);
-  const [showModal, setShowModal]   = useState(false);
-  const [showInstructions, setShowInstructions] = useState(null);
-  const [showSubjectModal, setShowSubjectModal] = useState(null); // staff member
-  const [revoking, setRevoking]     = useState(null);
-  const [toast, setToast]           = useState(null);
-  const [saving, setSaving]         = useState(false);
-  const [copied, setCopied]         = useState('');
+  const [staffList, setStaffList]     = useState([]);
+  const [loading, setLoading]         = useState(true);
+  const [showModal, setShowModal]     = useState(false);
+  const [showSuccess, setShowSuccess] = useState(null);
+  const [showSubjectModal, setShowSubjectModal] = useState(null);
+  const [revoking, setRevoking]       = useState(null);
+  const [toast, setToast]             = useState(null);
+  const [saving, setSaving]           = useState(false);
   const [editingSubjects, setEditingSubjects] = useState([]);
   const [form, setForm] = useState({ name:'', email:'', role:'staff' });
 
@@ -45,24 +50,24 @@ export default function StaffManagement() {
 
   useEffect(() => { load(); }, []);
 
+  // ── Add staff — completely in-app, no Firebase Console needed ─
   const handleAdd = async (e) => {
     e.preventDefault();
     setSaving(true);
     try {
-      const tempPassword = generateTempPassword();
-      const newDocRef = doc(collection(db, 'staff'));
-      await setDoc(newDocRef, {
-        name:           form.name,
-        email:          form.email,
-        role:           form.role,
-        subjects:       [],
-        active:         true,
-        tempPassword:   tempPassword,
-        needsAuthSetup: true,
-        createdAt:      new Date().toISOString(),
+      const result = await createStaffAccount({
+        name:     form.name,
+        email:    form.email,
+        role:     form.role,
+        subjects: [],
       });
+
       setShowModal(false);
-      setShowInstructions({ name: form.name, email: form.email, tempPassword, role: form.role });
+      setShowSuccess({
+        name:  form.name,
+        email: form.email,
+        role:  form.role,
+      });
       setForm({ name:'', email:'', role:'staff' });
       load();
     } catch (err) {
@@ -72,6 +77,7 @@ export default function StaffManagement() {
     }
   };
 
+  // ── Revoke / restore access ────────────────────────────────
   const handleRevoke = async () => {
     await updateDoc(doc(db, 'staff', revoking.id), { active: false });
     setRevoking(null);
@@ -85,6 +91,7 @@ export default function StaffManagement() {
     load();
   };
 
+  // ── Subject assignment ─────────────────────────────────────
   const handleSaveSubjects = async () => {
     await updateDoc(doc(db, 'staff', showSubjectModal.id), { subjects: editingSubjects });
     setToast({ message: `Subjects updated for ${showSubjectModal.name}!`, type:'success' });
@@ -96,12 +103,6 @@ export default function StaffManagement() {
     setEditingSubjects(prev =>
       prev.includes(sub) ? prev.filter(s => s !== sub) : [...prev, sub]
     );
-  };
-
-  const copyToClipboard = (text, key) => {
-    navigator.clipboard.writeText(text);
-    setCopied(key);
-    setTimeout(() => setCopied(''), 2000);
   };
 
   const active  = staffList.filter(s => s.active !== false);
@@ -118,12 +119,15 @@ export default function StaffManagement() {
         </button>
       </div>
 
-      {/* Role cards */}
+      {/* Role explanation cards */}
       <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:12, marginBottom:20 }}>
         {Object.entries(ROLE_INFO).map(([key, info]) => (
-          <div key={key} style={{ padding:'14px 16px', borderRadius:10, border:`1.5px solid ${info.color}30`, background:`${info.color}08` }}>
+          <div key={key} style={{
+            padding:'14px 16px', borderRadius:10,
+            border:`1.5px solid ${info.color}30`, background:`${info.color}08`
+          }}>
             <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:6 }}>
-              <Shield size={15} style={{ color:info.color }} />
+              <Shield size={15} style={{ color:info.color }}/>
               <span style={{ fontWeight:600, fontSize:13, color:info.color }}>{info.label}</span>
             </div>
             <div style={{ fontSize:12, color:'#6B7280', lineHeight:1.5 }}>{info.desc}</div>
@@ -131,29 +135,54 @@ export default function StaffManagement() {
         ))}
       </div>
 
-      {/* Auth setup warning */}
-      <div style={{ padding:'12px 16px', background:'#FFFBEB', border:'1px solid #FDE68A', borderRadius:10, marginBottom:20, fontSize:13 }}>
-        <div style={{ fontWeight:600, marginBottom:6 }}>⚠️ How to give staff login access (2 steps)</div>
-        <div style={{ color:'#374151', lineHeight:1.7 }}>
-          <strong>Step 1:</strong> Add staff below → saves their profile + generates temp password.<br/>
-          <strong>Step 2:</strong> Go to <a href="https://console.firebase.google.com" target="_blank" rel="noreferrer" style={{ color:'#E53935' }}>Firebase Console</a> → Authentication → Add user → enter their email + temp password → copy the UID → in Firestore rename their staff document ID to match that UID.
+      {/* Info banner — new flow */}
+      <div style={{
+        padding:'12px 16px', background:'#F0FDF4',
+        border:'1px solid #BBF7D0', borderRadius:10, marginBottom:20,
+        display:'flex', gap:10, alignItems:'flex-start'
+      }}>
+        <CheckCircle size={18} style={{ color:'#10B981', flexShrink:0, marginTop:1 }}/>
+        <div>
+          <div style={{ fontWeight:600, fontSize:13, color:'#065F46', marginBottom:4 }}>
+            Staff accounts created directly from this dashboard
+          </div>
+          <div style={{ fontSize:12, color:'#374151', lineHeight:1.7 }}>
+            Enter staff name, email and role → click Add. The system automatically:
+            <br/>✅ Creates their login account
+            <br/>✅ Saves their profile with correct role
+            <br/>✅ Sends them a password setup email
+            <br/>Staff clicks the email link → sets their own password → logs in. Done.
+            <br/><strong>No Firebase Console needed ever again.</strong>
+          </div>
         </div>
       </div>
 
       {/* Active staff table */}
       <div className="table-container" style={{ marginBottom:20 }}>
-        <div style={{ padding:'12px 16px', borderBottom:'1px solid var(--border)', fontWeight:600, fontSize:13 }}>
+        <div style={{
+          padding:'12px 16px', borderBottom:'1px solid var(--border)',
+          fontWeight:600, fontSize:13
+        }}>
           Active Staff ({active.length})
         </div>
         <table>
           <thead>
-            <tr><th>Name</th><th>Email</th><th>Role</th><th>Subjects Handling</th><th>Auth Status</th><th>Actions</th></tr>
+            <tr>
+              <th>Name</th>
+              <th>Email</th>
+              <th>Role</th>
+              <th>Subjects Handling</th>
+              <th>Account</th>
+              <th>Actions</th>
+            </tr>
           </thead>
           <tbody>
             {active.length === 0 && (
-              <tr><td colSpan={6} style={{ textAlign:'center', color:'#6B7280', padding:30 }}>
-                No staff yet. Add your first staff member.
-              </td></tr>
+              <tr>
+                <td colSpan={6} style={{ textAlign:'center', color:'#6B7280', padding:30 }}>
+                  No staff yet. Add your first staff member above.
+                </td>
+              </tr>
             )}
             {active.map(member => {
               const ri = ROLE_INFO[member.role] || ROLE_INFO.staff;
@@ -161,51 +190,64 @@ export default function StaffManagement() {
                 <tr key={member.id}>
                   <td>
                     <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-                      <div style={{ width:30, height:30, borderRadius:'50%', background:ri.color, display:'flex', alignItems:'center', justifyContent:'center', color:'#fff', fontSize:11, fontWeight:600 }}>
+                      <div style={{
+                        width:30, height:30, borderRadius:'50%',
+                        background:ri.color, color:'#fff',
+                        display:'flex', alignItems:'center', justifyContent:'center',
+                        fontSize:11, fontWeight:600
+                      }}>
                         {member.name?.charAt(0)?.toUpperCase()}
                       </div>
                       <span style={{ fontWeight:500, fontSize:13 }}>{member.name}</span>
                     </div>
                   </td>
                   <td style={{ color:'#6B7280', fontSize:13 }}>{member.email}</td>
-                  <td><span className={`badge ${ri.badgeCls}`}>{ri.label}</span></td>
+                  <td>
+                    <span className={`badge ${ri.badgeCls}`}>{ri.label}</span>
+                  </td>
                   <td>
                     <div style={{ display:'flex', flexWrap:'wrap', gap:4, alignItems:'center' }}>
                       {(member.subjects || []).length === 0 ? (
-                        <span style={{ fontSize:12, color:'#9CA3AF' }}>No subjects assigned</span>
+                        <span style={{ fontSize:12, color:'#9CA3AF' }}>None assigned</span>
                       ) : (
                         (member.subjects || []).slice(0, 3).map(s => (
                           <span key={s} className="badge badge-blue" style={{ fontSize:10 }}>{s}</span>
                         ))
                       )}
                       {(member.subjects || []).length > 3 && (
-                        <span style={{ fontSize:11, color:'#6B7280' }}>+{member.subjects.length - 3} more</span>
+                        <span style={{ fontSize:11, color:'#6B7280' }}>
+                          +{member.subjects.length - 3} more
+                        </span>
                       )}
-                      <button className="btn btn-ghost btn-sm" style={{ padding:'3px 8px', fontSize:11 }}
-                        onClick={() => { setShowSubjectModal(member); setEditingSubjects(member.subjects || []); }}>
-                        <Edit size={11} /> Edit
+                      <button
+                        className="btn btn-ghost btn-sm"
+                        style={{ padding:'3px 8px', fontSize:11 }}
+                        onClick={() => {
+                          setShowSubjectModal(member);
+                          setEditingSubjects(member.subjects || []);
+                        }}>
+                        <Edit size={11}/> Edit
                       </button>
                     </div>
                   </td>
                   <td>
-                    {member.needsAuthSetup
-                      ? <span className="badge badge-amber">⚠️ Needs Auth setup</span>
-                      : <span className="badge badge-green">✅ Login active</span>
-                    }
+                    <span className="badge badge-green">
+                      <CheckCircle size={11} style={{ marginRight:3 }}/> Active
+                    </span>
                   </td>
                   <td>
                     <div style={{ display:'flex', gap:6 }}>
-                      {member.needsAuthSetup && member.tempPassword && (
-                        <button className="btn btn-ghost btn-sm"
-                          onClick={() => setShowInstructions({ name:member.name, email:member.email, tempPassword:member.tempPassword, role:member.role })}>
-                          View Setup
-                        </button>
-                      )}
                       {member.role !== 'ceo' && (
-                        <button className="btn btn-sm"
-                          style={{ background:'#FEE2E2', color:'#991B1B', border:'none', borderRadius:6, cursor:'pointer', padding:'5px 10px', fontSize:12, display:'flex', alignItems:'center', gap:4 }}
+                        <button
+                          className="btn btn-sm"
+                          style={{
+                            background:'#FEE2E2', color:'#991B1B',
+                            border:'none', borderRadius:6, cursor:'pointer',
+                            padding:'5px 10px', fontSize:12,
+                            display:'flex', alignItems:'center', gap:4
+                          }}
                           onClick={() => setRevoking(member)}>
-                          <ShieldOff size={13} /> Revoke
+                          <ShieldOff size={13}/> Revoke
                         </button>
                       )}
                     </div>
@@ -220,20 +262,30 @@ export default function StaffManagement() {
       {/* Revoked staff */}
       {revoked.length > 0 && (
         <div className="table-container">
-          <div style={{ padding:'12px 16px', borderBottom:'1px solid var(--border)', fontWeight:600, fontSize:13, color:'#6B7280' }}>
+          <div style={{
+            padding:'12px 16px',
+            borderBottom:'1px solid var(--border)',
+            fontWeight:600, fontSize:13, color:'#6B7280'
+          }}>
             Revoked ({revoked.length})
           </div>
           <table>
-            <thead><tr><th>Name</th><th>Email</th><th>Role</th><th></th></tr></thead>
+            <thead>
+              <tr><th>Name</th><th>Email</th><th>Role</th><th></th></tr>
+            </thead>
             <tbody>
               {revoked.map(member => (
                 <tr key={member.id} style={{ opacity:0.6 }}>
                   <td style={{ fontSize:13, fontWeight:500 }}>{member.name}</td>
                   <td style={{ fontSize:13, color:'#6B7280' }}>{member.email}</td>
-                  <td><span className={`badge ${ROLE_INFO[member.role]?.badgeCls||'badge-gray'}`}>{member.role}</span></td>
+                  <td>
+                    <span className={`badge ${ROLE_INFO[member.role]?.badgeCls || 'badge-gray'}`}>
+                      {member.role}
+                    </span>
+                  </td>
                   <td>
                     <button className="btn btn-ghost btn-sm" onClick={() => handleRestore(member)}>
-                      <RefreshCw size={13} /> Restore
+                      <RefreshCw size={13}/> Restore Access
                     </button>
                   </td>
                 </tr>
@@ -243,124 +295,169 @@ export default function StaffManagement() {
         </div>
       )}
 
-      {/* Add Staff Modal */}
+      {/* ── ADD STAFF MODAL ── */}
       {showModal && (
-        <Modal title="Add Staff Member" onClose={() => setShowModal(false)}>
+        <Modal title="Add New Staff Member" onClose={() => setShowModal(false)}>
           <form onSubmit={handleAdd} style={{ display:'flex', flexDirection:'column', gap:14 }}>
+            <div style={{
+              padding:'10px 14px', background:'#EFF6FF',
+              borderRadius:8, fontSize:12, color:'#1E40AF',
+              display:'flex', gap:8, alignItems:'flex-start'
+            }}>
+              <Mail size={14} style={{ flexShrink:0, marginTop:1 }}/>
+              <span>
+                After adding, the staff member gets a <strong>password setup email</strong>.
+                They click the link, set their password, and log in. No extra steps for you.
+              </span>
+            </div>
             <div className="form-group">
               <label className="form-label">Full Name *</label>
-              <input className="form-input" required value={form.name}
-                onChange={e => setForm({...form, name:e.target.value})} placeholder="Staff member's full name" />
+              <input
+                className="form-input" required
+                placeholder="e.g. Priya Suresh"
+                value={form.name}
+                onChange={e => setForm({...form, name:e.target.value})}
+              />
             </div>
             <div className="form-group">
               <label className="form-label">Email Address *</label>
-              <input className="form-input" type="email" required value={form.email}
-                onChange={e => setForm({...form, email:e.target.value})} placeholder="staff@internationalskillsclub.com" />
+              <input
+                className="form-input" type="email" required
+                placeholder="priya@internationalskillsclub.com"
+                value={form.email}
+                onChange={e => setForm({...form, email:e.target.value})}
+              />
+              <div style={{ fontSize:11, color:'#6B7280', marginTop:4 }}>
+                The password setup email will be sent here automatically.
+              </div>
             </div>
             <div className="form-group">
               <label className="form-label">Role *</label>
-              <select className="form-input" value={form.role} onChange={e => setForm({...form, role:e.target.value})}>
+              <select
+                className="form-input"
+                value={form.role}
+                onChange={e => setForm({...form, role:e.target.value})}
+              >
                 <option value="staff">Staff — Limited access</option>
                 <option value="admin">Admin — Moderate access</option>
                 <option value="ceo">CEO — Full access</option>
               </select>
-              <div style={{ fontSize:11, color:'#6B7280', marginTop:4 }}>{ROLE_INFO[form.role]?.desc}</div>
-            </div>
-            <div style={{ padding:'10px 14px', background:'#FFFBEB', borderRadius:8, fontSize:12, color:'#92400E' }}>
-              After saving, you can assign subjects to this staff member from the table.
+              <div style={{ fontSize:11, color:'#6B7280', marginTop:4 }}>
+                {ROLE_INFO[form.role]?.desc}
+              </div>
             </div>
             <div style={{ display:'flex', gap:10, justifyContent:'flex-end' }}>
-              <button type="button" className="btn btn-ghost" onClick={() => setShowModal(false)}>Cancel</button>
+              <button type="button" className="btn btn-ghost"
+                onClick={() => setShowModal(false)}>
+                Cancel
+              </button>
               <button type="submit" className="btn btn-primary" disabled={saving}>
-                {saving ? 'Saving...' : 'Add Staff Member'}
+                {saving
+                  ? 'Creating account...'
+                  : <><Plus size={14}/> Add & Send Email</>
+                }
               </button>
             </div>
           </form>
         </Modal>
       )}
 
-      {/* Subject Assignment Modal */}
-      {showSubjectModal && (
-        <Modal title={`Assign Subjects — ${showSubjectModal.name}`} onClose={() => setShowSubjectModal(null)}>
-          <div style={{ fontSize:13, color:'#6B7280', marginBottom:14 }}>
-            Select all subjects this staff member handles. A staff member can handle multiple subjects.
-          </div>
-          <div style={{ display:'flex', flexWrap:'wrap', gap:8, marginBottom:20 }}>
-            {ALL_SUBJECTS.map(sub => (
-              <div key={sub} onClick={() => toggleSubject(sub)} style={{
-                padding:'6px 14px', borderRadius:20, fontSize:12, cursor:'pointer', fontWeight:500,
-                background: editingSubjects.includes(sub) ? '#3B82F6' : 'var(--bg)',
-                color:      editingSubjects.includes(sub) ? '#fff'    : 'var(--muted)',
-                border:     `1px solid ${editingSubjects.includes(sub) ? '#3B82F6' : 'var(--border)'}`,
-                transition: 'all .15s',
-              }}>
-                {editingSubjects.includes(sub) ? '✓ ' : ''}{sub}
+      {/* ── SUCCESS MODAL ── */}
+      {showSuccess && (
+        <Modal title="Staff Added Successfully!" onClose={() => setShowSuccess(null)}>
+          <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
+            <div style={{
+              padding:'14px', background:'#F0FDF4',
+              borderRadius:10, border:'1px solid #BBF7D0'
+            }}>
+              <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:10 }}>
+                <CheckCircle size={20} style={{ color:'#10B981' }}/>
+                <span style={{ fontWeight:600, fontSize:14, color:'#065F46' }}>
+                  Account created for {showSuccess.name}
+                </span>
               </div>
-            ))}
-          </div>
-          {editingSubjects.length > 0 && (
-            <div style={{ padding:'8px 12px', background:'#DBEAFE', borderRadius:8, fontSize:12, color:'#1E40AF', marginBottom:14 }}>
-              <strong>Assigned:</strong> {editingSubjects.join(', ')}
+              <div style={{ fontSize:13, color:'#374151', lineHeight:1.8 }}>
+                ✅ Login account created in Firebase<br/>
+                ✅ Profile saved with <strong>{showSuccess.role}</strong> role<br/>
+                ✅ Password setup email sent to <strong>{showSuccess.email}</strong><br/>
+                <br/>
+                <strong>What happens next:</strong><br/>
+                The staff member opens their email → clicks "Reset Password" →
+                sets their own password → logs in to the app with their email.
+                <br/><br/>
+                <strong>If they don't receive the email:</strong><br/>
+                Ask them to check spam folder. Or go to Staff Management and
+                you can resend from Firebase Console → Authentication → their account → Reset password.
+              </div>
             </div>
-          )}
-          <div style={{ display:'flex', gap:10, justifyContent:'flex-end' }}>
-            <button className="btn btn-ghost" onClick={() => setShowSubjectModal(null)}>Cancel</button>
-            <button className="btn btn-primary" onClick={handleSaveSubjects}>
-              <BookOpen size={14} /> Save Subjects
+            <button className="btn btn-primary" onClick={() => setShowSuccess(null)}>
+              Done
             </button>
           </div>
         </Modal>
       )}
 
-      {/* Setup Instructions Modal */}
-      {showInstructions && (
-        <Modal title="Staff Setup Instructions" onClose={() => setShowInstructions(null)}>
-          <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
-            <div style={{ padding:'12px 14px', background:'#D1FAE5', borderRadius:8, fontSize:13, color:'#065F46', fontWeight:500 }}>
-              ✅ Staff profile saved! Follow these 2 steps to give them login access.
-            </div>
-            <div style={{ padding:'14px', background:'var(--bg)', borderRadius:10, border:'1px solid var(--border)' }}>
-              <div style={{ fontWeight:600, fontSize:13, marginBottom:10 }}>Step 1 — Create login in Firebase Console</div>
-              <ol style={{ fontSize:12, color:'#374151', lineHeight:2, paddingLeft:16 }}>
-                <li>Go to <a href="https://console.firebase.google.com" target="_blank" rel="noreferrer" style={{ color:'#E53935' }}>console.firebase.google.com</a></li>
-                <li>Open your project → Authentication → Users → Add user</li>
-                <li>Enter the email and password shown below</li>
-                <li>Copy the UID shown after creation</li>
-                <li>In Firestore → staff collection → find this person's document → click the 3 dots → rename document ID to match the UID</li>
-              </ol>
-            </div>
-            <div style={{ padding:'14px', background:'var(--bg)', borderRadius:10, border:'1px solid var(--border)' }}>
-              <div style={{ fontWeight:600, fontSize:13, marginBottom:10 }}>Step 2 — Share with {showInstructions.name}</div>
-              <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-                {[
-                  { label:'App URL',      value:window.location.origin,         key:'url'   },
-                  { label:'Email',        value:showInstructions.email,          key:'email' },
-                  { label:'Temp Password',value:showInstructions.tempPassword,   key:'pass'  },
-                  { label:'Role',         value:showInstructions.role,           key:'role'  },
-                ].map(item => (
-                  <div key={item.key} style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'8px 12px', background:'#fff', borderRadius:8, border:'1px solid var(--border)' }}>
-                    <div>
-                      <div style={{ fontSize:10, color:'#9CA3AF', textTransform:'uppercase', marginBottom:2 }}>{item.label}</div>
-                      <div style={{ fontSize:13, fontWeight:500, fontFamily:item.key==='pass'?'monospace':'inherit' }}>{item.value}</div>
-                    </div>
-                    <button className="btn btn-ghost btn-sm btn-icon" onClick={() => copyToClipboard(item.value, item.key)}>
-                      {copied === item.key ? <Check size={13} style={{ color:'#10B981' }} /> : <Copy size={13} />}
-                    </button>
-                  </div>
-                ))}
+      {/* ── SUBJECT ASSIGNMENT MODAL ── */}
+      {showSubjectModal && (
+        <Modal
+          title={`Assign Subjects — ${showSubjectModal.name}`}
+          onClose={() => setShowSubjectModal(null)}
+        >
+          <div style={{ fontSize:13, color:'#6B7280', marginBottom:14 }}>
+            Select all subjects this staff member handles.
+            A staff can handle multiple subjects.
+          </div>
+          <div style={{ display:'flex', flexWrap:'wrap', gap:8, marginBottom:18 }}>
+            {ALL_SUBJECTS.map(sub => (
+              <div
+                key={sub}
+                onClick={() => toggleSubject(sub)}
+                style={{
+                  padding:'6px 14px', borderRadius:20, fontSize:12,
+                  cursor:'pointer', fontWeight:500, transition:'all .15s',
+                  background: editingSubjects.includes(sub) ? '#3B82F6' : 'var(--bg)',
+                  color:      editingSubjects.includes(sub) ? '#fff'    : 'var(--muted)',
+                  border:     `1px solid ${editingSubjects.includes(sub) ? '#3B82F6' : 'var(--border)'}`,
+                }}
+              >
+                {editingSubjects.includes(sub) ? '✓ ' : ''}{sub}
               </div>
+            ))}
+          </div>
+          {editingSubjects.length > 0 && (
+            <div style={{
+              padding:'8px 12px', background:'#DBEAFE',
+              borderRadius:8, fontSize:12, color:'#1E40AF', marginBottom:14
+            }}>
+              <strong>Selected:</strong> {editingSubjects.join(', ')}
             </div>
-            <button className="btn btn-primary" onClick={() => setShowInstructions(null)}>Done</button>
+          )}
+          <div style={{ display:'flex', gap:10, justifyContent:'flex-end' }}>
+            <button className="btn btn-ghost" onClick={() => setShowSubjectModal(null)}>
+              Cancel
+            </button>
+            <button className="btn btn-primary" onClick={handleSaveSubjects}>
+              <BookOpen size={14}/> Save Subjects
+            </button>
           </div>
         </Modal>
       )}
 
+      {/* Revoke confirmation */}
       {revoking && (
-        <Confirm
-          message={`Revoke access for ${revoking.name}? Their data is preserved but they cannot log in.`}
-          onConfirm={handleRevoke}
-          onCancel={() => setRevoking(null)}
-        />
+        <div className="modal-overlay">
+          <div className="modal" style={{ maxWidth:400 }}>
+            <p style={{ marginBottom:16, fontSize:14, lineHeight:1.6 }}>
+              Revoke access for <strong>{revoking.name}</strong>?
+              They will immediately lose the ability to log in.
+              Their data and history will be preserved.
+            </p>
+            <div style={{ display:'flex', gap:10, justifyContent:'flex-end' }}>
+              <button className="btn btn-ghost" onClick={() => setRevoking(null)}>Cancel</button>
+              <button className="btn btn-danger" onClick={handleRevoke}>Revoke Access</button>
+            </div>
+          </div>
+        </div>
       )}
 
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
