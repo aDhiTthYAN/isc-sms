@@ -1,22 +1,57 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { getStudents, getTasks, getAllFollowUps, getBatches } from '../firebase/services';
+import { getStudents, getTasks, getAllFollowUps, getBatches, getBatchTasks, getBatchStudentCount } from '../firebase/services';
 import { Loading, Avatar, StatusBadge } from '../components/ui';
-import { TrendingUp, Users, AlertTriangle, School, ChevronRight, AlertCircle } from 'lucide-react';
+import { TrendingUp, Users, AlertTriangle, School, ChevronRight, AlertCircle, CheckSquare, Clock } from 'lucide-react';
 
 export default function Dashboard() {
   const [students,  setStudents]  = useState([]);
   const [tasks,     setTasks]     = useState([]);
   const [followups, setFollowups] = useState([]);
   const [batches,   setBatches]   = useState([]);
+  const [batchStats, setBatchStats] = useState([]);
   const [loading,   setLoading]   = useState(true);
 
   useEffect(() => {
-    Promise.all([getStudents(), getTasks(), getAllFollowUps(), getBatches()])
-      .then(([s, t, f, b]) => {
+    const load = async () => {
+      try {
+        const [s, t, f, b] = await Promise.all([
+          getStudents().catch(() => []),
+          getTasks().catch(() => []),
+          getAllFollowUps().catch(() => []),
+          getBatches().catch(() => []),
+        ]);
         setStudents(s); setTasks(t); setFollowups(f); setBatches(b);
+
+        // Load task + student stats per active batch
+        const activeBatches = b.filter(batch => batch.status === 'active');
+        const stats = await Promise.all(activeBatches.map(async (batch) => {
+          const [tasks, count] = await Promise.all([
+            getBatchTasks(batch.id).catch(() => []),
+            getBatchStudentCount(batch.id).catch(() => 0),
+          ]);
+
+          // Course flow completion across all students — not stored per-batch easily
+          // Use task completion as primary metric
+          const totalSubmissions = tasks.reduce((sum, t) => sum + (t.submittedBy?.length || 0), 0);
+          const totalExpected    = tasks.length * (count || 1);
+          const completionPct    = totalExpected > 0 ? Math.round(totalSubmissions / totalExpected * 100) : 0;
+
+          const overdueTasks = tasks.filter(t => {
+            if (!t.dueDate) return false;
+            return new Date(t.dueDate) < new Date() && (t.submittedBy?.length || 0) < count;
+          });
+
+          return { batch, tasks, count, totalSubmissions, totalExpected, completionPct, overdueTasks };
+        }));
+        setBatchStats(stats);
+      } catch (err) {
+        console.error('Dashboard load error:', err);
+      } finally {
         setLoading(false);
-      });
+      }
+    };
+    load();
   }, []);
 
   if (loading) return <Loading text="Loading dashboard..." />;
@@ -27,10 +62,8 @@ export default function Dashboard() {
   const dropped  = students.filter(s => s.status === 'dropped').length;
   const total    = students.length;
 
-  // Students with weak subjects
   const weakSubjectStudents = students.filter(s => s.weakSubjects?.length > 0);
 
-  // Expiring subscriptions
   const expiringSoon = students.filter(s => {
     if (!s.joinDate || !s.courseDurationMonths) return false;
     const exp = new Date(s.joinDate);
@@ -43,15 +76,14 @@ export default function Dashboard() {
   const activeBatches   = batches.filter(b => b.status === 'active');
 
   const statsCards = [
-    { label:'Total Students', value:total,        sub:`+${students.filter(s => { if (!s.createdAt) return false; const d = s.createdAt.toDate?s.createdAt.toDate():new Date(s.createdAt); const now=new Date(); return d.getMonth()===now.getMonth()&&d.getFullYear()===now.getFullYear(); }).length} this month`, color:'#E53935', bg:'#FEE2E2', icon:Users },
-    { label:'Active Students', value:active,       sub:`${total?Math.round(active/total*100):0}% active rate`, color:'#10B981', bg:'#D1FAE5', icon:TrendingUp },
-    { label:'At Risk',         value:atRisk,        sub:'Needs attention',  color:'#F59E0B', bg:'#FEF3C7', icon:AlertTriangle },
-    { label:'Active Batches',  value:activeBatches.length, sub:`${batches.filter(b=>b.status==='upcoming').length} starting soon`, color:'#3B82F6', bg:'#DBEAFE', icon:School },
+    { label:'Total Students', value:total, sub:`+${students.filter(s => { if (!s.createdAt) return false; const d = s.createdAt.toDate?s.createdAt.toDate():new Date(s.createdAt); const now=new Date(); return d.getMonth()===now.getMonth()&&d.getFullYear()===now.getFullYear(); }).length} this month`, color:'#E53935', bg:'#FEE2E2', icon:Users },
+    { label:'Active Students', value:active, sub:`${total?Math.round(active/total*100):0}% active rate`, color:'#10B981', bg:'#D1FAE5', icon:TrendingUp },
+    { label:'At Risk', value:atRisk, sub:'Needs attention', color:'#F59E0B', bg:'#FEF3C7', icon:AlertTriangle },
+    { label:'Active Batches', value:activeBatches.length, sub:`${batches.filter(b=>b.status==='upcoming').length} starting soon`, color:'#3B82F6', bg:'#DBEAFE', icon:School },
   ];
 
   return (
     <div>
-      {/* Alert banners */}
       {expiringSoon.length > 0 && (
         <div style={{ padding:'10px 14px', background:'#FEE2E2', borderRadius:8, fontSize:12, color:'#991B1B', marginBottom:14, display:'flex', alignItems:'center', gap:8 }}>
           📅 <strong>{expiringSoon.length} student subscriptions</strong> expire within 30 days.
@@ -88,9 +120,9 @@ export default function Dashboard() {
           </div>
           {[
             { label:'Active',   count:active,   color:'#10B981', total },
-            { label:'Moderate', count:moderate,  color:'#F59E0B', total },
-            { label:'At Risk',  count:atRisk,    color:'#EF4444', total },
-            { label:'Dropped',  count:dropped,   color:'#9CA3AF', total },
+            { label:'Moderate', count:moderate, color:'#F59E0B', total },
+            { label:'At Risk',  count:atRisk,   color:'#EF4444', total },
+            { label:'Dropped',  count:dropped,  color:'#9CA3AF', total },
           ].map(row => (
             <div key={row.label} style={{ display:'flex', alignItems:'center', gap:10, marginBottom:10 }}>
               <div style={{ width:9, height:9, borderRadius:'50%', background:row.color, flexShrink:0 }}/>
@@ -101,7 +133,6 @@ export default function Dashboard() {
               <span style={{ fontSize:13, fontWeight:600, width:28, textAlign:'right' }}>{row.count}</span>
             </div>
           ))}
-          {/* Weak subject students */}
           {weakSubjectStudents.length > 0 && (
             <div style={{ marginTop:12, padding:'10px 12px', background:'#FEF3C7', borderRadius:8, display:'flex', alignItems:'center', gap:8 }}>
               <AlertCircle size={14} style={{ color:'#F59E0B' }}/>
@@ -135,6 +166,64 @@ export default function Dashboard() {
           ))}
         </div>
       </div>
+
+      {/* Batch Assignment Completion */}
+      {batchStats.length > 0 && (
+        <div className="card" style={{ marginBottom:14 }}>
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:14 }}>
+            <h3 style={{ fontSize:14, fontWeight:600 }}>📊 Batch Assignment Tracker</h3>
+            <Link to="/batches" style={{ fontSize:12, color:'#E53935', display:'flex', alignItems:'center', gap:2 }}>
+              Manage <ChevronRight size={13}/>
+            </Link>
+          </div>
+          <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
+            {batchStats.map(({ batch, tasks, count, completionPct, overdueTasks }) => (
+              <div key={batch.id} style={{ padding:'12px 14px', background:'#FAFAFA', borderRadius:10, border:'1px solid #E5E7EB' }}>
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:8 }}>
+                  <div>
+                    <div style={{ fontWeight:600, fontSize:13 }}>{batch.name}</div>
+                    <div style={{ fontSize:11, color:'#6B7280' }}>{count} students · {tasks.length} tasks</div>
+                  </div>
+                  <div style={{ textAlign:'right' }}>
+                    <div style={{ fontSize:18, fontWeight:700, color: completionPct >= 80 ? '#10B981' : completionPct >= 50 ? '#F59E0B' : '#EF4444' }}>
+                      {completionPct}%
+                    </div>
+                    <div style={{ fontSize:10, color:'#6B7280' }}>submitted</div>
+                  </div>
+                </div>
+                <div className="progress-bar" style={{ marginBottom:8 }}>
+                  <div className="progress-fill" style={{ width:`${completionPct}%`, background: completionPct >= 80 ? '#10B981' : completionPct >= 50 ? '#F59E0B' : '#EF4444' }}/>
+                </div>
+                <div style={{ display:'flex', gap:16, fontSize:11 }}>
+                  {tasks.slice(0, 3).map(task => {
+                    const submitted = task.submittedBy?.length || 0;
+                    const pct = count > 0 ? Math.round(submitted/count*100) : 0;
+                    const overdue = task.dueDate && new Date(task.dueDate) < new Date() && submitted < count;
+                    return (
+                      <div key={task.id} style={{ flex:1, padding:'6px 8px', background: overdue ? '#FEF3C7' : '#F0FDF4', borderRadius:6 }}>
+                        <div style={{ fontWeight:500, marginBottom:2, color:'#374151', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>
+                          {overdue ? '⚠️ ' : '✅ '}{task.title}
+                        </div>
+                        <div style={{ color: submitted === count ? '#10B981' : '#6B7280' }}>
+                          {submitted}/{count} done {overdue && <span style={{ color:'#92400E' }}>· overdue</span>}
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {tasks.length > 3 && (
+                    <div style={{ display:'flex', alignItems:'center', fontSize:11, color:'#6B7280' }}>+{tasks.length-3} more</div>
+                  )}
+                </div>
+                {overdueTasks.length > 0 && (
+                  <div style={{ marginTop:8, padding:'6px 10px', background:'#FEE2E2', borderRadius:6, fontSize:11, color:'#991B1B' }}>
+                    ⚠️ {overdueTasks.length} overdue task{overdueTasks.length > 1 ? 's' : ''} need attention
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="grid-2">
         {/* Tasks */}
@@ -184,9 +273,7 @@ export default function Dashboard() {
                   <div>
                     <div style={{ fontSize:13, fontWeight:500 }}>{batch.name}</div>
                     <div style={{ fontSize:11, color:'#6B7280' }}>
-                      {batch.faculties?.length > 0
-                        ? batch.faculties.join(', ')
-                        : batch.mentor || '—'}
+                      {batch.faculties?.length > 0 ? batch.faculties.join(', ') : batch.mentor || '—'}
                     </div>
                   </div>
                   <span className={`badge ${batch.status==='active'?'badge-green':batch.status==='upcoming'?'badge-blue':'badge-gray'}`}>
