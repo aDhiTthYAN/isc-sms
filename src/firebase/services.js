@@ -240,11 +240,13 @@ export const updateBatchTask = async (id, data) =>
   updateDoc(doc(db,'batchTasks', id), data);
 
 // ── Assessments ────────────────────────────────────────────────
-export const getAssessments = async (studentId) => {
-  const q = query(collection(db,'assessments'), where('studentId','==',studentId));
+export const getAssessments = async (batchId) => {
+  const q = batchId
+    ? query(collection(db,'assessments'), where('batchId','==',batchId))
+    : collection(db,'assessments');
   const snap = await getDocs(q);
   return snap.docs.map(d => ({ id: d.id, ...d.data() }))
-    .sort((a,b) => (a.date||'').localeCompare(b.date||''));
+    .sort((a,b) => (b.date||'').localeCompare(a.date||''));
 };
 
 export const getAllAssessments = async () => {
@@ -253,13 +255,26 @@ export const getAllAssessments = async () => {
 };
 
 export const getBatchAssessments = async (batchId, testName) => {
-  const q = query(collection(db,'assessments'), where('batchId','==',batchId), where('testName','==',testName), orderBy('percentage','desc'));
+  const q = query(collection(db,'assessments'), where('batchId','==',batchId), where('testName','==',testName));
   const snap = await getDocs(q);
-  return snap.docs.map((d, i) => ({ id: d.id, rank: i + 1, ...d.data() }));
+  return snap.docs.map((d, i) => ({ id: d.id, rank: i + 1, ...d.data() }))
+    .sort((a,b) => (b.percentage||0) - (a.percentage||0));
 };
 
 export const addAssessment = async (data) =>
   addDoc(collection(db,'assessments'), { ...data, createdAt: serverTimestamp() });
+
+export const deleteAssessment = async (id) => deleteDoc(doc(db,'assessments',id));
+
+export const getAssessmentResults = async (assessmentId) => {
+  const q = query(collection(db,'assessmentResults'), where('assessmentId','==',assessmentId));
+  const snap = await getDocs(q);
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }))
+    .sort((a,b) => (b.percentage||0) - (a.percentage||0));
+};
+
+export const saveAssessmentResults = async (results) =>
+  Promise.all(results.map(r => addDoc(collection(db,'assessmentResults'), { ...r, savedAt: serverTimestamp() })));
 
 // ── Tasks ──────────────────────────────────────────────────────
 export const getTasks = async () => {
@@ -454,27 +469,13 @@ export const getRequests = async (status) => {
 export const updateRequest = async (id, data) =>
   updateDoc(doc(db,'requests', id), data);
 
-// ── Top-level Assessments ──────────────────────────────────────
-export const getTopLevelAssessments = async () => {
-  const snap = await getDocs(collection(db,'topAssessments'));
-  return snap.docs.map(d => ({ id: d.id, ...d.data() }))
-    .sort((a,b) => (b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));
-};
-
-export const addTopLevelAssessment = async (data) =>
-  addDoc(collection(db,'topAssessments'), { ...data, createdAt: serverTimestamp() });
-
+// ── Top-level Assessments (legacy aliases kept for compatibility) ──
+export const getTopLevelAssessments = getAssessments;
+export const addTopLevelAssessment = addAssessment;
 export const updateTopLevelAssessment = async (id, data) =>
-  updateDoc(doc(db,'topAssessments', id), data);
-
+  updateDoc(doc(db,'assessments', id), data);
 export const saveAssessmentResult = async (data) =>
   addDoc(collection(db,'assessmentResults'), { ...data, savedAt: serverTimestamp() });
-
-export const getAssessmentResults = async (assessmentId) => {
-  const q = query(collection(db,'assessmentResults'), where('assessmentId','==',assessmentId));
-  const snap = await getDocs(q);
-  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
-};
 
 // ── Batch staff (for assigned batches by staffIds) ─────────────
 export const getStaffBatches = async (uid) => {
