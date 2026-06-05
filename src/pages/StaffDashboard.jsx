@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import {
-  getMyStudents, getMyTasks, getMyFollowUps, getBatches, updateTask
+  getMyStudents, getMyTasks, getMyFollowUps, getStaffBatches, updateTask
 } from '../firebase/services';
 import { Loading, StatusBadge } from '../components/ui';
 import { useAuth } from '../context/AuthContext';
@@ -31,27 +31,23 @@ export default function StaffDashboard() {
     const load = async () => {
       try {
         const [s, t, f, b] = await Promise.all([
-          getMyStudents(profile?.name).catch(() => []),
+          getMyStudents(profile?.name, profile?.uid).catch(() => []),
           getMyTasks(profile?.email).catch(() => []),
           getMyFollowUps(profile?.email).catch(() => []),
-          getBatches().catch(() => []),
+          getStaffBatches(profile?.uid).catch(() => []),
         ]);
         setStudents(s);
         setTasks(t);
         setFollowups(f);
-        const mine = b.filter(batch =>
-          batch.faculties?.includes(profile?.name) ||
-          batch.mentor === profile?.name
-        );
-        setMyBatches(mine.length > 0 ? mine : b.slice(0, 5));
+        setMyBatches(b);
       } catch (err) {
         console.error(err);
       } finally {
         setLoading(false);
       }
     };
-    if (profile?.name) load();
-  }, [profile?.name]);
+    if (profile?.uid) load();
+  }, [profile?.uid]);
 
   if (loading) return <Loading text="Loading your dashboard..." />;
 

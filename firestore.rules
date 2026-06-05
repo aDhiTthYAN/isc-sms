@@ -80,5 +80,23 @@ service cloud.firestore {
     match /attendance/{doc} {
       allow read, write: if isAuth();
     }
+
+    match /trash/{doc} {
+      allow read, write: if isCEO();
+    }
+
+    match /requests/{doc} {
+      allow read: if isAuth();
+      allow create: if isAuth();
+      allow update: if isCEO();
+    }
+
+    match /assessmentResults/{doc} {
+      allow read, write: if isAuth();
+    }
+
+    match /topAssessments/{doc} {
+      allow read, write: if isAuth();
+    }
   }
 }

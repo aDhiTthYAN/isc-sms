@@ -21,6 +21,8 @@ import Leads           from './pages/Leads';
 import Documents       from './pages/Documents';
 import StaffManagement from './pages/StaffManagement';
 import BulkImport      from './pages/BulkImport';
+import Trash           from './pages/Trash';
+import Requests        from './pages/Requests';
 
 const NAV_BY_ROLE = {
   ceo: [
@@ -42,6 +44,8 @@ const NAV_BY_ROLE = {
     { to: '/documents',   label: 'Documents',        icon: 'FolderOpen'     },
     { section: 'Settings' },
     { to: '/staff',       label: 'Staff Management', icon: 'UsersRound'     },
+    { to: '/requests',    label: 'Staff Requests',   icon: 'Inbox'          },
+    { to: '/trash',       label: 'Trash',            icon: 'Trash2'         },
   ],
   admin: [
     { section: 'Overview' },
@@ -140,6 +144,8 @@ export default function App() {
             <Route path="/leads"         element={<Leads />}           />
             <Route path="/documents"     element={<Documents />}       />
             <Route path="/staff"         element={<StaffManagement />} />
+            <Route path="/trash"         element={<Trash />}           />
+            <Route path="/requests"      element={<Requests />}        />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

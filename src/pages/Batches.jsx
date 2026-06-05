@@ -5,8 +5,14 @@ import {
   getBatchStudents, addStudent, bulkAddStudents, getBatchStudentCount,
   getStaffProfiles, getBatchSchedules, addBatchSchedule, deleteBatchSchedule,
   getBatchTasks, addBatchTask, markTaskSubmitted,
-  updateScheduleStatus, saveAttendance, getSessionAttendance
+  updateScheduleStatus, saveAttendance, getSessionAttendance,
+  addNotification, getTrashItems, permanentDelete,
+  createRequest
 } from '../firebase/services';
+import {
+  collection, addDoc, deleteDoc, doc, setDoc, serverTimestamp, getDocs, query, where, updateDoc
+} from 'firebase/firestore';
+import { db } from '../firebase/config';
 import { Modal, Toast, Loading, FormRow, Avatar, StatusBadge } from '../components/ui';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -201,6 +207,16 @@ export default function Batches() {
   const [attendanceSaved, setAttendanceSaved] = useState({});
   const attendanceFileRef = useRef();
 
+  // Staff tab state
+  const [showAddStaff,    setShowAddStaff]    = useState(false);
+  const [staffSearch,     setStaffSearch]     = useState('');
+  const [selectedStaffIds, setSelectedStaffIds] = useState([]);
+  const [removalReason,   setRemovalReason]   = useState('');
+  const [showRemovalModal, setShowRemovalModal] = useState(null); // { uid, name, targetType, targetId, targetName }
+
+  // Delete batch / student confirmation
+  const [deleteStudentConfirm, setDeleteStudentConfirm] = useState(null); // student object
+
   // Onboarding analytics side panel
   const [selectedStep, setSelectedStep]     = useState(null);
 
@@ -214,11 +230,11 @@ export default function Batches() {
 
   // Batch create form
   const [createForm, setCreateForm] = useState({
-    name:'', course:'', mentor:'', faculties:[], startDate:'', endDate:'',
+    name:'', course:'', mentorId:'', mentorName:'', faculties:[], startDate:'', endDate:'',
     status:'upcoming', maxSeats:'', courseDurationMonths:'',
     courseFlow: DEFAULT_COURSE_FLOW,
     studentFields: DEFAULT_STUDENT_FIELDS,
-    subjects: [],
+    subjects: [], staffIds: [], staffDetails: [],
   });
 
   const [studentForm, setStudentForm] = useState({});
@@ -290,7 +306,7 @@ export default function Batches() {
     await addBatch(createForm);
     setToast({ message:`Batch "${createForm.name}" created!`, type:'success' });
     setShowCreate(false);
-    setCreateForm({ name:'', course:'', mentor:'', faculties:[], startDate:'', endDate:'', status:'upcoming', maxSeats:'', courseDurationMonths:'', courseFlow:DEFAULT_COURSE_FLOW, studentFields:DEFAULT_STUDENT_FIELDS, subjects:[] });
+    setCreateForm({ name:'', course:'', mentorId:'', mentorName:'', faculties:[], startDate:'', endDate:'', status:'upcoming', maxSeats:'', courseDurationMonths:'', courseFlow:DEFAULT_COURSE_FLOW, studentFields:DEFAULT_STUDENT_FIELDS, subjects:[], staffIds:[], staffDetails:[] });
     await loadBatches(); setSaving(false);
   };
 
@@ -360,6 +376,133 @@ export default function Batches() {
     const updated = { ...selectedBatch, subjects:editSubjects };
     setSelectedBatch(updated); setBatches(prev => prev.map(b => b.id===selectedBatch.id?updated:b));
     setShowSubjectConfig(false); setToast({ message:'Subjects updated!', type:'success' }); setSaving(false);
+  };
+
+  const handleDeleteBatch = async () => {
+    if (!selectedBatch) return;
+    setSaving(true);
+    try {
+      // Move to trash
+      await addDoc(collection(db,'trash'), {
+        type: 'batch', originalId: selectedBatch.id, data: selectedBatch,
+        deletedAt: serverTimestamp(), deletedBy: profile?.uid,
+      });
+      // Mark all students as deleted
+      const studentsSnap = await getDocs(query(collection(db,'students'), where('batchId','==',selectedBatch.id)));
+      await Promise.all(studentsSnap.docs.map(d =>
+        updateDoc(doc(db, 'students', d.id), { deleted: true, deletedAt: serverTimestamp(), batchId: selectedBatch.id })
+      ));
+      // Delete batch
+      await deleteDoc(doc(db,'batches', selectedBatch.id));
+      setToast({ message:'Batch deleted and archived to trash.', type:'success' });
+      setSelectedBatch(null);
+      await loadBatches();
+    } catch (err) {
+      setToast({ message:'Error deleting batch: ' + err.message, type:'error' });
+    }
+    setSaving(false);
+  };
+
+  const handleDeleteStudent = async (student) => {
+    setSaving(true);
+    try {
+      await addDoc(collection(db,'trash'), {
+        type: 'student', originalId: student.id, data: student,
+        deletedAt: serverTimestamp(),
+      });
+      await deleteDoc(doc(db,'students', student.id));
+      setToast({ message:`${student.name} moved to trash.`, type:'success' });
+      setDeleteStudentConfirm(null);
+      await loadBatchDetail(selectedBatch);
+      const c = await getBatchStudentCount(selectedBatch.id);
+      setBatchCounts(prev => ({ ...prev, [selectedBatch.id]: c }));
+    } catch (err) {
+      setToast({ message:'Error: ' + err.message, type:'error' });
+    }
+    setSaving(false);
+  };
+
+  const handleAddStaffToBatch = async () => {
+    if (!selectedStaffIds.length) return;
+    setSaving(true);
+    try {
+      const currentStaffIds = selectedBatch.staffIds || [];
+      const currentStaffDetails = selectedBatch.staffDetails || [];
+      const newStaffToAdd = staffList.filter(s => selectedStaffIds.includes(s.id) && !currentStaffIds.includes(s.id));
+      const updatedStaffIds = [...currentStaffIds, ...newStaffToAdd.map(s => s.id)];
+      const updatedStaffDetails = [...currentStaffDetails, ...newStaffToAdd.map(s => ({
+        uid: s.id, name: s.name, phone: s.phone || '', email: s.email || '', subjects: [],
+      }))];
+      await updateBatch(selectedBatch.id, { staffIds: updatedStaffIds, staffDetails: updatedStaffDetails });
+      // Send notifications
+      for (const staff of newStaffToAdd) {
+        if (staff.email) {
+          await addNotification({
+            toEmail: staff.email, title: 'New Batch Assignment',
+            body: `You have been added to batch ${selectedBatch.name}`,
+            type: 'batch_assignment', read: false,
+          });
+        }
+      }
+      const updated = { ...selectedBatch, staffIds: updatedStaffIds, staffDetails: updatedStaffDetails };
+      setSelectedBatch(updated);
+      setBatches(prev => prev.map(b => b.id === selectedBatch.id ? updated : b));
+      setShowAddStaff(false);
+      setSelectedStaffIds([]);
+      setToast({ message:'Staff added to batch!', type:'success' });
+    } catch (err) {
+      setToast({ message:'Error: ' + err.message, type:'error' });
+    }
+    setSaving(false);
+  };
+
+  const handleRemoveStaffFromBatch = async (staffUid) => {
+    setSaving(true);
+    try {
+      const updatedStaffIds = (selectedBatch.staffIds || []).filter(id => id !== staffUid);
+      const updatedStaffDetails = (selectedBatch.staffDetails || []).filter(s => s.uid !== staffUid);
+      await updateBatch(selectedBatch.id, { staffIds: updatedStaffIds, staffDetails: updatedStaffDetails });
+      const updated = { ...selectedBatch, staffIds: updatedStaffIds, staffDetails: updatedStaffDetails };
+      setSelectedBatch(updated);
+      setBatches(prev => prev.map(b => b.id === selectedBatch.id ? updated : b));
+      setToast({ message:'Staff removed from batch.', type:'success' });
+    } catch (err) {
+      setToast({ message:'Error: ' + err.message, type:'error' });
+    }
+    setSaving(false);
+  };
+
+  const handleSubmitRemovalRequest = async () => {
+    if (!showRemovalModal || !removalReason.trim()) return;
+    setSaving(true);
+    try {
+      await createRequest({
+        type: 'removal',
+        requestedBy: profile?.uid, requestedByName: profile?.name,
+        targetType: showRemovalModal.targetType,
+        targetId: showRemovalModal.targetId,
+        targetName: showRemovalModal.targetName,
+        reason: removalReason, status: 'pending',
+      });
+      // Notify CEO
+      const ceoSnap = await getDocs(query(collection(db,'staff'), where('role','==','ceo')));
+      for (const ceoDoc of ceoSnap.docs) {
+        const ceo = ceoDoc.data();
+        if (ceo.email) {
+          await addNotification({
+            toEmail: ceo.email, title: 'Staff Removal Request',
+            body: `${profile?.name} requested removal from ${showRemovalModal.targetName}`,
+            type: 'removal_request', read: false,
+          });
+        }
+      }
+      setShowRemovalModal(null);
+      setRemovalReason('');
+      setToast({ message:'Removal request submitted.', type:'success' });
+    } catch (err) {
+      setToast({ message:'Error: ' + err.message, type:'error' });
+    }
+    setSaving(false);
   };
 
   const handleAddSchedule = async (e) => {
@@ -438,9 +581,12 @@ export default function Batches() {
     const batchFlow = selectedBatch.courseFlow || DEFAULT_COURSE_FLOW;
     const batchFields = selectedBatch.studentFields || DEFAULT_STUDENT_FIELDS;
     const batchSubjects = selectedBatch.subjects || [];
+    const batchStaffDetails = selectedBatch.staffDetails || [];
     const flowAnalytics = getFlowAnalytics();
     const fullyOnboarded = batchStudents.filter(s => batchFlow.every(step => s.courseFlow?.[step.key]?.done)).length;
     const overdueSessions = getOverdueSessions();
+    const isExpired = selectedBatch.endDate && new Date(selectedBatch.endDate) < new Date();
+    const isMentorOrCEOAdmin = isCEOorAdmin || selectedBatch.mentorId === profile?.uid;
 
     // Task split panel data
     const currentTask = selectedTask ? batchTasks.find(t => t.id === selectedTask) : null;
@@ -465,11 +611,17 @@ export default function Batches() {
           <div style={{ display:'flex', alignItems:'center', gap:12 }}>
             <button className="btn btn-ghost btn-sm btn-icon" onClick={() => setSelectedBatch(null)}><ArrowLeft size={16}/></button>
             <div>
-              <h2 style={{ fontSize: 20, fontWeight: 700 }}>{selectedBatch.name}</h2>
+              <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                <h2 style={{ fontSize: 20, fontWeight: 700 }}>{selectedBatch.name}</h2>
+                {isExpired && (
+                  <span style={{ fontSize:11, padding:'2px 8px', borderRadius:10, background:'#E5E7EB', color:'#6B7280', fontWeight:600 }}>Expired</span>
+                )}
+              </div>
               <div style={{ fontSize:13, color:'#6B7280' }}>
                 {selectedBatch.course}
                 {selectedBatch.courseDurationMonths ? ` · ${selectedBatch.courseDurationMonths} months` : ''}
                 {' · '}{count} students
+                {selectedBatch.mentorName ? ` · Mentor: ${selectedBatch.mentorName}` : ''}
               </div>
             </div>
           </div>
@@ -481,17 +633,26 @@ export default function Batches() {
                 <button className="btn btn-ghost btn-sm" onClick={() => { setEditSubjects([...batchSubjects]); setShowSubjectConfig(true); }}><Settings size={13}/> Subjects</button>
               </>
             )}
-            {activeTab === 'students' && (
+            {activeTab === 'students' && !isExpired && (
               <>
                 <button className="btn btn-ghost" onClick={() => setShowBulk(true)}><Upload size={14}/> Bulk CSV</button>
                 {isCEOorAdmin && <button className="btn btn-primary" onClick={() => setShowAddStudent(true)}><UserPlus size={14}/> Add Student</button>}
               </>
             )}
-            {activeTab === 'schedule' && (
+            {activeTab === 'schedule' && !isExpired && (
               <button className="btn btn-primary" onClick={() => setShowSchedule(true)}><Plus size={14}/> Add Class</button>
             )}
-            {activeTab === 'tasks' && (
+            {activeTab === 'tasks' && !isExpired && (
               <button className="btn btn-primary" onClick={() => setShowTask(true)}><Plus size={14}/> Add Task</button>
+            )}
+            {profile?.role === 'ceo' && (
+              <button
+                className="btn btn-sm"
+                style={{ background:'#EF4444', color:'#fff', border:'none' }}
+                onClick={() => { if (window.confirm('Are you sure? This will archive all student data. Students can be restored from the Trash.')) handleDeleteBatch(); }}
+              >
+                <Trash2 size={13}/> Delete Batch
+              </button>
             )}
           </div>
         </div>
@@ -531,6 +692,7 @@ export default function Batches() {
             { key:'onboarding', label:'Onboarding Analytics'              },
             { key:'schedule',   label:`Schedule (${schedules.length})`    },
             { key:'tasks',      label:`Assignments (${batchTasks.length})` },
+            { key:'staff',      label:`Staff (${batchStaffDetails.length + (selectedBatch.mentorId ? 1 : 0)})` },
           ].map(t => (
             <div key={t.key} className={`tab ${activeTab===t.key?'active':''}`} onClick={() => { setActiveTab(t.key); setSelectedTask(null); }}>
               {t.label}
@@ -613,7 +775,13 @@ export default function Batches() {
                               {flowDone}/{batchFlow.length} {onboardDone ? '✅' : '⏳'}
                             </span>
                           </td>
-                          <td><button className="btn btn-ghost btn-sm" onClick={() => navigate(`/students/${s.id}`)}>View <ChevronRight size={12}/></button></td>
+                          <td style={{ display:'flex', gap:4, alignItems:'center' }}>
+                            <button className="btn btn-ghost btn-sm" onClick={() => navigate(`/students/${s.id}`)}>View <ChevronRight size={12}/></button>
+                            {profile?.role === 'ceo' && (
+                              <button className="btn btn-sm" style={{ background:'#FEE2E2', color:'#EF4444', border:'none', padding:'4px 8px' }}
+                                onClick={() => setDeleteStudentConfirm(s)}><Trash2 size={12}/></button>
+                            )}
+                          </td>
                         </tr>
                       );
                     })}
@@ -1012,7 +1180,135 @@ export default function Batches() {
           </div>
         )}
 
+        {/* ── STAFF TAB ── */}
+        {activeTab === 'staff' && (() => {
+          // Build staff rows: mentor first, then staffDetails
+          const mentorEntry = selectedBatch.mentorId ? {
+            uid: selectedBatch.mentorId, name: selectedBatch.mentorName || '—',
+            phone: '', email: '', subjects: [], isMentor: true,
+          } : null;
+          const staffRows = [
+            ...(mentorEntry ? [mentorEntry] : []),
+            ...(batchStaffDetails.filter(s => s.uid !== selectedBatch.mentorId).map(s => ({ ...s, isMentor: false }))),
+          ];
+
+          return (
+            <div>
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:14 }}>
+                <h3 style={{ fontSize:15, fontWeight:700 }}>Staff & Mentor</h3>
+                {isMentorOrCEOAdmin && (
+                  <button className="btn btn-primary btn-sm" onClick={() => setShowAddStaff(true)}><Plus size={13}/> Add Staff</button>
+                )}
+              </div>
+              <div className="table-container">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Name</th><th>Phone</th><th>Email</th><th>Subjects</th><th>Role</th><th></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {staffRows.length === 0 && (
+                      <tr><td colSpan={6} style={{ textAlign:'center', color:'#9CA3AF', padding:32 }}>No staff assigned yet.</td></tr>
+                    )}
+                    {staffRows.map(s => (
+                      <tr key={s.uid}>
+                        <td style={{ fontWeight:600 }}>{s.name}</td>
+                        <td style={{ color:'#6B7280' }}>{s.phone||'—'}</td>
+                        <td style={{ color:'#6B7280' }}>{s.email||'—'}</td>
+                        <td style={{ color:'#6B7280' }}>{(s.subjects||[]).join(', ')||'—'}</td>
+                        <td>
+                          {s.isMentor
+                            ? <span style={{ fontSize:11, padding:'2px 9px', borderRadius:10, background:'#FEF3C7', color:'#92400E', fontWeight:700 }}>Mentor</span>
+                            : <span style={{ fontSize:11, padding:'2px 9px', borderRadius:10, background:'#DBEAFE', color:'#1E40AF', fontWeight:600 }}>Staff</span>
+                          }
+                        </td>
+                        <td style={{ display:'flex', gap:6 }}>
+                          {profile?.role === 'ceo' && !s.isMentor && (
+                            <button className="btn btn-sm" style={{ background:'#FEE2E2', color:'#EF4444', border:'none' }}
+                              onClick={() => { if (window.confirm(`Remove ${s.name} from batch?`)) handleRemoveStaffFromBatch(s.uid); }}>
+                              Remove
+                            </button>
+                          )}
+                          {s.uid === profile?.uid && !s.isMentor && (
+                            <button className="btn btn-sm btn-ghost"
+                              onClick={() => setShowRemovalModal({ uid: s.uid, name: s.name, targetType: 'batch', targetId: selectedBatch.id, targetName: selectedBatch.name })}>
+                              Request Removal
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          );
+        })()}
+
         {/* ── MODALS ── */}
+
+        {/* Delete Student Confirm */}
+        {deleteStudentConfirm && (
+          <Modal title="Delete Student" onClose={() => setDeleteStudentConfirm(null)}>
+            <p style={{ fontSize:14, color:'#374151', marginBottom:20 }}>
+              Are you sure you want to delete <strong>{deleteStudentConfirm.name}</strong>?
+              They will be moved to Trash and can be restored.
+            </p>
+            <div style={{ display:'flex', gap:10, justifyContent:'flex-end' }}>
+              <button className="btn btn-ghost" onClick={() => setDeleteStudentConfirm(null)}>Cancel</button>
+              <button className="btn btn-sm" style={{ background:'#EF4444', color:'#fff', border:'none' }}
+                disabled={saving} onClick={() => handleDeleteStudent(deleteStudentConfirm)}>
+                {saving ? 'Deleting...' : 'Delete'}
+              </button>
+            </div>
+          </Modal>
+        )}
+
+        {/* Add Staff Modal */}
+        {showAddStaff && (
+          <Modal title={`Add Staff to ${selectedBatch.name}`} onClose={() => { setShowAddStaff(false); setSelectedStaffIds([]); setStaffSearch(''); }}>
+            <input className="form-input" placeholder="Search staff..." style={{ marginBottom:12 }}
+              value={staffSearch} onChange={e => setStaffSearch(e.target.value)} />
+            <div style={{ maxHeight:280, overflowY:'auto', display:'flex', flexDirection:'column', gap:6, marginBottom:16 }}>
+              {staffList.filter(s => s.role !== 'ceo' && (!staffSearch || s.name?.toLowerCase().includes(staffSearch.toLowerCase()) || s.phone?.includes(staffSearch))).map(s => (
+                <div key={s.id} onClick={() => setSelectedStaffIds(prev => prev.includes(s.id) ? prev.filter(x=>x!==s.id) : [...prev, s.id])}
+                  style={{ display:'flex', alignItems:'center', gap:10, padding:'9px 12px', borderRadius:8, cursor:'pointer',
+                    background: selectedStaffIds.includes(s.id) ? '#EFF6FF' : '#F9FAFB',
+                    border: `1px solid ${selectedStaffIds.includes(s.id) ? '#3B82F6' : '#E5E7EB'}` }}>
+                  <input type="checkbox" readOnly checked={selectedStaffIds.includes(s.id)} style={{ marginRight:4 }}/>
+                  <div>
+                    <div style={{ fontWeight:600, fontSize:13 }}>{s.name} ({s.phone || 'no phone'})</div>
+                    <div style={{ fontSize:11, color:'#9CA3AF' }}>{s.role}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div style={{ display:'flex', gap:10, justifyContent:'flex-end' }}>
+              <button className="btn btn-ghost" onClick={() => { setShowAddStaff(false); setSelectedStaffIds([]); }}>Cancel</button>
+              <button className="btn btn-primary" disabled={!selectedStaffIds.length || saving} onClick={handleAddStaffToBatch}>
+                {saving ? 'Saving...' : `Add ${selectedStaffIds.length} Staff`}
+              </button>
+            </div>
+          </Modal>
+        )}
+
+        {/* Removal Request Modal */}
+        {showRemovalModal && (
+          <Modal title="Request Removal" onClose={() => { setShowRemovalModal(null); setRemovalReason(''); }}>
+            <p style={{ fontSize:14, color:'#374151', marginBottom:12 }}>
+              Request removal from <strong>{showRemovalModal.targetName}</strong>. Reason:
+            </p>
+            <textarea className="form-input" rows={3} placeholder="Explain reason..."
+              value={removalReason} onChange={e => setRemovalReason(e.target.value)} style={{ marginBottom:16 }}/>
+            <div style={{ display:'flex', gap:10, justifyContent:'flex-end' }}>
+              <button className="btn btn-ghost" onClick={() => { setShowRemovalModal(null); setRemovalReason(''); }}>Cancel</button>
+              <button className="btn btn-primary" disabled={!removalReason.trim() || saving} onClick={handleSubmitRemovalRequest}>
+                {saving ? 'Submitting...' : 'Submit Request'}
+              </button>
+            </div>
+          </Modal>
+        )}
 
         {/* Add Student */}
         {showAddStudent && (
@@ -1452,12 +1748,17 @@ export default function Batches() {
                       <div style={{ fontWeight:700, fontSize:14 }}>{b.name}</div>
                       <div style={{ fontSize:12, color:'#6B7280' }}>{b.course}{b.courseDurationMonths?` · ${b.courseDurationMonths}mo`:''}</div>
                     </div>
-                    <span className={`badge ${b.status==='active'?'badge-green':b.status==='upcoming'?'badge-blue':'badge-gray'}`}>{b.status}</span>
+                    <div style={{ display:'flex', flexDirection:'column', gap:4, alignItems:'flex-end' }}>
+                      <span className={`badge ${b.status==='active'?'badge-green':b.status==='upcoming'?'badge-blue':'badge-gray'}`}>{b.status}</span>
+                      {b.endDate && new Date(b.endDate) < new Date() && (
+                        <span style={{ fontSize:10, padding:'1px 7px', borderRadius:10, background:'#E5E7EB', color:'#6B7280', fontWeight:600 }}>Expired</span>
+                      )}
+                    </div>
                   </div>
                   <div style={{ fontSize:13, marginBottom:8 }}>
                     <span style={{ color:'#6B7280' }}>Students: </span>
                     <strong style={{ color:'#0F3460', fontSize:16 }}>{batchCounts[b.id]||0}</strong>
-                    {b.mentor && <><span style={{ color:'#6B7280', marginLeft:10 }}>Mentor: </span>{b.mentor}</>}
+                    {b.mentorName && <><span style={{ color:'#6B7280', marginLeft:10 }}>Mentor: </span>{b.mentorName}</>}
                   </div>
                   {b.subjects?.length > 0 && (
                     <div style={{ display:'flex', flexWrap:'wrap', gap:4, marginBottom:6 }}>
@@ -1511,6 +1812,19 @@ export default function Batches() {
               <div className="form-group"><label className="form-label">End Date</label><input className="form-input" type="date" value={createForm.endDate} onChange={e=>setCreateForm({...createForm,endDate:e.target.value})}/></div>
             </FormRow>
             <div className="form-group">
+              <label className="form-label">Assign Mentor</label>
+              <select className="form-input" value={createForm.mentorId}
+                onChange={e => {
+                  const sel = staffList.find(s => s.id === e.target.value);
+                  setCreateForm({ ...createForm, mentorId: e.target.value, mentorName: sel?.name || '' });
+                }}>
+                <option value="">Select Mentor</option>
+                {staffList.filter(s=>s.role!=='ceo').map(s=>(
+                  <option key={s.id} value={s.id}>{s.name} ({s.phone || 'no phone'})</option>
+                ))}
+              </select>
+            </div>
+            <div className="form-group">
               <label className="form-label">Assign Faculties / Staff</label>
               <div style={{ display:'flex', flexWrap:'wrap', gap:8, padding:'10px', background:'var(--bg)', borderRadius:8, border:'1px solid var(--border)', minHeight:48 }}>
                 {staffList.filter(s=>s.role!=='ceo').map(s=>(
@@ -1521,7 +1835,7 @@ export default function Batches() {
                     border: `1px solid ${createForm.faculties.includes(s.name)?'#E53935':'var(--border)'}`,
                     transition:'all 0.12s',
                   }}>
-                    {s.name} <span style={{ fontSize:10, opacity:0.7 }}>({s.role})</span>
+                    {s.name} ({s.phone || s.role})
                   </div>
                 ))}
               </div>
