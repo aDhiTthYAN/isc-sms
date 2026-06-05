@@ -20,10 +20,6 @@ const ROLE_INFO = {
     label:'CEO', badgeCls:'badge-red', color:'#E53935',
     desc:'Full access — all modules, assign tasks, manage all staff and reports'
   },
-  admin: {
-    label:'Admin', badgeCls:'badge-purple', color:'#8B5CF6',
-    desc:'Manage students, batches, documents, concerns. Cannot manage staff.'
-  },
   staff: {
     label:'Staff', badgeCls:'badge-blue', color:'#3B82F6',
     desc:'View assigned students, log follow-ups, submit reports, complete tasks.'
@@ -339,7 +335,6 @@ export default function StaffManagement() {
                 onChange={e => setForm({...form, role:e.target.value})}
               >
                 <option value="staff">Staff — Limited access</option>
-                <option value="admin">Admin — Moderate access</option>
                 <option value="ceo">CEO — Full access</option>
               </select>
               <div style={{ fontSize:11, color:'#6B7280', marginTop:4 }}>

@@ -2502,14 +2502,20 @@ export default function Batches() {
 
       {/* In-app confirmation dialog */}
       {confirmDialog && (
-        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.5)', zIndex:9999, display:'flex', alignItems:'center', justifyContent:'center' }}>
-          <div style={{ background:'#fff', borderRadius:16, padding:28, maxWidth:400, width:'90%', boxShadow:'0 20px 60px rgba(0,0,0,0.3)' }}>
+        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.55)', zIndex:9999, display:'flex', alignItems:'center', justifyContent:'center' }}
+          onClick={e => { if (e.target === e.currentTarget) setConfirmDialog(null); }}>
+          <div style={{ background:'#fff', borderRadius:16, padding:28, maxWidth:420, width:'90%', boxShadow:'0 20px 60px rgba(0,0,0,0.35)' }}
+            onClick={e => e.stopPropagation()}>
             <div style={{ fontSize:18, fontWeight:700, marginBottom:12 }}>Are you sure?</div>
             <div style={{ fontSize:14, color:'#6B7280', marginBottom:24, lineHeight:1.6 }}>{confirmDialog.message}</div>
             <div style={{ display:'flex', gap:10, justifyContent:'flex-end' }}>
               <button className="btn btn-ghost" onClick={() => setConfirmDialog(null)}>Cancel</button>
               <button className="btn btn-sm" style={{ background:'#EF4444', color:'#fff', border:'none', padding:'8px 20px' }}
-                onClick={() => { confirmDialog.onConfirm(); setConfirmDialog(null); }}>
+                onClick={async () => {
+                  const fn = confirmDialog.onConfirm;
+                  setConfirmDialog(null);
+                  await fn();
+                }}>
                 Confirm
               </button>
             </div>
