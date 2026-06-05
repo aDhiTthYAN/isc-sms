@@ -89,20 +89,57 @@ function matchCsvHeader(csvHeader, fields) {
   return n; // fallback to normalized header
 }
 
-function parseCSV(text, fields) {
-  const lines = text.trim().split('\n');
-  const rawHeaders = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g,''));
-  // Build mapping: csvColumnIndex → fieldKey
-  const colKeys = rawHeaders.map(h => fields ? matchCsvHeader(h, fields) : normalize(h));
+// Proper RFC-4180 CSV parser — handles quoted fields with commas and newlines inside
+function parseCsvLine(line) {
+  const fields = [];
+  let cur = '', inQuote = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (inQuote) {
+      if (ch === '"' && line[i+1] === '"') { cur += '"'; i++; }
+      else if (ch === '"') { inQuote = false; }
+      else { cur += ch; }
+    } else {
+      if (ch === '"') { inQuote = true; }
+      else if (ch === ',') { fields.push(cur.trim()); cur = ''; }
+      else { cur += ch; }
+    }
+  }
+  fields.push(cur.trim());
+  return fields;
+}
+
+function parseCSVText(text) {
+  // Split into lines but respect quoted newlines
   const rows = [];
+  let cur = '', inQuote = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (ch === '"') { inQuote = !inQuote; cur += ch; }
+    else if ((ch === '\n' || ch === '\r') && !inQuote) {
+      if (cur.trim()) rows.push(cur);
+      cur = '';
+      if (ch === '\r' && text[i+1] === '\n') i++;
+    } else { cur += ch; }
+  }
+  if (cur.trim()) rows.push(cur);
+  return rows;
+}
+
+function parseCSV(text, fields) {
+  const lines = parseCSVText(text);
+  if (lines.length === 0) return [];
+  const rawHeaders = parseCsvLine(lines[0]).map(h => h.replace(/^"|"$/g,'').trim());
+  const colKeys = rawHeaders.map(h => fields ? matchCsvHeader(h, fields) : normalize(h));
+  const result = [];
   for (let i = 1; i < lines.length; i++) {
-    const vals = lines[i].split(',').map(v => v.trim().replace(/^"|"$/g,''));
+    const vals = parseCsvLine(lines[i]).map(v => v.replace(/^"|"$/g,'').trim());
     if (vals.every(v => !v)) continue;
     const obj = {};
     colKeys.forEach((key, idx) => { obj[key] = vals[idx] || ''; });
-    rows.push(obj);
+    result.push(obj);
   }
-  return rows;
+  return result;
 }
 
 function downloadTemplate(batchName, fields) {
@@ -852,13 +889,23 @@ export default function Batches() {
                 <table>
                   <thead>
                     <tr>
-                      {batchFields.map(f => <th key={f.key}>{f.label}</th>)}
-                      <th>Staff</th><th>Status</th><th>Onboarding</th><th></th>
+                      <th>Kids Name</th>
+                      <th>Father Name</th>
+                      <th>Mother Name</th>
+                      <th>Phone</th>
+                      <th>WhatsApp</th>
+                      <th>Class</th>
+                      <th>VARK</th>
+                      <th>Syllabus</th>
+                      <th>Staff</th>
+                      <th>Status</th>
+                      <th>Onboarding</th>
+                      <th></th>
                     </tr>
                   </thead>
                   <tbody>
                     {paginated.length === 0 && (
-                      <tr><td colSpan={batchFields.length + 4} style={{ textAlign:'center', padding:40, color:'#6B7280' }}>
+                      <tr><td colSpan={12} style={{ textAlign:'center', padding:40, color:'#6B7280' }}>
                         {studentSearch || studentStatusFilter ? 'No students match your filter.' : 'No students yet.'}
                         {!studentSearch && !studentStatusFilter && (
                           <div style={{ display:'flex', gap:8, justifyContent:'center', marginTop:12 }}>
@@ -873,16 +920,19 @@ export default function Batches() {
                       const onboardDone = batchFlow.length > 0 && flowDone === batchFlow.length;
                       return (
                         <tr key={s.id}>
-                          {batchFields.map(f => (
-                            <td key={f.key} style={{ fontSize:13 }}>
-                              {f.key === 'name'
-                                ? <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-                                    <Avatar name={s[f.key]||'?'} size="sm"/>
-                                    <div style={{ fontWeight:500 }}>{s[f.key]||'—'}</div>
-                                  </div>
-                                : s[f.key]||'—'}
-                            </td>
-                          ))}
+                          <td style={{ fontSize:13 }}>
+                            <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                              <Avatar name={s.name||'?'} size="sm"/>
+                              <div style={{ fontWeight:500 }}>{s.name||'—'}</div>
+                            </div>
+                          </td>
+                          <td style={{ fontSize:13 }}>{s.fatherName||'—'}</td>
+                          <td style={{ fontSize:13 }}>{s.motherName||'—'}</td>
+                          <td style={{ fontSize:13 }}>{s.phone||'—'}</td>
+                          <td style={{ fontSize:13 }}>{s.whatsappNumber||'—'}</td>
+                          <td style={{ fontSize:13 }}>{s.classStd||'—'}</td>
+                          <td style={{ fontSize:12 }}>{s.varkResult||'—'}</td>
+                          <td style={{ fontSize:12 }}>{s.syllabus||'—'}</td>
                           <td style={{ fontSize:13 }}>{s.staffAssigned||'—'}</td>
                           <td><StatusBadge status={s.status}/></td>
                           <td>
@@ -892,7 +942,7 @@ export default function Batches() {
                           </td>
                           <td style={{ display:'flex', gap:4, alignItems:'center' }}>
                             <button className="btn btn-ghost btn-sm" onClick={() => navigate(`/students/${s.id}`)}>View <ChevronRight size={12}/></button>
-                            {profile?.role === 'ceo' && (
+                            {(profile?.role === 'ceo' || profile?.role === 'staff') && (
                               <button className="btn btn-sm" style={{ background:'#FEE2E2', color:'#EF4444', border:'none', padding:'4px 8px' }}
                                 onClick={() => setDeleteStudentConfirm(s)}><Trash2 size={12}/></button>
                             )}
