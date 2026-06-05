@@ -481,7 +481,7 @@ export default function Batches() {
       // Move to trash
       await addDoc(collection(db,'trash'), {
         type: 'batch', originalId: selectedBatch.id, data: selectedBatch,
-        deletedAt: serverTimestamp(), deletedBy: profile?.uid,
+        deletedAt: serverTimestamp(), deletedBy: profile?.uid || profile?.email || 'unknown',
       });
       // Mark all students as deleted
       const studentsSnap = await getDocs(query(collection(db,'students'), where('batchId','==',selectedBatch.id)));
@@ -832,7 +832,7 @@ export default function Batches() {
         {/* Header */}
         <div className="page-header">
           <div style={{ display:'flex', alignItems:'center', gap:12 }}>
-            <button className="btn btn-ghost btn-sm btn-icon" onClick={() => setSelectedBatch(null)}><ArrowLeft size={16}/></button>
+            <button className="btn btn-ghost btn-sm btn-icon" onClick={() => { setSelectedBatch(null); setConfirmDialog(null); }}><ArrowLeft size={16}/></button>
             <div>
               <div style={{ display:'flex', alignItems:'center', gap:8 }}>
                 <h2 style={{ fontSize: 20, fontWeight: 700 }}>{selectedBatch.name}</h2>
@@ -897,7 +897,7 @@ export default function Batches() {
                       setSaving(true);
                       try {
                         for (const s of batchStudents) {
-                          await addDoc(collection(db,'trash'), { type:'student', originalId:s.id, data:s, deletedAt:serverTimestamp(), deletedBy:profile?.uid });
+                          await addDoc(collection(db,'trash'), { type:'student', originalId:s.id, data:s, deletedAt:serverTimestamp(), deletedBy:profile?.uid||profile?.email||'unknown' });
                           await deleteDoc(doc(db,'students', s.id));
                         }
                         setToast({ message:`${batchStudents.length} students moved to trash.`, type:'success' });
@@ -2346,6 +2346,25 @@ export default function Batches() {
         )}
 
         {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)}/>}
+
+        {/* In-app confirmation dialog (batch detail) */}
+        {confirmDialog && (
+          <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.55)', zIndex:9999, display:'flex', alignItems:'center', justifyContent:'center' }}
+            onClick={e => { if (e.target === e.currentTarget) setConfirmDialog(null); }}>
+            <div style={{ background:'#fff', borderRadius:16, padding:28, maxWidth:420, width:'90%', boxShadow:'0 20px 60px rgba(0,0,0,0.35)' }}
+              onClick={e => e.stopPropagation()}>
+              <div style={{ fontSize:18, fontWeight:700, marginBottom:12 }}>Are you sure?</div>
+              <div style={{ fontSize:14, color:'#6B7280', marginBottom:24, lineHeight:1.6 }}>{confirmDialog.message}</div>
+              <div style={{ display:'flex', gap:10, justifyContent:'flex-end' }}>
+                <button className="btn btn-ghost" onClick={() => setConfirmDialog(null)}>Cancel</button>
+                <button className="btn btn-sm" style={{ background:'#EF4444', color:'#fff', border:'none', padding:'8px 20px' }}
+                  onClick={async () => { const fn = confirmDialog.onConfirm; setConfirmDialog(null); await fn(); }}>
+                  Confirm
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
