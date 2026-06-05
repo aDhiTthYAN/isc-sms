@@ -265,10 +265,16 @@ export default function Batches() {
 
   const loadBatches = async () => {
     const [b, s] = await Promise.all([getBatches(), getStaffProfiles()]);
-    setBatches(b);
+    // Staff only see batches they are assigned to (as mentor or staff member)
+    const uid = profile?.uid;
+    const isStaff = !isCEOorAdmin;
+    const filtered = isStaff
+      ? b.filter(batch => batch.mentorId === uid || (batch.staffIds || []).includes(uid))
+      : b;
+    setBatches(filtered);
     setStaffList(s.filter(x => x.active !== false));
     const counts = {};
-    await Promise.all(b.map(async batch => { counts[batch.id] = await getBatchStudentCount(batch.id); }));
+    await Promise.all(filtered.map(async batch => { counts[batch.id] = await getBatchStudentCount(batch.id); }));
     setBatchCounts(counts);
     setLoading(false);
   };
@@ -735,15 +741,6 @@ export default function Batches() {
             </div>
           ))}
         </div>
-
-        {/* Faculties */}
-        {selectedBatch.faculties?.length > 0 && (
-          <div style={{ marginBottom:14, display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }}>
-            {selectedBatch.faculties.map((f,i) => (
-              <span key={i} className="badge badge-blue">{f}</span>
-            ))}
-          </div>
-        )}
 
         {/* Tab bar */}
         <div className="tab-bar" style={{ marginBottom:16 }}>
@@ -1972,21 +1969,6 @@ export default function Batches() {
                     <strong style={{ color:'#0F3460', fontSize:16 }}>{batchCounts[b.id]||0}</strong>
                     {b.mentorName && <><span style={{ color:'#6B7280', marginLeft:10 }}>Mentor: </span>{b.mentorName}</>}
                   </div>
-                  {b.subjects?.length > 0 && (
-                    <div style={{ display:'flex', flexWrap:'wrap', gap:4, marginBottom:6 }}>
-                      {b.subjects.slice(0,3).map((s,i)=>(
-                        <span key={i} style={{ fontSize:10, padding:'1px 7px', borderRadius:10, background:'#EDE9FE', color:'#6D28D9', fontWeight:600 }}>{s.name}</span>
-                      ))}
-                      {b.subjects.length>3 && <span style={{ fontSize:10, color:'#6B7280' }}>+{b.subjects.length-3}</span>}
-                    </div>
-                  )}
-                  {b.faculties?.length>0 && (
-                    <div style={{ display:'flex', flexWrap:'wrap', gap:4, marginBottom:8 }}>
-                      {b.faculties.map((f,i)=>(
-                        <span key={i} style={{ fontSize:10, padding:'2px 7px', borderRadius:10, background:'#DBEAFE', color:'#1E40AF', fontWeight:600 }}>{f}</span>
-                      ))}
-                    </div>
-                  )}
                   {b.status==='active' && (
                     <div style={{ height:4, background:'#E5E7EB', borderRadius:2, overflow:'hidden', marginTop:4 }}>
                       <div style={{ height:'100%', width:`${progress(b)}%`, background:'#E53935', transition:'width 0.3s' }}/>
