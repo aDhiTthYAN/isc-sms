@@ -608,7 +608,7 @@ export default function Batches() {
       await addAssessment({
         ...assessmentForm,
         batchId: selectedBatch.id, batchName: selectedBatch.name,
-        createdBy: profile?.uid, createdByName: profile?.name,
+        createdBy: profile?.uid || profile?.email || 'unknown', createdByName: profile?.name || '',
         totalMarks: Number(assessmentForm.totalMarks),
       });
       // Notify other conducting staff
@@ -1013,7 +1013,6 @@ export default function Batches() {
                       <th>Class</th>
                       <th>VARK</th>
                       <th>Syllabus</th>
-                      <th>Staff</th>
                       <th>Status</th>
                       <th>Onboarding</th>
                       <th></th>
@@ -1021,7 +1020,7 @@ export default function Batches() {
                   </thead>
                   <tbody>
                     {paginated.length === 0 && (
-                      <tr><td colSpan={12} style={{ textAlign:'center', padding:40, color:'#6B7280' }}>
+                      <tr><td colSpan={11} style={{ textAlign:'center', padding:40, color:'#6B7280' }}>
                         {studentSearch || studentStatusFilter ? 'No students match your filter.' : 'No students yet.'}
                         {!studentSearch && !studentStatusFilter && (
                           <div style={{ display:'flex', gap:8, justifyContent:'center', marginTop:12 }}>
@@ -1049,7 +1048,6 @@ export default function Batches() {
                           <td style={{ fontSize:13 }}>{s.classStd||'—'}</td>
                           <td style={{ fontSize:12 }}>{s.varkResult||'—'}</td>
                           <td style={{ fontSize:12 }}>{s.syllabus||'—'}</td>
-                          <td style={{ fontSize:13 }}>{s.staffAssigned||'—'}</td>
                           <td><StatusBadge status={s.status}/></td>
                           <td>
                             <span style={{ fontSize:11, padding:'2px 8px', borderRadius:10, fontWeight:600, background:onboardDone?'#D1FAE5':'#FEF3C7', color:onboardDone?'#065F46':'#92400E' }}>
