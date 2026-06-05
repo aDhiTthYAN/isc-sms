@@ -31,7 +31,6 @@ const NAV_BY_ROLE = {
     { to: '/',            label: 'Dashboard',       icon: 'LayoutDashboard' },
     { section: 'Students' },
     { to: '/students',    label: 'All Students',     icon: 'Users'          },
-    { to: '/bulk-import', label: 'Bulk Import',      icon: 'Upload'         },
     { to: '/followups',   label: 'Follow-Ups',       icon: 'PhoneCall'      },
     { to: '/concerns',    label: 'Concerns',         icon: 'AlertCircle'    },
     { section: 'Academic' },
@@ -53,7 +52,6 @@ const NAV_BY_ROLE = {
     { to: '/',            label: 'Dashboard',        icon: 'LayoutDashboard' },
     { section: 'Students' },
     { to: '/students',    label: 'All Students',     icon: 'Users'           },
-    { to: '/bulk-import', label: 'Bulk Import',      icon: 'Upload'          },
     { to: '/followups',   label: 'Follow-Ups',       icon: 'PhoneCall'       },
     { to: '/concerns',    label: 'Concerns',         icon: 'AlertCircle'     },
     { section: 'Academic' },
@@ -134,7 +132,6 @@ export default function App() {
             <Route path="/"              element={<HomeDashboard />}   />
             <Route path="/students"      element={<StudentsPage />}    />
             <Route path="/students/:id"  element={<StudentProfile />}  />
-            <Route path="/bulk-import"   element={<BulkImport />}      />
             <Route path="/followups"     element={<FollowUps />}       />
             <Route path="/concerns"      element={<Concerns />}        />
             <Route path="/assessments"   element={<Assessments />}     />

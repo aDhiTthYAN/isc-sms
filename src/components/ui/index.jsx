@@ -1,17 +1,20 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { X } from 'lucide-react';
 
 // ── Modal ──────────────────────────────────────────────────────
 export function Modal({ title, onClose, children, wide }) {
+  const onCloseRef = useRef(onClose);
+  useEffect(() => { onCloseRef.current = onClose; });
+
   useEffect(() => {
-    const handler = (e) => { if (e.key === 'Escape') onClose(); };
+    const handler = (e) => { if (e.key === 'Escape') onCloseRef.current(); };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [onClose]);
+  }, []); // stable — only mounts/unmounts with the modal
 
   return (
-    <div className="modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="modal" style={wide ? { maxWidth: 680 } : {}}>
+    <div className="modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) onCloseRef.current(); }}>
+      <div className="modal" style={wide ? { maxWidth: 680 } : {}} onClick={e => e.stopPropagation()}>
         <div className="modal-header">
           <h3>{title}</h3>
           <button className="btn btn-ghost btn-icon btn-sm" onClick={onClose}>

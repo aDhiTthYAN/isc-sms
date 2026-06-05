@@ -45,19 +45,22 @@ const DEFAULT_COURSE_FLOW = [
   { key: 'followup_monitor',  label: 'Regular Follow-up & Progress Monitoring', phase: 'course' },
 ];
 
+// Fields match the Google Form CSV columns in order:
+// Timestamp(→joinDate), Name of Father, Name of Mother, Email, Address,
+// Phone number, Whatsapp Number, Occupation, Kids Name(→name), Gender, Age, Class, School Name
 const DEFAULT_STUDENT_FIELDS = [
-  { key: 'name',          label: "Student Name (Kid's Name)", required: true,  type: 'text'  },
+  { key: 'fatherName',    label: 'Name of Father',            required: false, type: 'text'  },
+  { key: 'motherName',    label: 'Name of Mother',            required: false, type: 'text'  },
+  { key: 'email',         label: 'Email',                     required: false, type: 'email' },
+  { key: 'address',       label: 'Address',                   required: false, type: 'text'  },
+  { key: 'phone',         label: 'Phone Number',              required: false, type: 'text'  },
+  { key: 'whatsappNumber',label: 'Whatsapp Number',           required: false, type: 'text'  },
+  { key: 'occupation',    label: 'Occupation',                required: false, type: 'text'  },
+  { key: 'name',          label: "Kids Name",                 required: true,  type: 'text'  },
   { key: 'gender',        label: 'Gender',                    required: false, type: 'text'  },
   { key: 'age',           label: 'Age',                       required: false, type: 'number'},
   { key: 'classStd',      label: 'Class',                     required: false, type: 'text'  },
   { key: 'schoolName',    label: 'School Name',               required: false, type: 'text'  },
-  { key: 'fatherName',    label: 'Name of Father',            required: false, type: 'text'  },
-  { key: 'motherName',    label: 'Name of Mother',            required: false, type: 'text'  },
-  { key: 'phone',         label: 'Phone Number',              required: false, type: 'text'  },
-  { key: 'whatsappNumber',label: 'WhatsApp Number',           required: false, type: 'text'  },
-  { key: 'email',         label: 'Parent Email',              required: false, type: 'email' },
-  { key: 'address',       label: 'Address',                   required: false, type: 'text'  },
-  { key: 'occupation',    label: 'Parent Occupation',         required: false, type: 'text'  },
   { key: 'varkResult',    label: 'VARK Learning Style',       required: false, type: 'text'  },
   { key: 'syllabus',      label: 'Syllabus (CBSE/STATE/ICSE)',required: false, type: 'text'  },
 ];
@@ -377,10 +380,15 @@ export default function Batches() {
     const fields = selectedBatch.studentFields || DEFAULT_STUDENT_FIELDS;
     const students = csvPreview.map(row => {
       const obj = { batchId:selectedBatch.id, batchName:selectedBatch.name, course:selectedBatch.course, courseDurationMonths:selectedBatch.courseDurationMonths||'', status:row.status||'active' };
-      fields.forEach(f => {
-        const csvKey = f.key.toLowerCase().replace(/[^a-z0-9]/g,'');
-        obj[f.key] = row[csvKey]||row[f.key]||'';
-      });
+      // Extract join date from Timestamp column if present
+      const ts = row['timestamp'] || row['Timestamp'] || row['timestamp'];
+      if (ts) {
+        try {
+          const d = new Date(ts);
+          if (!isNaN(d)) obj.joinDate = d.toISOString().split('T')[0];
+        } catch {}
+      }
+      fields.forEach(f => { obj[f.key] = row[f.key] || ''; });
       return obj;
     });
     const res = await bulkAddStudents(students);
@@ -1571,8 +1579,11 @@ export default function Batches() {
         {/* Bulk Import */}
         {showBulk && (
           <Modal title={`Bulk Import into ${selectedBatch.name}`} onClose={() => { setShowBulk(false); setCsvPreview(null); }} wide>
-            <div style={{ padding:'8px 12px', background:'#EFF6FF', borderRadius:8, fontSize:12, color:'#1E40AF', marginBottom:14 }}>
-              CSV columns: <strong>{batchFields.map(f=>f.key).join(', ')}</strong>
+            <div style={{ padding:'10px 14px', background:'#FEF3C7', borderRadius:8, fontSize:12, color:'#92400E', marginBottom:14, lineHeight:1.6 }}>
+              ⚠️ <strong>Important:</strong> The CSV column order must match the app field order exactly, OR use the downloaded template.<br/>
+              Column names are matched by name (case-insensitive), but the order should match to avoid mismatches.<br/>
+              If your CSV has a <strong>Timestamp</strong> column, the date will be auto-captured as the joining date.<br/>
+              Expected columns: <strong>{batchFields.map(f=>f.label).join(', ')}</strong>
             </div>
             <button className="btn btn-ghost btn-sm" style={{ marginBottom:14 }} onClick={() => downloadTemplate(selectedBatch.name, batchFields)}>
               <Download size={13}/> Download CSV Template
