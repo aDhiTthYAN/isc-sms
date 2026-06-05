@@ -66,15 +66,37 @@ function generateKey(label) {
   return label.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '') + '_' + Math.random().toString(36).slice(2,5);
 }
 
-function parseCSV(text) {
+function normalize(s) { return (s||'').toLowerCase().replace(/[^a-z0-9]/g,''); }
+
+// Fuzzy-match a CSV header to a field key or label
+function matchCsvHeader(csvHeader, fields) {
+  const n = normalize(csvHeader);
+  // Exact key match
+  let f = fields.find(f => normalize(f.key) === n);
+  if (f) return f.key;
+  // Exact label match
+  f = fields.find(f => normalize(f.label) === n);
+  if (f) return f.key;
+  // Partial key match
+  f = fields.find(f => n.includes(normalize(f.key)) || normalize(f.key).includes(n));
+  if (f) return f.key;
+  // Partial label match
+  f = fields.find(f => n.includes(normalize(f.label)) || normalize(f.label).includes(n));
+  if (f) return f.key;
+  return n; // fallback to normalized header
+}
+
+function parseCSV(text, fields) {
   const lines = text.trim().split('\n');
-  const headers = lines[0].split(',').map(h => h.trim().toLowerCase().replace(/\s+/g,''));
+  const rawHeaders = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g,''));
+  // Build mapping: csvColumnIndex → fieldKey
+  const colKeys = rawHeaders.map(h => fields ? matchCsvHeader(h, fields) : normalize(h));
   const rows = [];
   for (let i = 1; i < lines.length; i++) {
     const vals = lines[i].split(',').map(v => v.trim().replace(/^"|"$/g,''));
     if (vals.every(v => !v)) continue;
     const obj = {};
-    headers.forEach((h, idx) => { obj[h] = vals[idx] || ''; });
+    colKeys.forEach((key, idx) => { obj[key] = vals[idx] || ''; });
     rows.push(obj);
   }
   return rows;
@@ -202,6 +224,7 @@ export default function Batches() {
   const [showFieldConfig, setShowFieldConfig] = useState(false);
   const [showSubjectConfig, setShowSubjectConfig] = useState(false);
   const [showAttendance,  setShowAttendance]  = useState(null);
+  const [confirmDialog,   setConfirmDialog]   = useState(null); // { message, onConfirm }
   const [attendanceCsv,   setAttendanceCsv]   = useState(null);
   const [attendancePreview, setAttendancePreview] = useState(null);
   const [attendanceSaved, setAttendanceSaved] = useState({});
@@ -680,13 +703,40 @@ export default function Batches() {
             <div>
               <div style={{ display:'flex', alignItems:'center', gap:8 }}>
                 <h2 style={{ fontSize: 20, fontWeight: 700 }}>{selectedBatch.name}</h2>
-                {isExpired && (
-                  <span style={{ fontSize:11, padding:'2px 8px', borderRadius:10, background:'#E5E7EB', color:'#6B7280', fontWeight:600 }}>Expired</span>
+                {isCEOorAdmin ? (
+                  <select
+                    value={selectedBatch.status || 'upcoming'}
+                    onChange={async e => {
+                      const newStatus = e.target.value;
+                      await updateBatch(selectedBatch.id, { status: newStatus });
+                      const updated = { ...selectedBatch, status: newStatus };
+                      setSelectedBatch(updated);
+                      setBatches(prev => prev.map(b => b.id === updated.id ? updated : b));
+                      setToast({ message: `Batch marked as ${newStatus}`, type: 'success' });
+                    }}
+                    style={{
+                      fontSize:11, padding:'2px 8px', borderRadius:10, fontWeight:600,
+                      border:'1px solid #E5E7EB', cursor:'pointer',
+                      background: selectedBatch.status==='active' ? '#D1FAE5' : selectedBatch.status==='completed' ? '#E5E7EB' : '#DBEAFE',
+                      color: selectedBatch.status==='active' ? '#065F46' : selectedBatch.status==='completed' ? '#6B7280' : '#1E40AF',
+                    }}
+                  >
+                    <option value="upcoming">Upcoming</option>
+                    <option value="active">Active</option>
+                    <option value="completed">Completed</option>
+                  </select>
+                ) : (
+                  <span style={{ fontSize:11, padding:'2px 8px', borderRadius:10, background: selectedBatch.status==='active'?'#D1FAE5':'#DBEAFE', color: selectedBatch.status==='active'?'#065F46':'#1E40AF', fontWeight:600 }}>
+                    {selectedBatch.status || 'upcoming'}
+                  </span>
                 )}
+                {isExpired && <span style={{ fontSize:11, padding:'2px 8px', borderRadius:10, background:'#E5E7EB', color:'#6B7280', fontWeight:600 }}>Expired</span>}
               </div>
               <div style={{ fontSize:13, color:'#6B7280' }}>
                 {selectedBatch.course}
                 {selectedBatch.courseDurationMonths ? ` · ${selectedBatch.courseDurationMonths} months` : ''}
+                {selectedBatch.startDate ? ` · ${new Date(selectedBatch.startDate).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'})} →` : ''}
+                {selectedBatch.endDate   ? ` ${new Date(selectedBatch.endDate).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'})}` : ''}
                 {' · '}{count} students
                 {selectedBatch.mentorName ? ` · Mentor: ${selectedBatch.mentorName}` : ''}
               </div>
@@ -718,7 +768,7 @@ export default function Batches() {
               <button
                 className="btn btn-sm"
                 style={{ background:'#EF4444', color:'#fff', border:'none' }}
-                onClick={() => { if (window.confirm('Are you sure? This will archive all student data. Students can be restored from the Trash.')) handleDeleteBatch(); }}
+                onClick={() => setConfirmDialog({ message: 'Delete this batch? All student data will be archived and can be restored from Trash.', onConfirm: handleDeleteBatch })}
               >
                 <Trash2 size={13}/> Delete Batch
               </button>
@@ -1162,13 +1212,12 @@ export default function Batches() {
                           {attendanceSaved[slot.id] ? 'Attendance ✓' : 'Upload Attendance'}
                         </button>
                         <button className="btn btn-sm" style={{ background:'#FEE2E2', color:'#EF4444', border:'none' }}
-                          onClick={async () => {
-                            if (!window.confirm('Delete this schedule slot?')) return;
+                          onClick={() => setConfirmDialog({ message: 'Delete this class slot?', onConfirm: async () => {
                             await deleteBatchSchedule(slot.id);
                             const sch = await getBatchSchedules(selectedBatch.id);
                             setSchedules(sch);
                             setCalendarSlotDetail(null);
-                          }}>
+                          }})}>
                           <Trash2 size={12}/> Delete
                         </button>
                       </div>
@@ -1403,7 +1452,7 @@ export default function Batches() {
                         <td style={{ display:'flex', gap:6 }}>
                           {profile?.role === 'ceo' && !s.isMentor && (
                             <button className="btn btn-sm" style={{ background:'#FEE2E2', color:'#EF4444', border:'none' }}
-                              onClick={() => { if (window.confirm(`Remove ${s.name} from batch?`)) handleRemoveStaffFromBatch(s.uid); }}>
+                              onClick={() => setConfirmDialog({ message: `Remove ${s.name} from this batch?`, onConfirm: () => handleRemoveStaffFromBatch(s.uid) })}>
                               Remove
                             </button>
                           )}
@@ -1529,7 +1578,7 @@ export default function Batches() {
               <Download size={13}/> Download CSV Template
             </button>
             <input ref={fileRef} type="file" accept=".csv" style={{ display:'none' }}
-              onChange={async e => { const t = await e.target.files[0]?.text(); if(t) setCsvPreview(parseCSV(t)); }}/>
+              onChange={async e => { const t = await e.target.files[0]?.text(); if(t) setCsvPreview(parseCSV(t, selectedBatch.studentFields || DEFAULT_STUDENT_FIELDS)); }}/>
             <div onClick={() => fileRef.current.click()} style={{ border:'2px dashed #E5E7EB', borderRadius:10, padding:'24px', textAlign:'center', cursor:'pointer', background:'#FAFAFA', marginBottom:14 }}>
               <Upload size={22} style={{ color:'#9CA3AF', marginBottom:6 }}/>
               <div style={{ fontSize:13, fontWeight:500 }}>{csvPreview?`${csvPreview.length} rows loaded`:'Click to upload CSV'}</div>
@@ -2056,6 +2105,23 @@ export default function Batches() {
       )}
 
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)}/>}
+
+      {/* In-app confirmation dialog */}
+      {confirmDialog && (
+        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.5)', zIndex:9999, display:'flex', alignItems:'center', justifyContent:'center' }}>
+          <div style={{ background:'#fff', borderRadius:16, padding:28, maxWidth:400, width:'90%', boxShadow:'0 20px 60px rgba(0,0,0,0.3)' }}>
+            <div style={{ fontSize:18, fontWeight:700, marginBottom:12 }}>Are you sure?</div>
+            <div style={{ fontSize:14, color:'#6B7280', marginBottom:24, lineHeight:1.6 }}>{confirmDialog.message}</div>
+            <div style={{ display:'flex', gap:10, justifyContent:'flex-end' }}>
+              <button className="btn btn-ghost" onClick={() => setConfirmDialog(null)}>Cancel</button>
+              <button className="btn btn-sm" style={{ background:'#EF4444', color:'#fff', border:'none', padding:'8px 20px' }}
+                onClick={() => { confirmDialog.onConfirm(); setConfirmDialog(null); }}>
+                Confirm
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
