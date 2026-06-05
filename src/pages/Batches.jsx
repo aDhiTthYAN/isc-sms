@@ -228,6 +228,14 @@ export default function Batches() {
   // Overdue class confirmation dialog
   const [overdueConfirm, setOverdueConfirm] = useState(null);
 
+  // Calendar schedule view state
+  const [calendarView, setCalendarView] = useState('week'); // 'week' | 'month'
+  const [calendarDate, setCalendarDate] = useState(new Date());
+  const [calendarSlotDetail, setCalendarSlotDetail] = useState(null); // slot shown in popover
+
+  // Share schedule modal
+  const [showShareSchedule, setShowShareSchedule] = useState(false);
+
   // Batch create form
   const [createForm, setCreateForm] = useState({
     name:'', course:'', mentorId:'', mentorName:'', faculties:[], startDate:'', endDate:'',
@@ -240,7 +248,7 @@ export default function Batches() {
   const [studentForm, setStudentForm] = useState({});
 
   const [scheduleForm, setScheduleForm] = useState({
-    title:'', day:'Monday', time:'', duration:'60', type:'live-class',
+    title:'', day:'Monday', scheduledDate:'', time:'', duration:'60', type:'live-class',
     facultyName:'', meetLink:'', notes:''
   });
   const [taskForm, setTaskForm] = useState({
@@ -431,7 +439,7 @@ export default function Batches() {
       const newStaffToAdd = staffList.filter(s => selectedStaffIds.includes(s.id) && !currentStaffIds.includes(s.id));
       const updatedStaffIds = [...currentStaffIds, ...newStaffToAdd.map(s => s.id)];
       const updatedStaffDetails = [...currentStaffDetails, ...newStaffToAdd.map(s => ({
-        uid: s.id, name: s.name, phone: s.phone || '', email: s.email || '', subjects: [],
+        uid: s.id, name: s.name, phone: s.phone || '', email: s.email || '', subjects: s.subjects || [],
       }))];
       await updateBatch(selectedBatch.id, { staffIds: updatedStaffIds, staffDetails: updatedStaffDetails });
       // Send notifications
@@ -510,7 +518,7 @@ export default function Batches() {
     await addBatchSchedule({ ...scheduleForm, batchId:selectedBatch.id, batchName:selectedBatch.name });
     setToast({ message:'Schedule added!', type:'success' });
     setShowSchedule(false);
-    setScheduleForm({ title:'', day:'Monday', time:'', duration:'60', type:'live-class', facultyName:'', meetLink:'', notes:'' });
+    setScheduleForm({ title:'', day:'Monday', scheduledDate:'', time:'', duration:'60', type:'live-class', facultyName:'', meetLink:'', notes:'' });
     const sch = await getBatchSchedules(selectedBatch.id);
     setSchedules(sch); setSaving(false);
   };
@@ -566,6 +574,59 @@ export default function Batches() {
       const d = new Date(slot.scheduledDate || slot.date);
       return d < now;
     });
+  };
+
+  // Calendar helpers
+  const ALL_DAYS = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  const getSlotsForDate = (date, scheds) => {
+    const dateStr = date.toISOString().split('T')[0];
+    const dayName = ALL_DAYS[date.getDay()];
+    return scheds.filter(s => {
+      if (s.scheduledDate) return s.scheduledDate === dateStr;
+      return s.day === dayName;
+    }).sort((a,b) => (a.time||'').localeCompare(b.time||''));
+  };
+
+  const getWeekDates = (refDate) => {
+    const d = new Date(refDate);
+    const day = d.getDay();
+    const monday = new Date(d);
+    monday.setDate(d.getDate() - ((day + 6) % 7));
+    return Array.from({ length: 7 }, (_, i) => {
+      const dd = new Date(monday);
+      dd.setDate(monday.getDate() + i);
+      return dd;
+    });
+  };
+
+  const getMonthDates = (refDate) => {
+    const year = refDate.getFullYear();
+    const month = refDate.getMonth();
+    const first = new Date(year, month, 1);
+    const startOffset = (first.getDay() + 6) % 7; // Mon=0
+    const totalDays = new Date(year, month + 1, 0).getDate();
+    const cells = [];
+    for (let i = 0; i < startOffset; i++) {
+      const d = new Date(year, month, 1 - (startOffset - i));
+      cells.push({ date: d, inMonth: false });
+    }
+    for (let i = 1; i <= totalDays; i++) {
+      cells.push({ date: new Date(year, month, i), inMonth: true });
+    }
+    while (cells.length % 7 !== 0) {
+      const last = cells[cells.length - 1].date;
+      const d = new Date(last);
+      d.setDate(last.getDate() + 1);
+      cells.push({ date: d, inMonth: false });
+    }
+    return cells;
+  };
+
+  const slotPillColor = (slot) => {
+    if (slot.status === 'completed')   return { bg:'#D1FAE5', col:'#065F46' };
+    if (slot.status === 'cancelled')   return { bg:'#FEE2E2', col:'#991B1B' };
+    if (slot.status === 'rescheduled') return { bg:'#FEF3C7', col:'#92400E' };
+    return { bg:'#DBEAFE', col:'#0F3460' };
   };
 
   if (loading) return <Loading/>;
@@ -630,7 +691,6 @@ export default function Batches() {
               <>
                 <button className="btn btn-ghost btn-sm" onClick={() => { setEditFlow([...batchFlow]); setShowFlowConfig(true); }}><Settings size={13}/> Course Flow</button>
                 <button className="btn btn-ghost btn-sm" onClick={() => { setEditFields([...batchFields]); setShowFieldConfig(true); }}><Settings size={13}/> Student Fields</button>
-                <button className="btn btn-ghost btn-sm" onClick={() => { setEditSubjects([...batchSubjects]); setShowSubjectConfig(true); }}><Settings size={13}/> Subjects</button>
               </>
             )}
             {activeTab === 'students' && !isExpired && (
@@ -639,8 +699,11 @@ export default function Batches() {
                 {isCEOorAdmin && <button className="btn btn-primary" onClick={() => setShowAddStudent(true)}><UserPlus size={14}/> Add Student</button>}
               </>
             )}
-            {activeTab === 'schedule' && !isExpired && (
-              <button className="btn btn-primary" onClick={() => setShowSchedule(true)}><Plus size={14}/> Add Class</button>
+            {activeTab === 'schedule' && (
+              <>
+                <button className="btn btn-ghost btn-sm" onClick={() => setShowShareSchedule(true)}>🔗 Share</button>
+                {!isExpired && <button className="btn btn-primary" onClick={() => setShowSchedule(true)}><Plus size={14}/> Add Class</button>}
+              </>
             )}
             {activeTab === 'tasks' && !isExpired && (
               <button className="btn btn-primary" onClick={() => setShowTask(true)}><Plus size={14}/> Add Task</button>
@@ -673,17 +736,14 @@ export default function Batches() {
           ))}
         </div>
 
-        {/* Faculties + subjects */}
-        <div style={{ marginBottom:14, display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }}>
-          {batchSubjects.map((s,i) => (
-            <span key={i} style={{ fontSize:11, padding:'3px 10px', borderRadius:10, background:'#EDE9FE', color:'#6D28D9', fontWeight:600 }}>
-              {s.name}{s.facultyName ? ` → ${s.facultyName}` : ''}
-            </span>
-          ))}
-          {selectedBatch.faculties?.map((f,i) => (
-            <span key={i} className="badge badge-blue">{f}</span>
-          ))}
-        </div>
+        {/* Faculties */}
+        {selectedBatch.faculties?.length > 0 && (
+          <div style={{ marginBottom:14, display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }}>
+            {selectedBatch.faculties.map((f,i) => (
+              <span key={i} className="badge badge-blue">{f}</span>
+            ))}
+          </div>
+        )}
 
         {/* Tab bar */}
         <div className="tab-bar" style={{ marginBottom:16 }}>
@@ -887,121 +947,241 @@ export default function Batches() {
         )}
 
         {/* ── SCHEDULE TAB ── */}
-        {activeTab === 'schedule' && (
-          <div>
-            {/* Overdue warning banner */}
-            {overdueSessions.length > 0 && (
-              <div style={{ padding: '12px 16px', background: '#FEF3C7', borderRadius: 10, border: '1px solid #FDE68A', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 10 }}>
-                <AlertTriangle size={16} style={{ color: '#F59E0B', flexShrink: 0 }} />
-                <div style={{ flex: 1, fontSize: 13, color: '#92400E', fontWeight: 500 }}>
-                  {overdueSessions.length} class{overdueSessions.length > 1 ? 'es' : ''} from the past have not been marked. Please update their status.
+        {activeTab === 'schedule' && (() => {
+          const today = new Date();
+          today.setHours(0,0,0,0);
+          const weekDates = getWeekDates(calendarDate);
+          const monthCells = getMonthDates(calendarDate);
+          const monthLabel = calendarDate.toLocaleString('default', { month:'long', year:'numeric' });
+          const weekLabel = `${weekDates[0].toLocaleDateString('default',{month:'short',day:'numeric'})} – ${weekDates[6].toLocaleDateString('default',{month:'short',day:'numeric',year:'numeric'})}`;
+
+          const SlotPill = ({ slot, compact }) => {
+            const pc = slotPillColor(slot);
+            const isOverdue = overdueSessions.find(s => s.id === slot.id);
+            return (
+              <div
+                onClick={() => setCalendarSlotDetail(slot)}
+                style={{
+                  padding: compact ? '2px 6px' : '4px 8px',
+                  borderRadius: 6,
+                  background: isOverdue ? '#FEF3C7' : pc.bg,
+                  color: isOverdue ? '#92400E' : pc.col,
+                  fontSize: compact ? 10 : 11,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  marginBottom: 2,
+                  border: `1px solid ${isOverdue ? '#FDE68A' : pc.col+'30'}`,
+                }}
+                title={slot.title}
+              >
+                {isOverdue && '⚠ '}{slot.time && `${slot.time} `}{slot.title}
+              </div>
+            );
+          };
+
+          return (
+            <div>
+              {/* Overdue warning banner */}
+              {overdueSessions.length > 0 && (
+                <div style={{ padding: '12px 16px', background: '#FEF3C7', borderRadius: 10, border: '1px solid #FDE68A', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <AlertTriangle size={16} style={{ color: '#F59E0B', flexShrink: 0 }} />
+                  <div style={{ flex: 1, fontSize: 13, color: '#92400E', fontWeight: 500 }}>
+                    {overdueSessions.length} class{overdueSessions.length > 1 ? 'es' : ''} from the past have not been marked. Please update their status.
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
 
-            {schedules.length === 0 && (
-              <div className="card" style={{ textAlign:'center', color:'#6B7280', padding:40 }}>
-                No schedule added yet. Click "Add Class" to create the weekly timetable.
+              {/* Calendar toolbar */}
+              <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:14, flexWrap:'wrap' }}>
+                {/* View toggle */}
+                <div style={{ display:'flex', background:'#F3F4F6', borderRadius:8, padding:2 }}>
+                  {['week','month'].map(v => (
+                    <button key={v} onClick={() => setCalendarView(v)}
+                      style={{ padding:'5px 14px', borderRadius:6, border:'none', cursor:'pointer', fontSize:12, fontWeight:600,
+                        background: calendarView === v ? '#0F3460' : 'transparent',
+                        color: calendarView === v ? '#fff' : '#6B7280',
+                        transition:'all 0.15s' }}
+                    >{v.charAt(0).toUpperCase()+v.slice(1)}</button>
+                  ))}
+                </div>
+                {/* Navigation */}
+                <button className="btn btn-ghost btn-sm" onClick={() => {
+                  const d = new Date(calendarDate);
+                  if (calendarView === 'week') d.setDate(d.getDate()-7);
+                  else d.setMonth(d.getMonth()-1);
+                  setCalendarDate(d);
+                }}>←</button>
+                <span style={{ fontSize:13, fontWeight:600, minWidth:180, textAlign:'center' }}>
+                  {calendarView === 'week' ? weekLabel : monthLabel}
+                </span>
+                <button className="btn btn-ghost btn-sm" onClick={() => {
+                  const d = new Date(calendarDate);
+                  if (calendarView === 'week') d.setDate(d.getDate()+7);
+                  else d.setMonth(d.getMonth()+1);
+                  setCalendarDate(d);
+                }}>→</button>
+                <button className="btn btn-ghost btn-sm" onClick={() => setCalendarDate(new Date())}>Today</button>
+                <div style={{ flex:1 }}/>
+                <button className="btn btn-ghost btn-sm" onClick={() => setShowShareSchedule(true)}>
+                  🔗 Share Schedule
+                </button>
               </div>
-            )}
-            <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
-              {DAYS.map(day => {
-                const daySlots = schedByDay[day] || [];
-                if (!daySlots.length) return null;
+
+              {/* Week view */}
+              {calendarView === 'week' && (
+                <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)', gap:8 }}>
+                  {weekDates.map((date, idx) => {
+                    const isToday = date.toDateString() === today.toDateString();
+                    const slots = getSlotsForDate(date, schedules);
+                    const dayLabel = date.toLocaleDateString('default',{weekday:'short'});
+                    const dateNum = date.getDate();
+                    const monthShort = date.toLocaleDateString('default',{month:'short'});
+                    return (
+                      <div key={idx} style={{
+                        background: '#fff', borderRadius: 10,
+                        border: `2px solid ${isToday ? '#0F3460' : '#E5E7EB'}`,
+                        minHeight: 140, padding: '10px 8px',
+                        boxShadow: isToday ? '0 0 0 2px #0F346030' : '0 1px 3px rgba(0,0,0,0.05)',
+                      }}>
+                        <div style={{ textAlign:'center', marginBottom:8 }}>
+                          <div style={{ fontSize:11, color: isToday ? '#0F3460' : '#9CA3AF', fontWeight:600 }}>{dayLabel}</div>
+                          <div style={{
+                            width:28, height:28, borderRadius:'50%', margin:'4px auto 0',
+                            background: isToday ? '#0F3460' : 'transparent',
+                            color: isToday ? '#fff' : '#1A1A2E',
+                            display:'flex', alignItems:'center', justifyContent:'center',
+                            fontWeight:700, fontSize:14,
+                          }}>{dateNum}</div>
+                          {isToday && <div style={{ fontSize:9, color:'#0F3460', fontWeight:600 }}>{monthShort}</div>}
+                        </div>
+                        <div>
+                          {slots.map(slot => <SlotPill key={slot.id} slot={slot} compact />)}
+                          {slots.length === 0 && <div style={{ fontSize:10, color:'#D1D5DB', textAlign:'center', marginTop:8 }}>—</div>}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Month view */}
+              {calendarView === 'month' && (
+                <div>
+                  <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)', gap:1, marginBottom:2 }}>
+                    {['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(d => (
+                      <div key={d} style={{ textAlign:'center', fontSize:11, fontWeight:700, color:'#6B7280', padding:'6px 0' }}>{d}</div>
+                    ))}
+                  </div>
+                  <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)', gap:2 }}>
+                    {monthCells.map(({ date, inMonth }, idx) => {
+                      const isToday = date.toDateString() === today.toDateString();
+                      const slots = inMonth ? getSlotsForDate(date, schedules) : [];
+                      return (
+                        <div key={idx} style={{
+                          background: inMonth ? '#fff' : '#F9FAFB',
+                          borderRadius: 8, minHeight: 80, padding: '6px',
+                          border: `1px solid ${isToday ? '#0F3460' : '#E5E7EB'}`,
+                          opacity: inMonth ? 1 : 0.4,
+                        }}>
+                          <div style={{
+                            width:22, height:22, borderRadius:'50%',
+                            background: isToday ? '#0F3460' : 'transparent',
+                            color: isToday ? '#fff' : inMonth ? '#1A1A2E' : '#9CA3AF',
+                            display:'flex', alignItems:'center', justifyContent:'center',
+                            fontWeight: isToday ? 700 : 500, fontSize:12, marginBottom:4,
+                          }}>{date.getDate()}</div>
+                          {slots.slice(0,3).map(slot => <SlotPill key={slot.id} slot={slot} compact />)}
+                          {slots.length > 3 && <div style={{ fontSize:9, color:'#9CA3AF', marginTop:2 }}>+{slots.length-3} more</div>}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {schedules.length === 0 && (
+                <div className="card" style={{ textAlign:'center', color:'#6B7280', padding:40, marginTop:16 }}>
+                  No schedule added yet. Click "Add Class" to create the timetable.
+                </div>
+              )}
+
+              {/* Slot detail popover */}
+              {calendarSlotDetail && (() => {
+                const slot = calendarSlotDetail;
+                const tc = typeColor(slot.type);
+                const isOverdue = overdueSessions.find(s => s.id === slot.id);
                 return (
-                  <div key={day} style={{ background: '#fff', borderRadius: 12, border: '1px solid #E5E7EB', padding: '16px 20px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
-                    <div style={{ fontWeight:700, fontSize:14, marginBottom:12, color:'#1A1A2E' }}>{day}</div>
-                    <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-                      {daySlots.map(slot => {
-                        const tc = typeColor(slot.type);
-                        const isOverdue = overdueSessions.find(s => s.id === slot.id);
-                        return (
-                          <div key={slot.id} style={{
-                            display:'flex', alignItems:'center', gap:12, padding:'12px 16px',
-                            background: isOverdue ? '#FFFBEB' : tc.bg,
-                            borderRadius:9, border:`1px solid ${isOverdue ? '#FDE68A' : tc.col+'20'}`,
-                          }}>
-                            <div style={{ flexShrink:0, textAlign:'center', minWidth:52 }}>
-                              <div style={{ fontWeight:700, fontSize:13, color:tc.col }}>{slot.time}</div>
-                              <div style={{ fontSize:10, color:'#6B7280' }}>{slot.duration}min</div>
-                            </div>
-                            <div style={{ flex:1 }}>
-                              <div style={{ fontWeight:600, fontSize:13 }}>
-                                {isOverdue && <AlertTriangle size={12} style={{ color:'#F59E0B', marginRight:5, display:'inline', verticalAlign:'middle' }}/>}
-                                {slot.title}
-                              </div>
-                              <div style={{ fontSize:12, color:'#6B7280', marginTop:2 }}>
-                                {slot.facultyName && `${slot.facultyName}`}
-                                {slot.meetLink && <a href={slot.meetLink} target="_blank" rel="noreferrer" style={{ color:'#E53935', marginLeft:8 }}>Join Link →</a>}
-                              </div>
-                              {slot.notes && <div style={{ fontSize:11, color:'#9CA3AF', marginTop:2 }}>{slot.notes}</div>}
-                            </div>
+                  <Modal title={slot.title} onClose={() => setCalendarSlotDetail(null)}>
+                    <div style={{ display:'flex', flexDirection:'column', gap:10, fontSize:13 }}>
+                      <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
+                        <span style={{ padding:'2px 9px', borderRadius:10, background:tc.bg, color:tc.col, fontWeight:600, fontSize:11 }}>{tc.label}</span>
+                        {slot.status && <span style={{ padding:'2px 9px', borderRadius:10, fontWeight:600, fontSize:11,
+                          background: slot.status==='completed'?'#D1FAE5':slot.status==='cancelled'?'#FEE2E2':'#FEF3C7',
+                          color: slot.status==='completed'?'#065F46':slot.status==='cancelled'?'#991B1B':'#92400E' }}>{slot.status}</span>}
+                      </div>
+                      <div style={{ color:'#374151' }}>
+                        <div><strong>Day:</strong> {slot.scheduledDate ? slot.scheduledDate : slot.day} {slot.scheduledDate ? '(one-time)' : '(recurring)'}</div>
+                        <div><strong>Time:</strong> {slot.time} · {slot.duration} min</div>
+                        {slot.facultyName && <div><strong>Faculty:</strong> {slot.facultyName}</div>}
+                        {slot.meetLink && <div><strong>Link:</strong> <a href={slot.meetLink} target="_blank" rel="noreferrer" style={{ color:'#E53935' }}>Join →</a></div>}
+                        {slot.notes && <div style={{ color:'#6B7280', marginTop:4 }}>{slot.notes}</div>}
+                      </div>
 
-                            <span style={{ padding:'3px 9px', borderRadius:20, fontSize:11, fontWeight:600, background:tc.bg, color:tc.col, border:`1px solid ${tc.col}40`, flexShrink:0 }}>
-                              {tc.label}
-                            </span>
-
-                            <div style={{ display:'flex', gap:6, alignItems:'center', flexShrink:0 }}>
-                              {slot.status === 'completed'   && <span style={{ fontSize:10, padding:'2px 8px', borderRadius:10, background:'#D1FAE5', color:'#065F46', fontWeight:600 }}>Done</span>}
-                              {slot.status === 'cancelled'   && <span style={{ fontSize:10, padding:'2px 8px', borderRadius:10, background:'#FEE2E2', color:'#991B1B', fontWeight:600 }}>Cancelled</span>}
-                              {slot.status === 'rescheduled' && <span style={{ fontSize:10, padding:'2px 8px', borderRadius:10, background:'#FEF3C7', color:'#92400E', fontWeight:600 }}>Rescheduled</span>}
-                              {!slot.status && <span style={{ fontSize:10, padding:'2px 8px', borderRadius:10, background:'#DBEAFE', color:'#1E40AF', fontWeight:600 }}>Upcoming</span>}
-
-                              {isOverdue ? (
-                                <button
-                                  style={{ fontSize:11, padding:'4px 10px', borderRadius:7, background:'#F59E0B', color:'#fff', border:'none', cursor:'pointer', fontWeight:600 }}
-                                  onClick={() => setOverdueConfirm(slot)}
-                                >
-                                  Mark
-                                </button>
-                              ) : (
-                                <select
-                                  style={{ fontSize:11, padding:'3px 7px', borderRadius:6, border:'1px solid #E5E7EB', background:'#fff' }}
-                                  value={slot.status || ''}
-                                  onChange={async e => {
-                                    const newStatus = e.target.value;
-                                    if (!newStatus) return;
-                                    await updateScheduleStatus(slot.id, newStatus);
-                                    const sch = await getBatchSchedules(selectedBatch.id);
-                                    setSchedules(sch);
-                                  }}
-                                >
-                                  <option value="">Mark as...</option>
-                                  <option value="completed">Completed</option>
-                                  <option value="cancelled">Cancelled</option>
-                                  <option value="rescheduled">Rescheduled</option>
-                                </select>
-                              )}
-
-                              <button
-                                style={{ fontSize:11, padding:'4px 10px', borderRadius:7, background:'#EDE9FE', color:'#6D28D9', border:'none', cursor:'pointer', fontWeight:600 }}
-                                onClick={() => setShowAttendance(slot)}
-                              >
-                                {attendanceSaved[slot.id] ? 'Attendance ✓' : 'Attendance'}
-                              </button>
-                            </div>
-
-                            <button
-                              onClick={async () => {
-                                if (!window.confirm('Delete this schedule slot?')) return;
-                                await deleteBatchSchedule(slot.id);
-                                const sch = await getBatchSchedules(selectedBatch.id);
-                                setSchedules(sch);
-                              }}
-                              style={{ background:'none', border:'none', cursor:'pointer', color:'#EF4444', padding:'4px', flexShrink:0 }}
-                            >
-                              <Trash2 size={14}/>
+                      {/* Status update */}
+                      <div className="form-group">
+                        <label className="form-label">Update Status</label>
+                        {isOverdue ? (
+                          <div style={{ display:'flex', gap:8 }}>
+                            <button className="btn btn-sm" style={{ background:'#D1FAE5', color:'#065F46', border:'none' }}
+                              onClick={async () => { await updateScheduleStatus(slot.id,'completed'); const sch=await getBatchSchedules(selectedBatch.id); setSchedules(sch); setCalendarSlotDetail(null); setShowAttendance(slot); }}>
+                              Mark Completed
+                            </button>
+                            <button className="btn btn-sm" style={{ background:'#FEE2E2', color:'#991B1B', border:'none' }}
+                              onClick={async () => { await updateScheduleStatus(slot.id,'cancelled'); const sch=await getBatchSchedules(selectedBatch.id); setSchedules(sch); setCalendarSlotDetail(null); }}>
+                              Mark Cancelled
                             </button>
                           </div>
-                        );
-                      })}
+                        ) : (
+                          <select className="form-input" value={slot.status || ''} onChange={async e => {
+                            const ns = e.target.value; if (!ns) return;
+                            await updateScheduleStatus(slot.id, ns);
+                            const sch = await getBatchSchedules(selectedBatch.id);
+                            setSchedules(sch);
+                            setCalendarSlotDetail({ ...slot, status: ns });
+                          }}>
+                            <option value="">Mark as...</option>
+                            <option value="completed">Completed</option>
+                            <option value="cancelled">Cancelled</option>
+                            <option value="rescheduled">Rescheduled</option>
+                          </select>
+                        )}
+                      </div>
+
+                      <div style={{ display:'flex', gap:8, justifyContent:'space-between', marginTop:4 }}>
+                        <button className="btn btn-ghost btn-sm" onClick={() => { setCalendarSlotDetail(null); setShowAttendance(slot); }}>
+                          {attendanceSaved[slot.id] ? 'Attendance ✓' : 'Upload Attendance'}
+                        </button>
+                        <button className="btn btn-sm" style={{ background:'#FEE2E2', color:'#EF4444', border:'none' }}
+                          onClick={async () => {
+                            if (!window.confirm('Delete this schedule slot?')) return;
+                            await deleteBatchSchedule(slot.id);
+                            const sch = await getBatchSchedules(selectedBatch.id);
+                            setSchedules(sch);
+                            setCalendarSlotDetail(null);
+                          }}>
+                          <Trash2 size={12}/> Delete
+                        </button>
+                      </div>
                     </div>
-                  </div>
+                  </Modal>
                 );
-              })}
+              })()}
             </div>
-          </div>
-        )}
+          );
+        })()}
 
         {/* ── TASKS / ASSIGNMENTS TAB ── Split Panel ── */}
         {activeTab === 'tasks' && (
@@ -1216,7 +1396,7 @@ export default function Batches() {
                         <td style={{ fontWeight:600 }}>{s.name}</td>
                         <td style={{ color:'#6B7280' }}>{s.phone||'—'}</td>
                         <td style={{ color:'#6B7280' }}>{s.email||'—'}</td>
-                        <td style={{ color:'#6B7280' }}>{(s.subjects||[]).join(', ')||'—'}</td>
+                        <td style={{ color:'#6B7280' }}>{(s.subjects||[]).length ? (s.subjects||[]).map(x => (typeof x === 'object' ? (x.name || '') : x)).filter(Boolean).join(', ') || '—' : '—'}</td>
                         <td>
                           {s.isMentor
                             ? <span style={{ fontSize:11, padding:'2px 9px', borderRadius:10, background:'#FEF3C7', color:'#92400E', fontWeight:700 }}>Mentor</span>
@@ -1271,7 +1451,7 @@ export default function Batches() {
             <input className="form-input" placeholder="Search staff..." style={{ marginBottom:12 }}
               value={staffSearch} onChange={e => setStaffSearch(e.target.value)} />
             <div style={{ maxHeight:280, overflowY:'auto', display:'flex', flexDirection:'column', gap:6, marginBottom:16 }}>
-              {staffList.filter(s => s.role !== 'ceo' && (!staffSearch || s.name?.toLowerCase().includes(staffSearch.toLowerCase()) || s.phone?.includes(staffSearch))).map(s => (
+              {staffList.filter(s => (!staffSearch || s.name?.toLowerCase().includes(staffSearch.toLowerCase()) || s.phone?.includes(staffSearch))).map(s => (
                 <div key={s.id} onClick={() => setSelectedStaffIds(prev => prev.includes(s.id) ? prev.filter(x=>x!==s.id) : [...prev, s.id])}
                   style={{ display:'flex', alignItems:'center', gap:10, padding:'9px 12px', borderRadius:8, cursor:'pointer',
                     background: selectedStaffIds.includes(s.id) ? '#EFF6FF' : '#F9FAFB',
@@ -1466,13 +1646,18 @@ export default function Batches() {
 
         {/* Add Schedule */}
         {showSchedule && (
-          <Modal title="Add to Weekly Schedule" onClose={() => setShowSchedule(false)}>
+          <Modal title="Add Class" onClose={() => setShowSchedule(false)}>
             <form onSubmit={handleAddSchedule} style={{ display:'flex', flexDirection:'column', gap:12 }}>
               <div className="form-group"><label className="form-label">Title *</label><input className="form-input" required placeholder="e.g. Python Basics — Chapter 3" value={scheduleForm.title} onChange={e=>setScheduleForm({...scheduleForm,title:e.target.value})}/></div>
+              <div className="form-group">
+                <label className="form-label">Date (optional — for one-time classes)</label>
+                <input className="form-input" type="date" value={scheduleForm.scheduledDate} onChange={e=>setScheduleForm({...scheduleForm,scheduledDate:e.target.value})}/>
+                <div style={{ fontSize:11, color:'#9CA3AF', marginTop:3 }}>Leave blank to make this a recurring weekly class using the day below.</div>
+              </div>
               <FormRow>
                 <div className="form-group">
-                  <label className="form-label">Day *</label>
-                  <select className="form-input" value={scheduleForm.day} onChange={e=>setScheduleForm({...scheduleForm,day:e.target.value})}>
+                  <label className="form-label">Day of week (for recurring)</label>
+                  <select className="form-input" value={scheduleForm.day} onChange={e=>setScheduleForm({...scheduleForm,day:e.target.value})} disabled={!!scheduleForm.scheduledDate}>
                     {DAYS.map(d=><option key={d}>{d}</option>)}
                   </select>
                 </div>
@@ -1689,6 +1874,33 @@ export default function Batches() {
               >
                 No — Mark Cancelled
               </button>
+            </div>
+          </Modal>
+        )}
+
+        {/* Share Schedule Modal */}
+        {showShareSchedule && (
+          <Modal title="Share Schedule" onClose={() => setShowShareSchedule(false)}>
+            <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
+              <p style={{ fontSize:13, color:'#374151', lineHeight:1.6 }}>
+                Share this link with students. They can view the class schedule without logging in.
+              </p>
+              <div style={{ display:'flex', gap:8, alignItems:'center' }}>
+                <input
+                  className="form-input"
+                  readOnly
+                  value={`${window.location.origin}/public-schedule/${selectedBatch.id}`}
+                  style={{ flex:1, fontFamily:'monospace', fontSize:12 }}
+                  onFocus={e => e.target.select()}
+                />
+                <button className="btn btn-primary btn-sm" onClick={() => {
+                  navigator.clipboard.writeText(`${window.location.origin}/public-schedule/${selectedBatch.id}`);
+                  setToast({ message:'Link copied!', type:'success' });
+                }}>Copy Link</button>
+              </div>
+              <div style={{ fontSize:11, color:'#9CA3AF' }}>
+                Anyone with this link can view the schedule (read-only, no login required).
+              </div>
             </div>
           </Modal>
         )}

@@ -23,6 +23,7 @@ import StaffManagement from './pages/StaffManagement';
 import BulkImport      from './pages/BulkImport';
 import Trash           from './pages/Trash';
 import Requests        from './pages/Requests';
+import PublicSchedule  from './pages/PublicSchedule';
 
 const NAV_BY_ROLE = {
   ceo: [
@@ -147,6 +148,7 @@ export default function App() {
             <Route path="/trash"         element={<Trash />}           />
             <Route path="/requests"      element={<Requests />}        />
           </Route>
+          <Route path="/public-schedule/:batchId" element={<PublicSchedule />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </AuthProvider>
