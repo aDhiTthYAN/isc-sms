@@ -1321,13 +1321,13 @@ export default function Batches() {
                     )}
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 6 }}>
                       <div style={{ height: 4, flex: 1, background: isSelected ? 'rgba(255,255,255,0.15)' : '#E5E7EB', borderRadius: 2, overflow: 'hidden', marginRight: 8 }}>
-                        <div style={{ height: '100%', width: `${pctDone}%`, background: pctDone === 100 ? '#10B981' : '#F59E0B' }} />
+                        <div style={{ height: '100%', width: `${pctDone}%`, background: pctDone === 100 ? '#10B981' : '#F59E0B', transition: 'width 0.3s' }} />
                       </div>
                       <span style={{ fontSize: 11, fontWeight: 700, color: isSelected ? '#fff' : (pctDone === 100 ? '#10B981' : '#F59E0B'), whiteSpace: 'nowrap' }}>
-                        {submitted}/{total}
+                        {pctDone === 100 ? '✅ All done' : `${submitted}/${total}`}
                       </span>
                     </div>
-                    {isOverdue && <div style={{ fontSize: 10, color: isSelected ? '#FCA5A5' : '#EF4444', marginTop: 4, fontWeight: 600 }}>Overdue</div>}
+                    {isOverdue && <div style={{ fontSize: 10, color: isSelected ? '#FCA5A5' : '#EF4444', marginTop: 4, fontWeight: 600 }}>⚠ Overdue</div>}
                   </div>
                 );
               })}
@@ -1351,6 +1351,16 @@ export default function Batches() {
                       {currentTask.dueDate && <span style={{ fontSize: 11, color: '#9CA3AF' }}>Due: {currentTask.dueDate}</span>}
                     </div>
                     {currentTask.description && <div style={{ fontSize: 13, color: '#6B7280', lineHeight: 1.6 }}>{currentTask.description}</div>}
+                    {/* All done banner */}
+                    {(currentTask.submittedBy?.length || 0) >= batchStudents.length && batchStudents.length > 0 && (
+                      <div style={{ marginTop: 12, padding: '10px 16px', background: '#D1FAE5', borderRadius: 10, display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <span style={{ fontSize: 20 }}>🎉</span>
+                        <div>
+                          <div style={{ fontWeight: 700, color: '#065F46', fontSize: 14 }}>All students completed this assignment!</div>
+                          <div style={{ fontSize: 12, color: '#047857' }}>Every student in this batch has submitted.</div>
+                        </div>
+                      </div>
+                    )}
                     {/* Submission stats */}
                     <div style={{ display: 'flex', gap: 16, marginTop: 12 }}>
                       {[
@@ -1811,7 +1821,12 @@ export default function Batches() {
                   <label className="form-label">Subject</label>
                   <select className="form-input" value={taskForm.subject} onChange={e=>setTaskForm({...taskForm,subject:e.target.value})}>
                     <option value="">Select subject</option>
-                    {batchSubjects.map((s,i)=><option key={i} value={s.name}>{s.name}</option>)}
+                    {/* Subjects from batch staff profiles */}
+                    {[...new Set((selectedBatch.staffDetails||[]).flatMap(s => (s.subjects||[]).map(x => typeof x==='object'?x.name:x)).filter(Boolean))].map((sub,i) => (
+                      <option key={i} value={sub}>{sub}</option>
+                    ))}
+                    {/* Also any batch-level subjects */}
+                    {(selectedBatch.subjects||[]).filter(s => s.name).map((s,i)=><option key={`bs-${i}`} value={s.name}>{s.name}</option>)}
                   </select>
                 </div>
                 <div className="form-group">
