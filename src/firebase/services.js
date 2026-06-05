@@ -145,9 +145,10 @@ export const getFollowUps = async (studentId) => {
 export const getMyFollowUps = async (staffEmail) => {
   if (!staffEmail) return [];
   try {
-    const q = query(collection(db,'followups'), where('assignedToEmail','==',staffEmail), where('completed','==',false), limit(100));
+    const q = query(collection(db,'followups'), where('assignedToEmail','==',staffEmail), limit(100));
     const snap = await getDocs(q);
     return snap.docs.map(d => ({ id: d.id, ...d.data() }))
+      .filter(f => !f.completed)
       .sort((a,b) => (b.createdAt?.seconds||0) - (a.createdAt?.seconds||0));
   } catch {
     return [];
@@ -155,9 +156,9 @@ export const getMyFollowUps = async (staffEmail) => {
 };
 
 export const getAllFollowUps = async () => {
-  const q = query(collection(db,'followups'), orderBy('createdAt','desc'), limit(100));
-  const snap = await getDocs(q);
-  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  const snap = await getDocs(query(collection(db,'followups'), limit(100)));
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }))
+    .sort((a,b) => (b.createdAt?.seconds||0) - (a.createdAt?.seconds||0));
 };
 
 export const addFollowUp = async (data) =>
@@ -307,9 +308,10 @@ export const addNotification = async (data) =>
   addDoc(collection(db,'notifications'), { ...data, read: false, createdAt: serverTimestamp() });
 
 export const getMyNotifications = async (email) => {
-  const q = query(collection(db,'notifications'), where('toEmail','==',email), orderBy('createdAt','desc'), limit(20));
+  const q = query(collection(db,'notifications'), where('toEmail','==',email), limit(20));
   const snap = await getDocs(q);
-  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }))
+    .sort((a,b) => (b.createdAt?.seconds||0) - (a.createdAt?.seconds||0));
 };
 
 export const markNotificationRead = async (id) =>

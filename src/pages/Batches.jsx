@@ -7,7 +7,8 @@ import {
   getBatchTasks, addBatchTask, markTaskSubmitted,
   updateScheduleStatus, saveAttendance, getSessionAttendance,
   addNotification, getTrashItems, permanentDelete,
-  createRequest
+  createRequest,
+  getAssessments, addAssessment, deleteAssessment, getAssessmentResults, saveAssessmentResults,
 } from '../firebase/services';
 import {
   collection, addDoc, deleteDoc, doc, setDoc, serverTimestamp, getDocs, query, where, updateDoc
@@ -299,6 +300,17 @@ export default function Batches() {
   // Share schedule modal
   const [showShareSchedule, setShowShareSchedule] = useState(false);
 
+  // Assessments tab
+  const [batchAssessments, setBatchAssessments]     = useState([]);
+  const [showCreateAssessment, setShowCreateAssessment] = useState(false);
+  const [assessmentForm, setAssessmentForm]         = useState({ title:'', date:'', totalMarks:'', conductingStaff:[] });
+  const [assessmentResults, setAssessmentResults]   = useState({}); // assessmentId → results[]
+  const [showViewResults, setShowViewResults]       = useState(null); // assessment object
+  const [showImportMarks, setShowImportMarks]       = useState(null); // assessment object
+  const [marksPreview, setMarksPreview]             = useState(null);
+  const [importingMarks, setImportingMarks]         = useState(false);
+  const marksFileRef = useRef();
+
   // Batch create form
   const [createForm, setCreateForm] = useState({
     name:'', course:'', mentorId:'', mentorName:'', faculties:[], startDate:'', endDate:'',
@@ -344,17 +356,19 @@ export default function Batches() {
 
   const loadBatchDetail = async (batch) => {
     try {
-      const [res, sch, tasks] = await Promise.all([
+      const [res, sch, tasks, asmts] = await Promise.all([
         getBatchStudents(batch.id).catch(() => ({ students: [] })),
         getBatchSchedules(batch.id).catch(() => []),
         getBatchTasks(batch.id).catch(() => []),
+        getAssessments(batch.id).catch(() => []),
       ]);
       setBatchStudents(res.students || []);
       setSchedules(sch || []);
       setBatchTasks(tasks || []);
+      setBatchAssessments(asmts || []);
     } catch (err) {
       console.error('loadBatchDetail error:', err);
-      setBatchStudents([]); setSchedules([]); setBatchTasks([]);
+      setBatchStudents([]); setSchedules([]); setBatchTasks([]); setBatchAssessments([]);
     }
   };
 
@@ -587,6 +601,80 @@ export default function Batches() {
     setSaving(false);
   };
 
+  const handleCreateAssessment = async () => {
+    if (!assessmentForm.title || !assessmentForm.totalMarks) return;
+    setSaving(true);
+    try {
+      await addAssessment({
+        ...assessmentForm,
+        batchId: selectedBatch.id, batchName: selectedBatch.name,
+        createdBy: profile?.uid, createdByName: profile?.name,
+        totalMarks: Number(assessmentForm.totalMarks),
+      });
+      // Notify other conducting staff
+      for (const staffDetail of (assessmentForm.conductingStaff || [])) {
+        if (staffDetail.uid !== profile?.uid && staffDetail.email) {
+          await addNotification({
+            toEmail: staffDetail.email, title: 'New Assessment Added',
+            body: `${profile?.name} created assessment "${assessmentForm.title}" for ${selectedBatch.name} — you are listed as conducting staff.`,
+            type: 'assessment_added', read: false,
+          });
+        }
+      }
+      const asmts = await getAssessments(selectedBatch.id);
+      setBatchAssessments(asmts);
+      setShowCreateAssessment(false);
+      setAssessmentForm({ title:'', date:'', totalMarks:'', conductingStaff:[] });
+      setToast({ message:'Assessment created!', type:'success' });
+    } catch (err) {
+      setToast({ message:'Error: ' + err.message, type:'error' });
+    }
+    setSaving(false);
+  };
+
+  const handleImportMarks = async () => {
+    if (!marksPreview || !showImportMarks) return;
+    setImportingMarks(true);
+    try {
+      const results = marksPreview.map(row => {
+        const scored = Number(row.marks || row.marksScored || row.score || row.marks_scored || 0);
+        const total = showImportMarks.totalMarks || 100;
+        const pct = Math.round(scored / total * 100);
+        return {
+          assessmentId: showImportMarks.id,
+          assessmentTitle: showImportMarks.title,
+          batchId: selectedBatch.id,
+          studentName: row.name || row.studentName || row.student_name || '',
+          phone: row.phone || row.number || row.phoneNumber || row.phone_number || '',
+          marksScored: scored,
+          totalMarks: total,
+          percentage: pct,
+          passed: pct >= 40,
+        };
+      }).filter(r => r.studentName);
+      await saveAssessmentResults(results);
+      setMarksPreview(null);
+      setShowImportMarks(null);
+      setToast({ message:`Imported marks for ${results.length} students!`, type:'success' });
+    } catch (err) {
+      setToast({ message:'Error: ' + err.message, type:'error' });
+    }
+    setImportingMarks(false);
+  };
+
+  const handleDeleteAssessment = async (asmt) => {
+    setSaving(true);
+    try {
+      await deleteAssessment(asmt.id);
+      const asmts = await getAssessments(selectedBatch.id);
+      setBatchAssessments(asmts);
+      setToast({ message:'Assessment deleted.', type:'success' });
+    } catch (err) {
+      setToast({ message:'Error: ' + err.message, type:'error' });
+    }
+    setSaving(false);
+  };
+
   const handleAddSchedule = async (e) => {
     e.preventDefault(); setSaving(true);
     await addBatchSchedule({ ...scheduleForm, batchId:selectedBatch.id, batchName:selectedBatch.name });
@@ -794,10 +882,37 @@ export default function Batches() {
                 <button className="btn btn-ghost btn-sm" onClick={() => { setEditFields([...batchFields]); setShowFieldConfig(true); }}><Settings size={13}/> Student Fields</button>
               </>
             )}
+            {activeTab === 'assessments' && !isExpired && (
+              <button className="btn btn-primary" onClick={() => setShowCreateAssessment(true)}><Plus size={14}/> Add Assessment</button>
+            )}
             {activeTab === 'students' && !isExpired && (
               <>
                 <button className="btn btn-ghost" onClick={() => setShowBulk(true)}><Upload size={14}/> Bulk CSV</button>
                 {isCEOorAdmin && <button className="btn btn-primary" onClick={() => setShowAddStudent(true)}><UserPlus size={14}/> Add Student</button>}
+                {profile?.role === 'ceo' && batchStudents.length > 0 && (
+                  <button
+                    className="btn btn-sm"
+                    style={{ background:'#FEF3C7', color:'#92400E', border:'1px solid #FDE68A' }}
+                    onClick={() => setConfirmDialog({ message: `Delete ALL ${batchStudents.length} students from this batch? They will be moved to Trash and can be restored.`, onConfirm: async () => {
+                      setSaving(true);
+                      try {
+                        for (const s of batchStudents) {
+                          await addDoc(collection(db,'trash'), { type:'student', originalId:s.id, data:s, deletedAt:serverTimestamp(), deletedBy:profile?.uid });
+                          await deleteDoc(doc(db,'students', s.id));
+                        }
+                        setToast({ message:`${batchStudents.length} students moved to trash.`, type:'success' });
+                        await loadBatchDetail(selectedBatch);
+                        const c = await getBatchStudentCount(selectedBatch.id);
+                        setBatchCounts(prev => ({ ...prev, [selectedBatch.id]: c }));
+                      } catch (err) {
+                        setToast({ message:'Error: ' + err.message, type:'error' });
+                      }
+                      setSaving(false);
+                    }})}
+                  >
+                    <Trash2 size={13}/> Delete All
+                  </button>
+                )}
               </>
             )}
             {activeTab === 'schedule' && (
@@ -840,11 +955,12 @@ export default function Batches() {
         {/* Tab bar */}
         <div className="tab-bar" style={{ marginBottom:16 }}>
           {[
-            { key:'students',   label:`Students (${count})`               },
-            { key:'onboarding', label:'Onboarding Analytics'              },
-            { key:'schedule',   label:`Schedule (${schedules.length})`    },
-            { key:'tasks',      label:`Assignments (${batchTasks.length})` },
-            { key:'staff',      label:`Staff (${batchStaffDetails.length + (selectedBatch.mentorId ? 1 : 0)})` },
+            { key:'students',    label:`Students (${count})`               },
+            { key:'onboarding',  label:'Onboarding Analytics'              },
+            { key:'schedule',    label:`Schedule (${schedules.length})`    },
+            { key:'tasks',       label:`Assignments (${batchTasks.length})` },
+            { key:'assessments', label:`Assessments (${batchAssessments.length})` },
+            { key:'staff',       label:`Staff (${batchStaffDetails.length + (selectedBatch.mentorId ? 1 : 0)})` },
           ].map(t => (
             <div key={t.key} className={`tab ${activeTab===t.key?'active':''}`} onClick={() => { setActiveTab(t.key); setSelectedTask(null); }}>
               {t.label}
@@ -1540,7 +1656,209 @@ export default function Batches() {
           );
         })()}
 
+        {/* ── ASSESSMENTS TAB ── */}
+        {activeTab === 'assessments' && (
+          <div>
+            {batchAssessments.length === 0 && (
+              <div style={{ background:'#fff', borderRadius:14, border:'1px solid #E5E7EB', padding:48, textAlign:'center', color:'#9CA3AF' }}>
+                <div style={{ fontSize:32, marginBottom:8 }}>📋</div>
+                <div style={{ fontSize:15, fontWeight:600, marginBottom:4 }}>No assessments yet</div>
+                <div style={{ fontSize:13, marginBottom:16 }}>Create an exam or test for this batch</div>
+                <button className="btn btn-primary" onClick={() => setShowCreateAssessment(true)}><Plus size={14}/> Add Assessment</button>
+              </div>
+            )}
+            <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
+              {batchAssessments.map(asmt => {
+                const staffNames = (asmt.conductingStaff||[]).map(s => s.name||s).join(', ');
+                return (
+                  <div key={asmt.id} style={{ background:'#fff', borderRadius:12, border:'1px solid #E5E7EB', padding:'16px 20px', display:'flex', alignItems:'center', gap:16, boxShadow:'0 1px 3px rgba(0,0,0,0.06)' }}>
+                    <div style={{ flex:1 }}>
+                      <div style={{ fontSize:15, fontWeight:700, color:'#1A1A2E', marginBottom:4 }}>{asmt.title}</div>
+                      <div style={{ display:'flex', gap:10, flexWrap:'wrap', alignItems:'center' }}>
+                        {asmt.date && <span style={{ fontSize:12, color:'#6B7280' }}>📅 {asmt.date}</span>}
+                        <span style={{ fontSize:12, color:'#6B7280' }}>Total Marks: <strong>{asmt.totalMarks}</strong></span>
+                        {staffNames && <span style={{ fontSize:12, color:'#6B7280' }}>Staff: {staffNames}</span>}
+                        <span style={{ fontSize:11, padding:'2px 8px', borderRadius:10, background:'#EDE9FE', color:'#6D28D9', fontWeight:600 }}>Exam</span>
+                      </div>
+                    </div>
+                    <div style={{ display:'flex', gap:8 }}>
+                      <button className="btn btn-ghost btn-sm" onClick={async () => {
+                        const results = await getAssessmentResults(asmt.id);
+                        setAssessmentResults(prev => ({ ...prev, [asmt.id]: results }));
+                        setShowViewResults(asmt);
+                      }}>View Results</button>
+                      <button className="btn btn-sm" style={{ background:'#EFF6FF', color:'#1E40AF', border:'none' }}
+                        onClick={() => { setShowImportMarks(asmt); setMarksPreview(null); }}>
+                        <Upload size={12}/> Import Marks
+                      </button>
+                      {profile?.role === 'ceo' && (
+                        <button className="btn btn-sm" style={{ background:'#FEE2E2', color:'#EF4444', border:'none' }}
+                          onClick={() => setConfirmDialog({ message:`Delete assessment "${asmt.title}"?`, onConfirm: () => handleDeleteAssessment(asmt) })}>
+                          <Trash2 size={12}/>
+                        </button>
+                      )}
+                      {/* Staff request removal */}
+                      {(asmt.conductingStaff||[]).some(s => s.uid === profile?.uid) && profile?.role !== 'ceo' && (
+                        <button className="btn btn-ghost btn-sm"
+                          onClick={() => setShowRemovalModal({ uid: profile?.uid, name: profile?.name, targetType:'assessment', targetId:asmt.id, targetName:asmt.title })}>
+                          Request Removal
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {/* ── MODALS ── */}
+
+        {/* Create Assessment Modal */}
+        {showCreateAssessment && (
+          <Modal title={`Add Assessment — ${selectedBatch.name}`} onClose={() => setShowCreateAssessment(false)} wide>
+            <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
+              <div className="form-group">
+                <label className="form-label">Assessment Title *</label>
+                <input className="form-input" placeholder="e.g. Mid-Term Exam, Unit Test 1..." value={assessmentForm.title}
+                  onChange={e => setAssessmentForm(f => ({ ...f, title:e.target.value }))}/>
+              </div>
+              <FormRow>
+                <div className="form-group">
+                  <label className="form-label">Date</label>
+                  <input className="form-input" type="date" value={assessmentForm.date}
+                    onChange={e => setAssessmentForm(f => ({ ...f, date:e.target.value }))}/>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Total Marks *</label>
+                  <input className="form-input" type="number" placeholder="e.g. 100" value={assessmentForm.totalMarks}
+                    onChange={e => setAssessmentForm(f => ({ ...f, totalMarks:e.target.value }))}/>
+                </div>
+              </FormRow>
+              <div className="form-group">
+                <label className="form-label">Conducting Staff (select all involved)</label>
+                <div style={{ border:'1px solid #E5E7EB', borderRadius:8, maxHeight:180, overflowY:'auto', padding:4 }}>
+                  {[...(selectedBatch.staffDetails||[]), ...(selectedBatch.mentorId ? [{ uid:selectedBatch.mentorId, name:selectedBatch.mentorName, email:'' }] : [])].map(s => {
+                    const isSelected = (assessmentForm.conductingStaff||[]).some(x => x.uid === s.uid);
+                    return (
+                      <div key={s.uid} onClick={() => setAssessmentForm(f => ({
+                        ...f, conductingStaff: isSelected
+                          ? (f.conductingStaff||[]).filter(x => x.uid !== s.uid)
+                          : [...(f.conductingStaff||[]), { uid:s.uid, name:s.name, email:s.email||'' }]
+                      }))} style={{ display:'flex', alignItems:'center', gap:8, padding:'8px 10px', borderRadius:6, cursor:'pointer', background: isSelected ? '#EFF6FF' : 'transparent', marginBottom:2 }}>
+                        <input type="checkbox" readOnly checked={isSelected}/>
+                        <div style={{ fontSize:13, fontWeight: isSelected ? 600 : 400 }}>{s.name}</div>
+                      </div>
+                    );
+                  })}
+                  {(selectedBatch.staffDetails||[]).length === 0 && !selectedBatch.mentorId && (
+                    <div style={{ fontSize:12, color:'#9CA3AF', padding:8 }}>No staff assigned to this batch yet.</div>
+                  )}
+                </div>
+              </div>
+              <div style={{ display:'flex', gap:10, justifyContent:'flex-end' }}>
+                <button className="btn btn-ghost" onClick={() => setShowCreateAssessment(false)}>Cancel</button>
+                <button className="btn btn-primary" disabled={!assessmentForm.title || !assessmentForm.totalMarks || saving} onClick={handleCreateAssessment}>
+                  {saving ? 'Creating...' : 'Create Assessment'}
+                </button>
+              </div>
+            </div>
+          </Modal>
+        )}
+
+        {/* View Results Modal */}
+        {showViewResults && (
+          <Modal title={`Results — ${showViewResults.title}`} onClose={() => setShowViewResults(null)} wide>
+            <div style={{ marginBottom:12, fontSize:13, color:'#6B7280' }}>
+              Total Marks: <strong>{showViewResults.totalMarks}</strong> · Date: {showViewResults.date||'—'}
+            </div>
+            {(() => {
+              const results = assessmentResults[showViewResults.id] || [];
+              if (results.length === 0) return <div style={{ color:'#9CA3AF', textAlign:'center', padding:32 }}>No marks imported yet.</div>;
+              return (
+                <div className="table-container" style={{ maxHeight:360, overflowY:'auto' }}>
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>#</th><th>Student Name</th><th>Phone</th><th>Marks</th><th>%</th><th>Result</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {results.map((r, i) => (
+                        <tr key={r.id||i}>
+                          <td style={{ color:'#9CA3AF' }}>{i+1}</td>
+                          <td style={{ fontWeight:600 }}>{r.studentName}</td>
+                          <td style={{ color:'#6B7280' }}>{r.phone||'—'}</td>
+                          <td style={{ fontWeight:700 }}>{r.marksScored} / {r.totalMarks}</td>
+                          <td>{r.percentage}%</td>
+                          <td>
+                            <span style={{ fontSize:11, padding:'2px 8px', borderRadius:10, fontWeight:600,
+                              background: r.passed ? '#D1FAE5' : '#FEE2E2',
+                              color: r.passed ? '#065F46' : '#991B1B' }}>
+                              {r.passed ? 'Pass' : 'Fail'}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              );
+            })()}
+            <div style={{ display:'flex', justifyContent:'flex-end', marginTop:16 }}>
+              <button className="btn btn-ghost" onClick={() => setShowViewResults(null)}>Close</button>
+            </div>
+          </Modal>
+        )}
+
+        {/* Import Marks Modal */}
+        {showImportMarks && (
+          <Modal title={`Import Marks — ${showImportMarks.title}`} onClose={() => { setShowImportMarks(null); setMarksPreview(null); }} wide>
+            <div style={{ padding:'10px 14px', background:'#DBEAFE', borderRadius:8, fontSize:12, color:'#1E40AF', marginBottom:14, lineHeight:1.6 }}>
+              ℹ️ Upload a CSV with columns: <strong>name</strong> (student name), <strong>phone</strong> (number), <strong>marks</strong> (marks scored).<br/>
+              Pass mark is 40% of total marks ({Math.round((showImportMarks.totalMarks||100)*0.4)} out of {showImportMarks.totalMarks}).
+            </div>
+            <input ref={marksFileRef} type="file" accept=".csv" style={{ display:'none' }}
+              onChange={async e => {
+                const t = await e.target.files[0]?.text();
+                if (t) setMarksPreview(parseCSV(t, null));
+              }}/>
+            <div onClick={() => marksFileRef.current.click()} style={{ border:'2px dashed #E5E7EB', borderRadius:10, padding:'24px', textAlign:'center', cursor:'pointer', background:'#FAFAFA', marginBottom:14 }}>
+              <Upload size={22} style={{ color:'#9CA3AF', marginBottom:6 }}/>
+              <div style={{ fontSize:13, fontWeight:500 }}>{marksPreview ? `${marksPreview.length} rows loaded` : 'Click to upload CSV'}</div>
+            </div>
+            {marksPreview && (
+              <div className="table-container" style={{ maxHeight:200, overflowY:'auto', marginBottom:12 }}>
+                <table>
+                  <thead><tr><th>#</th><th>Name</th><th>Phone</th><th>Marks Scored</th><th>Result</th></tr></thead>
+                  <tbody>
+                    {marksPreview.slice(0,10).map((r, i) => {
+                      const scored = Number(r.marks || r.marksScored || r.score || 0);
+                      const pct = Math.round(scored / (showImportMarks.totalMarks||100) * 100);
+                      return (
+                        <tr key={i}>
+                          <td style={{ color:'#9CA3AF' }}>{i+1}</td>
+                          <td style={{ fontWeight:500 }}>{r.name||r.studentName||'—'}</td>
+                          <td style={{ color:'#6B7280' }}>{r.phone||r.number||'—'}</td>
+                          <td style={{ fontWeight:700 }}>{scored} / {showImportMarks.totalMarks}</td>
+                          <td><span style={{ fontSize:11, padding:'2px 6px', borderRadius:8, fontWeight:600,
+                            background: pct>=40?'#D1FAE5':'#FEE2E2', color: pct>=40?'#065F46':'#991B1B' }}>{pct>=40?'Pass':'Fail'}</span></td>
+                        </tr>
+                      );
+                    })}
+                    {marksPreview.length > 10 && <tr><td colSpan={5} style={{ textAlign:'center', color:'#6B7280', padding:8 }}>...{marksPreview.length-10} more</td></tr>}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            <div style={{ display:'flex', gap:10, justifyContent:'flex-end' }}>
+              <button className="btn btn-ghost" onClick={() => { setShowImportMarks(null); setMarksPreview(null); }}>Cancel</button>
+              <button className="btn btn-primary" disabled={!marksPreview || importingMarks} onClick={handleImportMarks}>
+                {importingMarks ? 'Importing...' : `Import ${marksPreview?.length||0} Results`}
+              </button>
+            </div>
+          </Modal>
+        )}
 
         {/* Delete Student Confirm */}
         {deleteStudentConfirm && (
