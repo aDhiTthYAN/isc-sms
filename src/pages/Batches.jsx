@@ -162,104 +162,150 @@ function downloadTemplate(batchName, fields) {
 // ─── Onboarding Step Side Panel ───────────────────────────────────────────────
 const VARK_OPTIONS = ['Visual', 'Auditory', 'Read/Write', 'Kinesthetic', 'Visual-Auditory', 'Visual-Kinesthetic', 'Auditory-Kinesthetic', 'Multimodal'];
 
-function OnboardingStepPanel({ step, onClose, onMarkComplete, onMarkVark }) {
+function OnboardingStepPanel({ step, onClose, onMarkComplete, onMarkVark, onRevoke }) {
   const [tab, setTab] = useState('not');
+  const [search, setSearch] = useState('');
   const [varkSelections, setVarkSelections] = useState({});
   const [marking, setMarking] = useState({});
+  // Local lists for instant UI update (optimistic)
+  const [localCompleted, setLocalCompleted]       = useState([]);
+  const [localNotCompleted, setLocalNotCompleted] = useState([]);
+
+  useEffect(() => {
+    setLocalCompleted(step?.completedStudents || []);
+    setLocalNotCompleted(step?.notCompletedStudents || []);
+    setSearch('');
+  }, [step?.key]);
+
   if (!step) return null;
 
   const isVark = step.key === 'vark_analysis';
 
+  const filteredNot = localNotCompleted.filter(s =>
+    !search || s.name?.toLowerCase().includes(search.toLowerCase()) || s.phone?.includes(search)
+  );
+  const filteredDone = localCompleted.filter(s =>
+    !search || s.name?.toLowerCase().includes(search.toLowerCase()) || s.phone?.includes(search)
+  );
+
+  const doMark = async (s) => {
+    if (s.status === 'dropped') { alert(`${s.name} is a dropped student — cannot mark steps.`); return; }
+    if (isVark && !varkSelections[s.id]) return;
+    setMarking(prev => ({ ...prev, [s.id]: true }));
+    // Optimistic update
+    setLocalNotCompleted(prev => prev.filter(x => x.id !== s.id));
+    setLocalCompleted(prev => [...prev, { ...s, varkResult: isVark ? varkSelections[s.id] : s.varkResult }]);
+    try {
+      if (isVark) await onMarkVark(s.id, step.key, varkSelections[s.id]);
+      else await onMarkComplete(s.id, step.key);
+    } catch {
+      // Revert on error
+      setLocalCompleted(prev => prev.filter(x => x.id !== s.id));
+      setLocalNotCompleted(prev => [...prev, s]);
+    }
+    setMarking(prev => ({ ...prev, [s.id]: false }));
+  };
+
+  const doRevoke = async (s) => {
+    setMarking(prev => ({ ...prev, [s.id]: true }));
+    setLocalCompleted(prev => prev.filter(x => x.id !== s.id));
+    setLocalNotCompleted(prev => [...prev, s]);
+    try {
+      await onRevoke(s.id, step.key);
+    } catch {
+      setLocalCompleted(prev => [...prev, s]);
+      setLocalNotCompleted(prev => prev.filter(x => x.id !== s.id));
+    }
+    setMarking(prev => ({ ...prev, [s.id]: false }));
+  };
+
   return (
-    <div style={{
-      position: 'fixed', top: 0, right: 0, width: 440, height: '100vh',
-      background: '#fff', boxShadow: '-4px 0 24px rgba(0,0,0,0.12)',
-      zIndex: 1000, display: 'flex', flexDirection: 'column',
-    }}>
-      <div style={{ padding: '18px 20px', borderBottom: '1px solid #E5E7EB', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+    <div style={{ position:'fixed', top:0, right:0, width:440, height:'100vh', background:'#fff', boxShadow:'-4px 0 24px rgba(0,0,0,0.12)', zIndex:1000, display:'flex', flexDirection:'column' }}>
+      <div style={{ padding:'18px 20px', borderBottom:'1px solid #E5E7EB', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
         <div>
-          <div style={{ fontWeight: 700, fontSize: 15, color: '#1A1A2E' }}>{step.label}</div>
-          <div style={{ fontSize: 12, color: '#9CA3AF', textTransform: 'capitalize' }}>{step.phase} phase</div>
+          <div style={{ fontWeight:700, fontSize:15, color:'#1A1A2E' }}>{step.label}</div>
+          <div style={{ fontSize:12, color:'#9CA3AF', textTransform:'capitalize' }}>{step.phase} phase</div>
         </div>
-        <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9CA3AF', padding: 4 }}><X size={18} /></button>
+        <button onClick={onClose} style={{ background:'none', border:'none', cursor:'pointer', color:'#9CA3AF', padding:4 }}><X size={18}/></button>
       </div>
-      <div style={{ display: 'flex', gap: 0, borderBottom: '1px solid #E5E7EB' }}>
+      {/* Search */}
+      <div style={{ padding:'10px 16px', borderBottom:'1px solid #F3F4F6' }}>
+        <input className="form-input" placeholder="Search student by name or phone..." value={search}
+          onChange={e => setSearch(e.target.value)} style={{ fontSize:12 }}/>
+      </div>
+      <div style={{ display:'flex', borderBottom:'1px solid #E5E7EB' }}>
         {[
-          { key: 'completed', label: `Completed (${step.completedStudents?.length || 0})`, color: '#10B981' },
-          { key: 'not',       label: `Not Completed (${step.notCompletedStudents?.length || 0})`, color: '#EF4444' },
+          { key:'not',       label:`Not Completed (${localNotCompleted.length})`, color:'#EF4444' },
+          { key:'completed', label:`Completed (${localCompleted.length})`,         color:'#10B981' },
         ].map(t => (
           <button key={t.key} onClick={() => setTab(t.key)}
-            style={{ flex: 1, padding: '10px 0', fontSize: 13, fontWeight: 600, cursor: 'pointer',
-              background: 'none', border: 'none', borderBottom: tab === t.key ? `2px solid ${t.color}` : '2px solid transparent',
-              color: tab === t.key ? t.color : '#9CA3AF', transition: 'all 0.15s' }}
-          >{t.label}</button>
+            style={{ flex:1, padding:'10px 0', fontSize:13, fontWeight:600, cursor:'pointer', background:'none', border:'none',
+              borderBottom: tab===t.key ? `2px solid ${t.color}` : '2px solid transparent',
+              color: tab===t.key ? t.color : '#9CA3AF', transition:'all 0.15s' }}>
+            {t.label}
+          </button>
         ))}
       </div>
-      <div style={{ flex: 1, overflowY: 'auto', padding: '12px 16px' }}>
-        {tab === 'completed' && (
-          <>
-            {(step.completedStudents || []).length === 0 && (
-              <div style={{ color: '#9CA3AF', fontSize: 13, textAlign: 'center', paddingTop: 40 }}>No students completed yet.</div>
-            )}
-            {(step.completedStudents || []).map(s => (
-              <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 10px', borderRadius: 8, marginBottom: 4, background: '#F0FDF4' }}>
-                <div style={{ width: 28, height: 28, borderRadius: '50%', background: '#D1FAE5', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: '#065F46', flexShrink: 0 }}>
-                  {(s.name || '?').charAt(0).toUpperCase()}
-                </div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 13, fontWeight: 500 }}>{s.name}</div>
-                  <div style={{ fontSize: 11, color: '#9CA3AF' }}>
-                    {s.phone || '—'}
-                    {isVark && s.varkResult && <span style={{ marginLeft: 6, fontWeight: 600, color: '#6D28D9' }}>· {s.varkResult}</span>}
-                  </div>
-                </div>
-                <CheckCircle size={14} style={{ color: '#10B981', flexShrink: 0 }} />
-              </div>
-            ))}
-          </>
-        )}
+      <div style={{ flex:1, overflowY:'auto', padding:'12px 16px' }}>
         {tab === 'not' && (
           <>
-            {(step.notCompletedStudents || []).length === 0 && (
-              <div style={{ color: '#9CA3AF', fontSize: 13, textAlign: 'center', paddingTop: 40 }}>All students completed this step!</div>
-            )}
-            {(step.notCompletedStudents || []).map(s => (
-              <div key={s.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px', borderRadius: 8, marginBottom: 6, background: '#FFF8F8', border: '1px solid #FEE2E2' }}>
-                <div style={{ width: 28, height: 28, borderRadius: '50%', background: '#FEE2E2', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: '#E53935', flexShrink: 0, marginTop: 2 }}>
-                  {(s.name || '?').charAt(0).toUpperCase()}
+            {filteredNot.length === 0 && <div style={{ color:'#9CA3AF', fontSize:13, textAlign:'center', paddingTop:40 }}>{search ? 'No match.' : 'All students completed this step!'}</div>}
+            {filteredNot.map(s => {
+              const isDropped = s.status === 'dropped';
+              return (
+                <div key={s.id} style={{ display:'flex', alignItems:'flex-start', gap:10, padding:10, borderRadius:8, marginBottom:6, background: isDropped ? '#F9FAFB' : '#FFF8F8', border:`1px solid ${isDropped ? '#E5E7EB' : '#FEE2E2'}` }}>
+                  <div style={{ width:28, height:28, borderRadius:'50%', background: isDropped ? '#E5E7EB' : '#FEE2E2', display:'flex', alignItems:'center', justifyContent:'center', fontSize:11, fontWeight:700, color: isDropped ? '#9CA3AF' : '#E53935', flexShrink:0, marginTop:2 }}>
+                    {(s.name||'?').charAt(0).toUpperCase()}
+                  </div>
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <div style={{ fontSize:13, fontWeight:500, display:'flex', alignItems:'center', gap:6 }}>
+                      {s.name}
+                      {isDropped && <span style={{ fontSize:10, padding:'1px 6px', borderRadius:8, background:'#E5E7EB', color:'#6B7280', fontWeight:600 }}>Dropped</span>}
+                    </div>
+                    <div style={{ fontSize:11, color:'#9CA3AF', marginBottom: isVark ? 6 : 0 }}>{s.phone||'—'}</div>
+                    {!isDropped && isVark && (
+                      <select value={varkSelections[s.id]||''} onChange={e => setVarkSelections(p => ({ ...p, [s.id]:e.target.value }))}
+                        style={{ fontSize:11, padding:'3px 6px', borderRadius:6, border:'1px solid #E5E7EB', width:'100%', marginBottom:6 }}>
+                        <option value="">Select VARK result...</option>
+                        {VARK_OPTIONS.map(v => <option key={v} value={v}>{v}</option>)}
+                      </select>
+                    )}
+                    {!isDropped && (
+                      <button disabled={marking[s.id] || (isVark && !varkSelections[s.id])}
+                        onClick={() => doMark(s)}
+                        style={{ fontSize:11, padding:'4px 10px', borderRadius:6, border:'none', cursor:'pointer', fontWeight:600,
+                          background: marking[s.id] ? '#E5E7EB' : '#D1FAE5', color: marking[s.id] ? '#9CA3AF' : '#065F46',
+                          opacity: isVark && !varkSelections[s.id] ? 0.5 : 1 }}>
+                        {marking[s.id] ? 'Saving...' : isVark ? '✓ Mark Complete + Save VARK' : '✓ Mark Complete'}
+                      </button>
+                    )}
+                    {isDropped && <div style={{ fontSize:11, color:'#9CA3AF', fontStyle:'italic' }}>Cannot mark — student is dropped</div>}
+                  </div>
                 </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 13, fontWeight: 500 }}>{s.name}</div>
-                  <div style={{ fontSize: 11, color: '#9CA3AF', marginBottom: isVark ? 6 : 0 }}>{s.phone || '—'}</div>
-                  {isVark && (
-                    <select
-                      value={varkSelections[s.id] || ''}
-                      onChange={e => setVarkSelections(prev => ({ ...prev, [s.id]: e.target.value }))}
-                      style={{ fontSize: 11, padding: '3px 6px', borderRadius: 6, border: '1px solid #E5E7EB', width: '100%', marginBottom: 6 }}
-                    >
-                      <option value="">Select VARK result...</option>
-                      {VARK_OPTIONS.map(v => <option key={v} value={v}>{v}</option>)}
-                    </select>
-                  )}
-                  <button
-                    style={{ fontSize: 11, padding: '4px 10px', borderRadius: 6, border: 'none', cursor: 'pointer', fontWeight: 600,
-                      background: marking[s.id] ? '#E5E7EB' : '#D1FAE5', color: marking[s.id] ? '#9CA3AF' : '#065F46',
-                      opacity: isVark && !varkSelections[s.id] ? 0.5 : 1 }}
-                    disabled={marking[s.id] || (isVark && !varkSelections[s.id])}
-                    onClick={async () => {
-                      if (isVark && !varkSelections[s.id]) return;
-                      setMarking(prev => ({ ...prev, [s.id]: true }));
-                      if (isVark) {
-                        await onMarkVark(s.id, step.key, varkSelections[s.id]);
-                      } else {
-                        await onMarkComplete(s.id, step.key);
-                      }
-                      setMarking(prev => ({ ...prev, [s.id]: false }));
-                    }}
-                  >
-                    {marking[s.id] ? 'Saving...' : isVark ? '✓ Mark Complete + Save VARK' : '✓ Mark Complete'}
-                  </button>
+              );
+            })}
+          </>
+        )}
+        {tab === 'completed' && (
+          <>
+            {filteredDone.length === 0 && <div style={{ color:'#9CA3AF', fontSize:13, textAlign:'center', paddingTop:40 }}>{search ? 'No match.' : 'No students completed yet.'}</div>}
+            {filteredDone.map(s => (
+              <div key={s.id} style={{ display:'flex', alignItems:'center', gap:10, padding:'9px 10px', borderRadius:8, marginBottom:4, background:'#F0FDF4', border:'1px solid #BBF7D0' }}>
+                <div style={{ width:28, height:28, borderRadius:'50%', background:'#D1FAE5', display:'flex', alignItems:'center', justifyContent:'center', fontSize:11, fontWeight:700, color:'#065F46', flexShrink:0 }}>
+                  {(s.name||'?').charAt(0).toUpperCase()}
                 </div>
+                <div style={{ flex:1, minWidth:0 }}>
+                  <div style={{ fontSize:13, fontWeight:500 }}>{s.name}</div>
+                  <div style={{ fontSize:11, color:'#9CA3AF' }}>
+                    {s.phone||'—'}
+                    {isVark && s.varkResult && <span style={{ marginLeft:6, fontWeight:600, color:'#6D28D9' }}>· {s.varkResult}</span>}
+                  </div>
+                </div>
+                <CheckCircle size={14} style={{ color:'#10B981', flexShrink:0 }}/>
+                <button disabled={marking[s.id]} onClick={() => doRevoke(s)}
+                  style={{ fontSize:10, padding:'2px 8px', borderRadius:8, border:'1px solid #E5E7EB', background:'#fff', color:'#9CA3AF', cursor:'pointer', flexShrink:0 }}>
+                  {marking[s.id] ? '...' : 'Undo'}
+                </button>
               </div>
             ))}
           </>
@@ -711,7 +757,8 @@ export default function Batches() {
 
   const handleMarkStepComplete = async (studentId, stepKey) => {
     await updateStudent(studentId, { [`courseFlow.${stepKey}.done`]: true, [`courseFlow.${stepKey}.doneAt`]: new Date().toISOString() });
-    await loadBatchDetail(selectedBatch);
+    // Refresh in background so local optimistic update already shows
+    loadBatchDetail(selectedBatch);
   };
 
   const handleMarkVark = async (studentId, stepKey, varkResult) => {
@@ -720,7 +767,12 @@ export default function Batches() {
       [`courseFlow.${stepKey}.doneAt`]: new Date().toISOString(),
       varkResult,
     });
-    await loadBatchDetail(selectedBatch);
+    loadBatchDetail(selectedBatch);
+  };
+
+  const handleRevokeStep = async (studentId, stepKey) => {
+    await updateStudent(studentId, { [`courseFlow.${stepKey}.done`]: false, [`courseFlow.${stepKey}.doneAt`]: null });
+    loadBatchDetail(selectedBatch);
   };
 
   const handleAddSchedule = async (e) => {
@@ -875,7 +927,7 @@ export default function Batches() {
         {selectedStep && (
           <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.2)', zIndex: 999 }} onClick={() => setSelectedStep(null)} />
         )}
-        <OnboardingStepPanel step={selectedStep} onClose={() => setSelectedStep(null)} onMarkComplete={handleMarkStepComplete} onMarkVark={handleMarkVark} />
+        <OnboardingStepPanel step={selectedStep} onClose={() => setSelectedStep(null)} onMarkComplete={handleMarkStepComplete} onMarkVark={handleMarkVark} onRevoke={handleRevokeStep} />
 
         {/* Header */}
         <div className="page-header">
@@ -1108,7 +1160,22 @@ export default function Batches() {
                           <td style={{ fontSize:13 }}>{s.classStd||'—'}</td>
                           <td style={{ fontSize:12 }}>{s.varkResult||'—'}</td>
                           <td style={{ fontSize:12 }}>{s.syllabus||'—'}</td>
-                          <td><StatusBadge status={s.status}/></td>
+                          <td>
+                            <select
+                              value={s.status||'active'}
+                              onChange={async e => {
+                                await updateStudent(s.id, { status: e.target.value });
+                                await loadBatchDetail(selectedBatch);
+                              }}
+                              style={{ fontSize:11, padding:'2px 6px', borderRadius:8, border:'1px solid #E5E7EB', fontWeight:600, cursor:'pointer',
+                                background: s.status==='active'?'#D1FAE5':s.status==='at-risk'?'#FEE2E2':s.status==='dropped'?'#F3F4F6':'#FEF3C7',
+                                color: s.status==='active'?'#065F46':s.status==='at-risk'?'#991B1B':s.status==='dropped'?'#6B7280':'#92400E' }}>
+                              <option value="active">🟢 Active</option>
+                              <option value="moderate">🟡 Moderate</option>
+                              <option value="at-risk">🔴 At Risk</option>
+                              <option value="dropped">⚫ Dropped</option>
+                            </select>
+                          </td>
                           <td>
                             <span style={{ fontSize:11, padding:'2px 8px', borderRadius:10, fontWeight:600, background:onboardDone?'#D1FAE5':'#FEF3C7', color:onboardDone?'#065F46':'#92400E' }}>
                               {flowDone}/{batchFlow.length} {onboardDone ? '✅' : '⏳'}
@@ -1622,7 +1689,9 @@ export default function Batches() {
                                 </span>
                               </td>
                               <td style={{ padding: '9px 10px' }}>
-                                {!submittedEntry ? (
+                                {s.status === 'dropped' ? (
+                                  <span style={{ fontSize:10, color:'#9CA3AF', fontStyle:'italic' }}>Dropped</span>
+                                ) : !submittedEntry ? (
                                   <button
                                     className="btn btn-sm"
                                     style={{ fontSize: 11, background: '#D1FAE5', color: '#065F46', border: 'none' }}
@@ -1739,7 +1808,21 @@ export default function Batches() {
                         <span style={{ fontSize:11, padding:'2px 8px', borderRadius:10, background:'#EDE9FE', color:'#6D28D9', fontWeight:600 }}>Exam</span>
                       </div>
                     </div>
-                    <div style={{ display:'flex', gap:8 }}>
+                    <div style={{ display:'flex', gap:8, alignItems:'center' }}>
+                      {/* Status toggle */}
+                      <select value={asmt.status||'upcoming'}
+                        onChange={async e => {
+                          const ns = e.target.value;
+                          await updateDoc(doc(db,'assessments',asmt.id), { status: ns });
+                          const asmts = await getAssessments(selectedBatch.id);
+                          setBatchAssessments(asmts);
+                        }}
+                        style={{ fontSize:11, padding:'2px 8px', borderRadius:8, border:'1px solid #E5E7EB', cursor:'pointer', fontWeight:600,
+                          background: asmt.status==='completed' ? '#D1FAE5' : '#DBEAFE',
+                          color: asmt.status==='completed' ? '#065F46' : '#1E40AF' }}>
+                        <option value="upcoming">Upcoming</option>
+                        <option value="completed">Completed</option>
+                      </select>
                       <button className="btn btn-ghost btn-sm" onClick={async () => {
                         const results = await getAssessmentResults(asmt.id);
                         setAssessmentResults(prev => ({ ...prev, [asmt.id]: results }));

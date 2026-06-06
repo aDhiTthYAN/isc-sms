@@ -462,6 +462,12 @@ export const permanentDelete = async (trashId) => {
 // ── Staff Requests ─────────────────────────────────────────────
 export const createRequest = async (data) => addDoc(collection(db,'requests'), { ...data, createdAt: serverTimestamp() });
 
+export const getMyRequests = async (uid) => {
+  const q = query(collection(db,'requests'), where('requestedBy','==',uid));
+  const snap = await getDocs(q);
+  return snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a,b) => (b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));
+};
+
 export const getRequests = async (status) => {
   const q = status ? query(collection(db,'requests'), where('status','==',status)) : collection(db,'requests');
   const snap = await getDocs(q);

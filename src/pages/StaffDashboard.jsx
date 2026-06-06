@@ -1,13 +1,16 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import {
-  getMyStudents, getMyTasks, getMyFollowUps, getStaffBatches, updateTask
+  getMyStudents, getMyTasks, getMyFollowUps, getStaffBatches, updateTask,
+  getMyNotifications, markNotificationRead, getMyRequests, updateRequest, addNotification, createRequest,
 } from '../firebase/services';
-import { Loading, StatusBadge } from '../components/ui';
+import { collection, getDocs, query, where } from 'firebase/firestore';
+import { db } from '../firebase/config';
+import { Loading } from '../components/ui';
 import { useAuth } from '../context/AuthContext';
 import {
   Users, CheckSquare, PhoneCall, School,
-  ChevronRight, AlertTriangle, Activity
+  ChevronRight, AlertTriangle, Activity, Bell, Inbox, X
 } from 'lucide-react';
 
 const CARD = {
@@ -26,20 +29,29 @@ export default function StaffDashboard() {
   const [followups,       setFollowups]       = useState([]);
   const [myBatches,       setMyBatches]       = useState([]);
   const [loading,         setLoading]         = useState(true);
+  const [notifications,   setNotifications]   = useState([]);
+  const [myRequests,      setMyRequests]      = useState([]);
+  const [showSidebar,     setShowSidebar]     = useState(false);
+  const [sidebarTab,      setSidebarTab]      = useState('notif'); // 'notif' | 'requests'
+  const [reminding,       setReminding]       = useState({});
 
   useEffect(() => {
     const load = async () => {
       try {
-        const [s, t, f, b] = await Promise.all([
+        const [s, t, f, b, n, r] = await Promise.all([
           getMyStudents(profile?.name, profile?.uid).catch(() => []),
           getMyTasks(profile?.email).catch(() => []),
           getMyFollowUps(profile?.email).catch(() => []),
           getStaffBatches(profile?.uid).catch(() => []),
+          getMyNotifications(profile?.email).catch(() => []),
+          getMyRequests(profile?.uid).catch(() => []),
         ]);
         setStudents(s);
         setTasks(t);
         setFollowups(f);
         setMyBatches(b);
+        setNotifications(n);
+        setMyRequests(r);
       } catch (err) {
         console.error(err);
       } finally {
@@ -73,17 +85,129 @@ export default function StaffDashboard() {
     </div>
   );
 
+  const unreadNotifs = notifications.filter(n => !n.read).length;
+  const pendingReqs  = myRequests.filter(r => r.status === 'pending').length;
+
   return (
     <div>
       {/* Welcome */}
-      <div style={{ marginBottom: 24 }}>
-        <h2 style={{ fontSize: 24, fontWeight: 700, color: '#1A1A2E', marginBottom: 4 }}>
-          Welcome back, {profile?.name?.split(' ')[0]}
-        </h2>
-        <div style={{ fontSize: 13, color: '#9CA3AF' }}>
-          {new Date().toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom: 24 }}>
+        <div>
+          <h2 style={{ fontSize: 24, fontWeight: 700, color: '#1A1A2E', marginBottom: 4 }}>
+            Welcome back, {profile?.name?.split(' ')[0]}
+          </h2>
+          <div style={{ fontSize: 13, color: '#9CA3AF' }}>
+            {new Date().toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+          </div>
+        </div>
+        {/* Bell + Requests button */}
+        <div style={{ display:'flex', gap:8 }}>
+          <button onClick={() => { setShowSidebar(true); setSidebarTab('requests'); }}
+            style={{ position:'relative', background:'#fff', border:'1px solid #E5E7EB', borderRadius:10, padding:'8px 12px', cursor:'pointer', display:'flex', alignItems:'center', gap:6, fontSize:13, fontWeight:600 }}>
+            <Inbox size={15} style={{ color:'#0F3460' }}/>
+            My Requests
+            {pendingReqs > 0 && <span style={{ background:'#E53935', color:'#fff', fontSize:10, fontWeight:700, borderRadius:'50%', width:18, height:18, display:'flex', alignItems:'center', justifyContent:'center' }}>{pendingReqs}</span>}
+          </button>
+          <button onClick={() => { setShowSidebar(true); setSidebarTab('notif'); }}
+            style={{ position:'relative', background:'#fff', border:'1px solid #E5E7EB', borderRadius:10, padding:'8px 12px', cursor:'pointer', display:'flex', alignItems:'center', gap:6, fontSize:13, fontWeight:600 }}>
+            <Bell size={15} style={{ color:'#0F3460' }}/>
+            Notifications
+            {unreadNotifs > 0 && <span style={{ background:'#E53935', color:'#fff', fontSize:10, fontWeight:700, borderRadius:'50%', width:18, height:18, display:'flex', alignItems:'center', justifyContent:'center' }}>{unreadNotifs}</span>}
+          </button>
         </div>
       </div>
+
+      {/* Notifications + Requests Sidebar */}
+      {showSidebar && (
+        <div style={{ position:'fixed', inset:0, zIndex:9000 }} onClick={() => setShowSidebar(false)}>
+          <div style={{ position:'fixed', top:0, right:0, width:380, height:'100vh', background:'#fff', boxShadow:'-4px 0 24px rgba(0,0,0,0.12)', display:'flex', flexDirection:'column', zIndex:9001 }}
+            onClick={e => e.stopPropagation()}>
+            <div style={{ padding:'18px 20px', borderBottom:'1px solid #E5E7EB', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+              <div style={{ display:'flex', gap:0, background:'#F3F4F6', borderRadius:8, padding:2 }}>
+                {[{ key:'notif', label:'Notifications' }, { key:'requests', label:'My Requests' }].map(t => (
+                  <button key={t.key} onClick={() => setSidebarTab(t.key)}
+                    style={{ padding:'5px 12px', borderRadius:6, border:'none', cursor:'pointer', fontSize:12, fontWeight:600,
+                      background: sidebarTab===t.key ? '#0F3460' : 'transparent',
+                      color: sidebarTab===t.key ? '#fff' : '#6B7280' }}>
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+              <button onClick={() => setShowSidebar(false)} style={{ background:'none', border:'none', cursor:'pointer', color:'#9CA3AF' }}><X size={18}/></button>
+            </div>
+            <div style={{ flex:1, overflowY:'auto', padding:'12px 16px' }}>
+              {sidebarTab === 'notif' && (
+                <>
+                  {notifications.length === 0 && <div style={{ color:'#9CA3AF', fontSize:13, textAlign:'center', paddingTop:40 }}>No notifications.</div>}
+                  {notifications.map(n => (
+                    <div key={n.id} onClick={() => markNotificationRead(n.id).then(() => setNotifications(prev => prev.map(x => x.id===n.id ? { ...x, read:true } : x)))}
+                      style={{ padding:'10px 12px', borderRadius:10, marginBottom:8, cursor:'pointer',
+                        background: n.read ? '#FAFBFC' : '#EFF6FF', border:`1px solid ${n.read ? '#E5E7EB' : '#BFDBFE'}` }}>
+                      <div style={{ fontSize:13, fontWeight:n.read ? 400 : 700, color:'#1A1A2E', marginBottom:2 }}>{n.title}</div>
+                      <div style={{ fontSize:12, color:'#6B7280' }}>{n.body}</div>
+                    </div>
+                  ))}
+                </>
+              )}
+              {sidebarTab === 'requests' && (
+                <>
+                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
+                    <div style={{ fontSize:13, fontWeight:600 }}>My Removal Requests</div>
+                    <button className="btn btn-ghost btn-sm" onClick={() => navigate('/requests')}>View All →</button>
+                  </div>
+                  {myRequests.length === 0 && <div style={{ color:'#9CA3AF', fontSize:13, textAlign:'center', paddingTop:40 }}>No requests submitted.</div>}
+                  {myRequests.map(req => {
+                    const isPending = req.status === 'pending';
+                    return (
+                      <div key={req.id} style={{ padding:'12px', borderRadius:10, marginBottom:8, background:'#FAFBFC', border:'1px solid #E5E7EB' }}>
+                        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:4 }}>
+                          <div style={{ fontSize:13, fontWeight:600 }}>{req.targetName}</div>
+                          <span style={{ fontSize:10, padding:'2px 8px', borderRadius:10, fontWeight:600,
+                            background: isPending ? '#FEF3C7' : req.status==='accepted' ? '#D1FAE5' : '#FEE2E2',
+                            color: isPending ? '#92400E' : req.status==='accepted' ? '#065F46' : '#991B1B' }}>
+                            {req.status}
+                          </span>
+                        </div>
+                        <div style={{ fontSize:12, color:'#6B7280', marginBottom:8 }}>
+                          {req.targetType} · {req.reason?.slice(0,80)}
+                        </div>
+                        {isPending && (
+                          <button
+                            disabled={reminding[req.id]}
+                            onClick={async () => {
+                              setReminding(p => ({ ...p, [req.id]: true }));
+                              // Notify CEO
+                              const ceoSnap = await getDocs(query(collection(db,'staff'), where('role','==','ceo')));
+                              for (const ceoDoc of ceoSnap.docs) {
+                                const ceo = ceoDoc.data();
+                                if (ceo.email) await addNotification({
+                                  toEmail: ceo.email, title: 'Reminder: Removal Request',
+                                  body: `${profile?.name} is reminding you about their removal request from ${req.targetName}.`,
+                                  type: 'removal_reminder', read: false,
+                                });
+                              }
+                              setReminding(p => ({ ...p, [req.id]: false }));
+                              alert('Reminder sent to CEO!');
+                            }}
+                            style={{ fontSize:11, padding:'4px 10px', borderRadius:6, border:'1px solid #E5E7EB', background:'#fff', cursor:'pointer', fontWeight:500 }}>
+                            {reminding[req.id] ? 'Sending...' : '🔔 Remind CEO'}
+                          </button>
+                        )}
+                        {req.status === 'accepted' && (
+                          <div style={{ fontSize:11, color:'#10B981', fontWeight:600 }}>✓ Approved — you have been removed.</div>
+                        )}
+                        {req.status === 'rejected' && (
+                          <div style={{ fontSize:11, color:'#EF4444', fontWeight:600 }}>✗ Request was declined by CEO.</div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* KPI Strip */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 14, marginBottom: 24 }}>

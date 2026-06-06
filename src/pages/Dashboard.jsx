@@ -2,14 +2,15 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   getBatches, getBatchStudentCount, getTasks, getAllFollowUps,
-  getStudentCount, getBatchTasks
+  getStudentCount, getBatchTasks, getRequests, addNotification, updateRequest, markNotificationRead,
 } from '../firebase/services';
 import { query, collection, where, limit, getDocs, getCountFromServer } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import { Loading, StatusBadge } from '../components/ui';
+import { useAuth } from '../context/AuthContext';
 import {
   Users, AlertTriangle, School, CheckSquare, TrendingUp,
-  Calendar, ChevronRight, Clock, Activity, ArrowRight
+  Calendar, ChevronRight, Clock, Activity, ArrowRight, Inbox, X, Bell
 } from 'lucide-react';
 
 const KPI_STYLE = {
@@ -48,6 +49,7 @@ function KPICard({ label, value, sub, color, bg, icon: Icon, link }) {
 
 export default function Dashboard() {
   const navigate = useNavigate();
+  const { profile } = useAuth();
   const [loading, setLoading]           = useState(true);
   const [totalStudents, setTotalStudents] = useState(0);
   const [atRiskCount, setAtRiskCount]   = useState(0);
@@ -58,6 +60,13 @@ export default function Dashboard() {
   const [atRiskStudents, setAtRiskStudents] = useState([]);
   const [actPage, setActPage]           = useState(0);
   const ACT_PAGE = 10;
+
+  // Sidebar state
+  const [showSidebar, setShowSidebar]   = useState(false);
+  const [sidebarTab, setSidebarTab]     = useState('requests');
+  const [pendingRequests, setPendingRequests] = useState([]);
+  const [notifications, setNotifications] = useState([]);
+  const [processingReq, setProcessingReq] = useState(null);
 
   useEffect(() => {
     const load = async () => {
@@ -111,6 +120,19 @@ export default function Dashboard() {
           return { batch, count, onboardedCount };
         }));
         setBatchRows(rows);
+
+        // CEO: load pending requests and notifications
+        const [reqs, notifs] = await Promise.all([
+          getRequests('pending').catch(() => []),
+          profile?.email ? (async () => {
+            const q = query(collection(db,'notifications'), where('toEmail','==',profile.email), limit(20));
+            const snap = await getDocs(q);
+            return snap.docs.map(d => ({ id: d.id, ...d.data() }))
+              .sort((a,b) => (b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));
+          })() : Promise.resolve([]),
+        ]);
+        setPendingRequests(reqs);
+        setNotifications(notifs);
       } catch (err) {
         console.error('Dashboard load error:', err);
       } finally {
@@ -118,7 +140,48 @@ export default function Dashboard() {
       }
     };
     load();
-  }, []);
+  }, [profile?.email]);
+
+  const handleAcceptRequest = async (req) => {
+    setProcessingReq(req.id);
+    try {
+      await updateRequest(req.id, { status: 'accepted' });
+      // notify requesting staff
+      if (req.requestedByEmail) {
+        await addNotification({
+          toEmail: req.requestedByEmail,
+          message: `Your request "${req.title || req.type}" has been approved by CEO.`,
+          type: 'request_accepted',
+          requestId: req.id,
+        });
+      }
+      setPendingRequests(prev => prev.filter(r => r.id !== req.id));
+    } catch (e) { console.error(e); }
+    setProcessingReq(null);
+  };
+
+  const handleRejectRequest = async (req) => {
+    setProcessingReq(req.id);
+    try {
+      await updateRequest(req.id, { status: 'rejected' });
+      if (req.requestedByEmail) {
+        await addNotification({
+          toEmail: req.requestedByEmail,
+          message: `Your request "${req.title || req.type}" has been declined by CEO.`,
+          type: 'request_rejected',
+          requestId: req.id,
+        });
+      }
+      setPendingRequests(prev => prev.filter(r => r.id !== req.id));
+    } catch (e) { console.error(e); }
+    setProcessingReq(null);
+  };
+
+  const handleMarkNotifRead = async (notif) => {
+    if (notif.read) return;
+    setNotifications(prev => prev.map(n => n.id === notif.id ? { ...n, read: true } : n));
+    await markNotificationRead(notif.id).catch(() => {});
+  };
 
   if (loading) return <Loading text="Loading dashboard..." />;
 
@@ -146,8 +209,122 @@ export default function Dashboard() {
     </div>
   );
 
+  const unreadNotifs = notifications.filter(n => !n.read).length;
+
   return (
     <div>
+      {/* Header with Sidebar Buttons */}
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginBottom: 16 }}>
+        <button
+          onClick={() => { setSidebarTab('notif'); setShowSidebar(true); }}
+          style={{ position: 'relative', background: '#fff', border: '1px solid #E5E7EB', borderRadius: 10, padding: '7px 14px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 500, color: '#374151' }}
+        >
+          <Bell size={16} />
+          Notifications
+          {unreadNotifs > 0 && (
+            <span style={{ position: 'absolute', top: -5, right: -5, background: '#E53935', color: '#fff', borderRadius: '50%', width: 18, height: 18, fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{unreadNotifs}</span>
+          )}
+        </button>
+        <button
+          onClick={() => { setSidebarTab('requests'); setShowSidebar(true); }}
+          style={{ position: 'relative', background: '#fff', border: '1px solid #E5E7EB', borderRadius: 10, padding: '7px 14px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 500, color: '#374151' }}
+        >
+          <Inbox size={16} />
+          Requests
+          {pendingRequests.length > 0 && (
+            <span style={{ position: 'absolute', top: -5, right: -5, background: '#F59E0B', color: '#fff', borderRadius: '50%', width: 18, height: 18, fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{pendingRequests.length}</span>
+          )}
+        </button>
+      </div>
+
+      {/* CEO Sidebar */}
+      {showSidebar && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 9000 }} onClick={() => setShowSidebar(false)}>
+          <div
+            style={{ position: 'absolute', top: 0, right: 0, width: 380, height: '100%', background: '#fff', boxShadow: '-4px 0 24px rgba(0,0,0,0.13)', display: 'flex', flexDirection: 'column', zIndex: 9001 }}
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Sidebar header */}
+            <div style={{ padding: '18px 20px 12px', borderBottom: '1px solid #F3F4F6', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button
+                  onClick={() => setSidebarTab('requests')}
+                  style={{ padding: '5px 14px', borderRadius: 8, border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: 13, background: sidebarTab === 'requests' ? '#0F3460' : '#F3F4F6', color: sidebarTab === 'requests' ? '#fff' : '#374151' }}
+                >Requests {pendingRequests.length > 0 ? `(${pendingRequests.length})` : ''}</button>
+                <button
+                  onClick={() => setSidebarTab('notif')}
+                  style={{ padding: '5px 14px', borderRadius: 8, border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: 13, background: sidebarTab === 'notif' ? '#0F3460' : '#F3F4F6', color: sidebarTab === 'notif' ? '#fff' : '#374151' }}
+                >Notifications {unreadNotifs > 0 ? `(${unreadNotifs})` : ''}</button>
+              </div>
+              <button onClick={() => setShowSidebar(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}>
+                <X size={18} style={{ color: '#6B7280' }} />
+              </button>
+            </div>
+
+            <div style={{ flex: 1, overflowY: 'auto', padding: '12px 16px' }}>
+              {sidebarTab === 'requests' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {pendingRequests.length === 0 && (
+                    <div style={{ textAlign: 'center', color: '#9CA3AF', paddingTop: 40, fontSize: 13 }}>No pending requests</div>
+                  )}
+                  {pendingRequests.map(req => (
+                    <div key={req.id} style={{ background: '#F8FAFC', borderRadius: 10, padding: '12px 14px', border: '1px solid #E5E7EB' }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: '#1A1A2E', marginBottom: 4 }}>{req.title || req.type || 'Request'}</div>
+                      <div style={{ fontSize: 12, color: '#6B7280', marginBottom: 2 }}>From: <b>{req.requestedByName || req.requestedByEmail || '—'}</b></div>
+                      {req.assessmentName && <div style={{ fontSize: 12, color: '#6B7280', marginBottom: 2 }}>Assessment: {req.assessmentName}</div>}
+                      {req.reason && <div style={{ fontSize: 12, color: '#6B7280', marginBottom: 8 }}>Reason: {req.reason}</div>}
+                      <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                        <button
+                          disabled={processingReq === req.id}
+                          onClick={() => handleAcceptRequest(req)}
+                          style={{ flex: 1, padding: '6px 0', borderRadius: 7, border: 'none', background: '#10B981', color: '#fff', fontWeight: 600, fontSize: 12, cursor: 'pointer' }}
+                        >Accept</button>
+                        <button
+                          disabled={processingReq === req.id}
+                          onClick={() => handleRejectRequest(req)}
+                          style={{ flex: 1, padding: '6px 0', borderRadius: 7, border: 'none', background: '#FEE2E2', color: '#991B1B', fontWeight: 600, fontSize: 12, cursor: 'pointer' }}
+                        >Reject</button>
+                        <button
+                          onClick={() => { setShowSidebar(false); navigate('/requests'); }}
+                          style={{ flex: 1, padding: '6px 0', borderRadius: 7, border: '1px solid #E5E7EB', background: '#fff', color: '#374151', fontWeight: 600, fontSize: 12, cursor: 'pointer' }}
+                        >View</button>
+                      </div>
+                    </div>
+                  ))}
+                  <button
+                    onClick={() => { setShowSidebar(false); navigate('/requests'); }}
+                    style={{ marginTop: 8, padding: '9px', borderRadius: 8, border: '1px solid #E5E7EB', background: '#fff', color: '#0F3460', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}
+                  >View All Requests →</button>
+                </div>
+              )}
+
+              {sidebarTab === 'notif' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {notifications.length === 0 && (
+                    <div style={{ textAlign: 'center', color: '#9CA3AF', paddingTop: 40, fontSize: 13 }}>No notifications</div>
+                  )}
+                  {notifications.map(notif => (
+                    <div
+                      key={notif.id}
+                      onClick={() => handleMarkNotifRead(notif)}
+                      style={{ padding: '10px 12px', borderRadius: 9, border: `1px solid ${notif.read ? '#F3F4F6' : '#BFDBFE'}`, background: notif.read ? '#F8FAFC' : '#EFF6FF', cursor: 'pointer' }}
+                    >
+                      <div style={{ fontSize: 13, color: '#1A1A2E', fontWeight: notif.read ? 400 : 600 }}>{notif.message}</div>
+                      {notif.createdAt?.seconds && (
+                        <div style={{ fontSize: 11, color: '#9CA3AF', marginTop: 4 }}>
+                          {new Date(notif.createdAt.seconds * 1000).toLocaleString()}
+                        </div>
+                      )}
+                      {!notif.read && <div style={{ fontSize: 10, color: '#2563EB', fontWeight: 600, marginTop: 2 }}>● Unread — click to mark read</div>}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* KPI Cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14, marginBottom: 24 }}>
         {kpis.map(k => <KPICard key={k.label} {...k} />)}
