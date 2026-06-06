@@ -73,6 +73,7 @@ export default function Assessments({ filterBatchId = null }) {
   const [filterBatch,   setFilterBatch]   = useState(filterBatchId || '');
   const [filterStatus,  setFilterStatus]  = useState('');
   const [searchTitle,   setSearchTitle]   = useState('');
+  const [filterScope,   setFilterScope]   = useState('all'); // 'all' | 'batch' | 'student'
 
   // Create modal
   const [showCreate,    setShowCreate]    = useState(false);
@@ -136,6 +137,8 @@ export default function Assessments({ filterBatchId = null }) {
     if (filterBatch  && a.batchId !== filterBatch)                              return false;
     if (filterStatus && a.status  !== filterStatus)                             return false;
     if (searchTitle  && !a.title?.toLowerCase().includes(searchTitle.toLowerCase())) return false;
+    if (filterScope === 'batch'   && a.studentId)                               return false;
+    if (filterScope === 'student' && !a.studentId)                              return false;
     return true;
   });
 
@@ -166,7 +169,7 @@ export default function Assessments({ filterBatchId = null }) {
         conductingStaff: createForm.conductingStaff,
         status:         createForm.status,
         notes:          createForm.notes,
-        createdBy:      profile?.uid,
+        createdBy:      profile?.uid || profile?.email || 'unknown',
       };
       await addAssessment(payload);
 
@@ -348,6 +351,24 @@ export default function Assessments({ filterBatchId = null }) {
         </button>
       </div>
 
+      {/* Scope tabs */}
+      {!filterBatchId && (
+        <div style={{ display:'flex', gap:0, background:'#F3F4F6', borderRadius:10, padding:3, marginBottom:14, width:'fit-content' }}>
+          {[
+            { key:'all',     label:'All Assessments' },
+            { key:'batch',   label:'Batch Assessments' },
+            { key:'student', label:'Student Assessments' },
+          ].map(t => (
+            <button key={t.key} onClick={() => setFilterScope(t.key)}
+              style={{ padding:'6px 16px', borderRadius:8, border:'none', cursor:'pointer', fontSize:12, fontWeight:600,
+                background: filterScope === t.key ? '#1A1A2E' : 'transparent',
+                color: filterScope === t.key ? '#fff' : '#6B7280', transition:'all 0.15s' }}>
+              {t.label}
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* Filter bar */}
       <div style={{ display:'flex', gap:10, flexWrap:'wrap', marginBottom:16, alignItems:'center' }}>
         <div style={{ position:'relative', flex:'1 1 200px', minWidth:160 }}>
@@ -381,7 +402,8 @@ export default function Assessments({ filterBatchId = null }) {
           <thead>
             <tr>
               <th>Title</th>
-              <th>Batch</th>
+              <th>Type</th>
+              <th>Batch / Student</th>
               <th>Date</th>
               <th>Total Marks</th>
               <th>Conducting Staff</th>
@@ -393,7 +415,7 @@ export default function Assessments({ filterBatchId = null }) {
           <tbody>
             {visible.length === 0 && (
               <tr>
-                <td colSpan={8} style={{ textAlign:'center', color:'#9CA3AF', padding:40 }}>
+                <td colSpan={9} style={{ textAlign:'center', color:'#9CA3AF', padding:40 }}>
                   No assessments found.
                 </td>
               </tr>
@@ -403,7 +425,16 @@ export default function Assessments({ filterBatchId = null }) {
               return (
                 <tr key={a.id}>
                   <td style={{ fontWeight:600 }}>{a.title}</td>
-                  <td style={{ color:'#6B7280' }}>{a.batchName || batchName(a.batchId)}</td>
+                  <td>
+                    <span style={{ fontSize:10, fontWeight:600, padding:'2px 8px', borderRadius:10,
+                      background: a.studentId ? '#EDE9FE' : '#DBEAFE',
+                      color: a.studentId ? '#6D28D9' : '#1E40AF' }}>
+                      {a.studentId ? 'Student' : 'Batch'}
+                    </span>
+                  </td>
+                  <td style={{ color:'#6B7280', fontSize:12 }}>
+                    {a.studentId ? (a.studentName || '—') : (a.batchName || batchName(a.batchId))}
+                  </td>
                   <td style={{ color:'#6B7280' }}>{formatDate(a.date)}</td>
                   <td style={{ color:'#6B7280' }}>{a.totalMarks}</td>
                   <td style={{ color:'#6B7280', fontSize:12, maxWidth:180 }}>

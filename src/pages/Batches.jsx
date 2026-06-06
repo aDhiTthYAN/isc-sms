@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   getBatches, addBatch, updateBatch,
-  getBatchStudents, addStudent, bulkAddStudents, getBatchStudentCount,
+  getBatchStudents, addStudent, bulkAddStudents, getBatchStudentCount, updateStudent,
   getStaffProfiles, getBatchSchedules, addBatchSchedule, deleteBatchSchedule,
   getBatchTasks, addBatchTask, markTaskSubmitted,
   updateScheduleStatus, saveAttendance, getSessionAttendance,
@@ -160,12 +160,19 @@ function downloadTemplate(batchName, fields) {
 }
 
 // ─── Onboarding Step Side Panel ───────────────────────────────────────────────
-function OnboardingStepPanel({ step, onClose }) {
+const VARK_OPTIONS = ['Visual', 'Auditory', 'Read/Write', 'Kinesthetic', 'Visual-Auditory', 'Visual-Kinesthetic', 'Auditory-Kinesthetic', 'Multimodal'];
+
+function OnboardingStepPanel({ step, onClose, onMarkComplete, onMarkVark }) {
   const [tab, setTab] = useState('not');
+  const [varkSelections, setVarkSelections] = useState({});
+  const [marking, setMarking] = useState({});
   if (!step) return null;
+
+  const isVark = step.key === 'vark_analysis';
+
   return (
     <div style={{
-      position: 'fixed', top: 0, right: 0, width: 420, height: '100vh',
+      position: 'fixed', top: 0, right: 0, width: 440, height: '100vh',
       background: '#fff', boxShadow: '-4px 0 24px rgba(0,0,0,0.12)',
       zIndex: 1000, display: 'flex', flexDirection: 'column',
     }}>
@@ -181,14 +188,10 @@ function OnboardingStepPanel({ step, onClose }) {
           { key: 'completed', label: `Completed (${step.completedStudents?.length || 0})`, color: '#10B981' },
           { key: 'not',       label: `Not Completed (${step.notCompletedStudents?.length || 0})`, color: '#EF4444' },
         ].map(t => (
-          <button
-            key={t.key}
-            onClick={() => setTab(t.key)}
-            style={{
-              flex: 1, padding: '10px 0', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+          <button key={t.key} onClick={() => setTab(t.key)}
+            style={{ flex: 1, padding: '10px 0', fontSize: 13, fontWeight: 600, cursor: 'pointer',
               background: 'none', border: 'none', borderBottom: tab === t.key ? `2px solid ${t.color}` : '2px solid transparent',
-              color: tab === t.key ? t.color : '#9CA3AF', transition: 'all 0.15s',
-            }}
+              color: tab === t.key ? t.color : '#9CA3AF', transition: 'all 0.15s' }}
           >{t.label}</button>
         ))}
       </div>
@@ -205,7 +208,10 @@ function OnboardingStepPanel({ step, onClose }) {
                 </div>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 13, fontWeight: 500 }}>{s.name}</div>
-                  <div style={{ fontSize: 11, color: '#9CA3AF' }}>{s.phone || '—'}</div>
+                  <div style={{ fontSize: 11, color: '#9CA3AF' }}>
+                    {s.phone || '—'}
+                    {isVark && s.varkResult && <span style={{ marginLeft: 6, fontWeight: 600, color: '#6D28D9' }}>· {s.varkResult}</span>}
+                  </div>
                 </div>
                 <CheckCircle size={14} style={{ color: '#10B981', flexShrink: 0 }} />
               </div>
@@ -218,13 +224,41 @@ function OnboardingStepPanel({ step, onClose }) {
               <div style={{ color: '#9CA3AF', fontSize: 13, textAlign: 'center', paddingTop: 40 }}>All students completed this step!</div>
             )}
             {(step.notCompletedStudents || []).map(s => (
-              <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 10px', borderRadius: 8, marginBottom: 4, background: '#FFF8F8' }}>
-                <div style={{ width: 28, height: 28, borderRadius: '50%', background: '#FEE2E2', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: '#E53935', flexShrink: 0 }}>
+              <div key={s.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px', borderRadius: 8, marginBottom: 6, background: '#FFF8F8', border: '1px solid #FEE2E2' }}>
+                <div style={{ width: 28, height: 28, borderRadius: '50%', background: '#FEE2E2', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: '#E53935', flexShrink: 0, marginTop: 2 }}>
                   {(s.name || '?').charAt(0).toUpperCase()}
                 </div>
-                <div style={{ flex: 1 }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 13, fontWeight: 500 }}>{s.name}</div>
-                  <div style={{ fontSize: 11, color: '#9CA3AF' }}>{s.phone || '—'} · Staff: {s.staffAssigned || '—'}</div>
+                  <div style={{ fontSize: 11, color: '#9CA3AF', marginBottom: isVark ? 6 : 0 }}>{s.phone || '—'}</div>
+                  {isVark && (
+                    <select
+                      value={varkSelections[s.id] || ''}
+                      onChange={e => setVarkSelections(prev => ({ ...prev, [s.id]: e.target.value }))}
+                      style={{ fontSize: 11, padding: '3px 6px', borderRadius: 6, border: '1px solid #E5E7EB', width: '100%', marginBottom: 6 }}
+                    >
+                      <option value="">Select VARK result...</option>
+                      {VARK_OPTIONS.map(v => <option key={v} value={v}>{v}</option>)}
+                    </select>
+                  )}
+                  <button
+                    style={{ fontSize: 11, padding: '4px 10px', borderRadius: 6, border: 'none', cursor: 'pointer', fontWeight: 600,
+                      background: marking[s.id] ? '#E5E7EB' : '#D1FAE5', color: marking[s.id] ? '#9CA3AF' : '#065F46',
+                      opacity: isVark && !varkSelections[s.id] ? 0.5 : 1 }}
+                    disabled={marking[s.id] || (isVark && !varkSelections[s.id])}
+                    onClick={async () => {
+                      if (isVark && !varkSelections[s.id]) return;
+                      setMarking(prev => ({ ...prev, [s.id]: true }));
+                      if (isVark) {
+                        await onMarkVark(s.id, step.key, varkSelections[s.id]);
+                      } else {
+                        await onMarkComplete(s.id, step.key);
+                      }
+                      setMarking(prev => ({ ...prev, [s.id]: false }));
+                    }}
+                  >
+                    {marking[s.id] ? 'Saving...' : isVark ? '✓ Mark Complete + Save VARK' : '✓ Mark Complete'}
+                  </button>
                 </div>
               </div>
             ))}
@@ -675,6 +709,20 @@ export default function Batches() {
     setSaving(false);
   };
 
+  const handleMarkStepComplete = async (studentId, stepKey) => {
+    await updateStudent(studentId, { [`courseFlow.${stepKey}.done`]: true, [`courseFlow.${stepKey}.doneAt`]: new Date().toISOString() });
+    await loadBatchDetail(selectedBatch);
+  };
+
+  const handleMarkVark = async (studentId, stepKey, varkResult) => {
+    await updateStudent(studentId, {
+      [`courseFlow.${stepKey}.done`]: true,
+      [`courseFlow.${stepKey}.doneAt`]: new Date().toISOString(),
+      varkResult,
+    });
+    await loadBatchDetail(selectedBatch);
+  };
+
   const handleAddSchedule = async (e) => {
     e.preventDefault(); setSaving(true);
     await addBatchSchedule({ ...scheduleForm, batchId:selectedBatch.id, batchName:selectedBatch.name });
@@ -827,7 +875,7 @@ export default function Batches() {
         {selectedStep && (
           <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.2)', zIndex: 999 }} onClick={() => setSelectedStep(null)} />
         )}
-        <OnboardingStepPanel step={selectedStep} onClose={() => setSelectedStep(null)} />
+        <OnboardingStepPanel step={selectedStep} onClose={() => setSelectedStep(null)} onMarkComplete={handleMarkStepComplete} onMarkVark={handleMarkVark} />
 
         {/* Header */}
         <div className="page-header">
@@ -972,13 +1020,25 @@ export default function Batches() {
         {activeTab === 'students' && (() => {
           const PAGE = 20;
           const filtered = batchStudents.filter(s => {
-            const matchSearch = !studentSearch ||
-              s.name?.toLowerCase().includes(studentSearch.toLowerCase()) ||
+            if (studentStatusFilter && s.status !== studentStatusFilter) return false;
+            if (!studentSearch) return true;
+            const q = studentSearch.toLowerCase();
+            return (
+              s.name?.toLowerCase().includes(q) ||
               s.phone?.includes(studentSearch) ||
-              s.fatherName?.toLowerCase().includes(studentSearch.toLowerCase()) ||
-              s.motherName?.toLowerCase().includes(studentSearch.toLowerCase());
-            const matchStatus = !studentStatusFilter || s.status === studentStatusFilter;
-            return matchSearch && matchStatus;
+              s.whatsappNumber?.includes(studentSearch) ||
+              s.fatherName?.toLowerCase().includes(q) ||
+              s.motherName?.toLowerCase().includes(q) ||
+              s.email?.toLowerCase().includes(q) ||
+              s.address?.toLowerCase().includes(q) ||
+              s.occupation?.toLowerCase().includes(q) ||
+              s.classStd?.toLowerCase().includes(q) ||
+              s.schoolName?.toLowerCase().includes(q) ||
+              s.varkResult?.toLowerCase().includes(q) ||
+              s.syllabus?.toLowerCase().includes(q) ||
+              s.gender?.toLowerCase().includes(q) ||
+              String(s.age||'').includes(studentSearch)
+            );
           });
           const pages = Math.ceil(filtered.length / PAGE);
           const paginated = filtered.slice(studentPage * PAGE, (studentPage + 1) * PAGE);
@@ -986,7 +1046,7 @@ export default function Batches() {
           return (
             <div>
               <div style={{ display:'flex', gap:10, marginBottom:14, flexWrap:'wrap' }}>
-                <input className="form-input" style={{ flex:2, minWidth:200 }} placeholder="Search by name, phone..."
+                <input className="form-input" style={{ flex:2, minWidth:200 }} placeholder="Search by name, phone, parent, VARK, class, school..."
                   value={studentSearch} onChange={e => { setStudentSearch(e.target.value); setStudentPage(0); }}/>
                 <select className="form-input" style={{ flex:1, minWidth:140 }}
                   value={studentStatusFilter} onChange={e => { setStudentStatusFilter(e.target.value); setStudentPage(0); }}>
