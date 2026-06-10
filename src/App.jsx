@@ -3,7 +3,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { NotifProvider } from './context/NotifContext';
 import Sidebar from './components/layout/Sidebar';
 import Topbar  from './components/layout/Topbar';
-import { Loading } from './components/ui';
+import { Loading } from './components/ui/index.jsx';
 
 import LoginPage       from './pages/Login';
 import Dashboard       from './pages/Dashboard';
