@@ -75,8 +75,8 @@
   /* Spacing */
   --sidebar-w: 248px;
   --topbar-h:  60px;
-  --page-pad:  28px;
-  --card-pad:  22px;
+  --page-pad:  20px;
+  --card-pad:  18px;
 
   /* Radii */
   --radius-xs:   6px;
@@ -208,8 +208,8 @@ select.form-input { appearance:none; cursor:pointer; background-image:url("data:
 .table-container { border-radius:var(--radius-xl); border:1px solid var(--border); background:var(--surface); overflow:hidden; box-shadow:var(--shadow-sm); }
 table { width:100%; border-collapse:collapse; font-size:var(--fs-base); }
 thead tr { background:var(--n-50); border-bottom:1px solid var(--border); }
-th { padding:11px 18px; text-align:left; font-size:var(--fs-xs); font-weight:600; color:var(--text-muted); letter-spacing:0.04em; white-space:nowrap; text-transform:uppercase; }
-td { padding:13px 18px; border-bottom:1px solid var(--border); vertical-align:middle; color:var(--text); }
+th { padding:9px 14px; text-align:left; font-size:var(--fs-xs); font-weight:600; color:var(--text-muted); letter-spacing:0.04em; white-space:nowrap; text-transform:uppercase; }
+td { padding:9px 14px; border-bottom:1px solid var(--border); vertical-align:middle; color:var(--text); font-size:var(--fs-sm); }
 tbody tr:last-child td { border-bottom:none; }
 tbody tr { transition:background var(--dur-fast) var(--ease); }
 tbody tr:hover { background:var(--surface-hover); }

@@ -4,7 +4,7 @@ import {
   getBatches, addBatch, updateBatch,
   getBatchStudents, addStudent, bulkAddStudents, getBatchStudentCount, updateStudent,
   getStaffProfiles, getBatchSchedules, addBatchSchedule, deleteBatchSchedule,
-  getBatchTasks, addBatchTask, markTaskSubmitted,
+  getBatchTasks, addBatchTask, markTaskSubmitted, updateBatchTask, deleteBatchTask,
   updateScheduleStatus, saveAttendance, getSessionAttendance,
   addNotification, getTrashItems, permanentDelete,
   createRequest,
@@ -19,7 +19,7 @@ import { useAuth } from '../context/AuthContext';
 import {
   Plus, Upload, UserPlus, ChevronRight, ArrowLeft,
   Download, CheckSquare, Users, Trash2, Settings,
-  AlertTriangle, CheckCircle, X, Search
+  AlertTriangle, CheckCircle, X, Search, Pencil
 } from 'lucide-react';
 
 const COURSES = ['Python','Data Science','Web Development','Machine Learning','Digital Marketing','UI/UX Design','Cyber Security','ISC Level 1','ISC Level 2','AI Batch','Other'];
@@ -367,6 +367,8 @@ export default function Batches() {
   // Task split panel
   const [selectedTask, setSelectedTask]     = useState(null);
   const [taskFilter, setTaskFilter]         = useState('all');
+  const [editingTask, setEditingTask]       = useState(null); // { id, title }
+  const [taskKpiFilter, setTaskKpiFilter]   = useState('all'); // 'all'|'pending'|'submitted'
   const [taskSearch, setTaskSearch]         = useState('');
 
   // Overdue class confirmation dialog
@@ -795,6 +797,26 @@ export default function Batches() {
     setBatchTasks(tasks); setSaving(false);
   };
 
+  const handleSaveTaskEdit = async () => {
+    if (!editingTask?.title?.trim()) return;
+    await updateBatchTask(editingTask.id, { title: editingTask.title });
+    setBatchTasks(prev => prev.map(t => t.id === editingTask.id ? { ...t, title: editingTask.title } : t));
+    setEditingTask(null);
+    setToast({ message: 'Assignment renamed!', type: 'success' });
+  };
+
+  const handleDeleteTask = (task) => {
+    setConfirmDialog({
+      message: `Delete assignment "${task.title}"? This cannot be undone.`,
+      onConfirm: async () => {
+        await deleteBatchTask(task.id);
+        setBatchTasks(prev => prev.filter(t => t.id !== task.id));
+        if (selectedTask === task.id) setSelectedTask(null);
+        setToast({ message: 'Assignment deleted.', type: 'success' });
+      },
+    });
+  };
+
   // ── Helpers ───────────────────────────────────────────────────
   const progress = (batch) => {
     const s = batch.startDate ? new Date(batch.startDate) : null;
@@ -841,7 +863,11 @@ export default function Batches() {
   // Calendar helpers
   const ALL_DAYS = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
   const getSlotsForDate = (date, scheds) => {
-    const dateStr = date.toISOString().split('T')[0];
+    // Use local date to avoid UTC shift (toISOString shifts timezone)
+    const y = date.getFullYear();
+    const m = String(date.getMonth()+1).padStart(2,'0');
+    const d = String(date.getDate()).padStart(2,'0');
+    const dateStr = `${y}-${m}-${d}`;
     const dayName = ALL_DAYS[date.getDay()];
     return scheds.filter(s => {
       if (s.scheduledDate) return s.scheduledDate === dateStr;
@@ -1531,44 +1557,105 @@ export default function Batches() {
         {/* ── TASKS / ASSIGNMENTS TAB ── Split Panel ── */}
         {activeTab === 'tasks' && (
           <div style={{ display: 'flex', gap: 14, minHeight: 500 }}>
-            {/* Left: Task list */}
+            {/* Left: KPI + Task list */}
             <div style={{ width: 300, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {/* KPI boxes — clickable filters */}
+              {batchTasks.length > 0 && (() => {
+                const totalStudents = batchStudents.length || 1;
+                const allSubmitted  = batchTasks.reduce((n,t) => n + (t.submittedBy?.length||0), 0);
+                const allPending    = batchTasks.reduce((n,t) => n + Math.max(0, totalStudents - (t.submittedBy?.length||0)), 0);
+                const completedTasks = batchTasks.filter(t => (t.submittedBy?.length||0) >= totalStudents).length;
+                const pendingTasks   = batchTasks.length - completedTasks;
+                return (
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6, marginBottom:4 }}>
+                    {[
+                      { key:'all',       label:'All Assignments', value:batchTasks.length,  bg:'var(--blue-soft)',   col:'var(--blue-ink)' },
+                      { key:'completed', label:'Fully Done',      value:completedTasks,      bg:'var(--green-soft)', col:'var(--green-ink)' },
+                      { key:'pending',   label:'In Progress',     value:pendingTasks,        bg:'var(--amber-soft)', col:'var(--amber-ink)' },
+                      { key:'overdue',   label:'Overdue',         value:batchTasks.filter(t=>t.dueDate&&new Date(t.dueDate)<new Date()&&(t.submittedBy?.length||0)<totalStudents).length, bg:'var(--red-soft)', col:'var(--red-ink)' },
+                    ].map(k => (
+                      <div key={k.key} onClick={() => setTaskKpiFilter(k.key)}
+                        style={{ background:k.bg, borderRadius:10, padding:'10px 12px', cursor:'pointer', border:`2px solid ${taskKpiFilter===k.key?k.col:'transparent'}`, transition:'all 0.15s' }}>
+                        <div style={{ fontSize:20, fontWeight:700, color:k.col, fontFamily:'var(--font-display)' }}>{k.value}</div>
+                        <div style={{ fontSize:11, color:k.col, fontWeight:500 }}>{k.label}</div>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
+
               {batchTasks.length === 0 && (
-                <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #E5E7EB', padding: 32, textAlign: 'center', color: '#9CA3AF', fontSize: 13 }}>
+                <div style={{ background:'var(--surface)', borderRadius:12, border:'1px solid var(--border)', padding:32, textAlign:'center', color:'var(--text-muted)', fontSize:13 }}>
                   No assignments yet. Click "Add Task".
                 </div>
               )}
-              {batchTasks.map(task => {
+              {batchTasks.filter(task => {
+                if (taskKpiFilter === 'all') return true;
+                const totalS = batchStudents.length || 1;
+                if (taskKpiFilter === 'completed') return (task.submittedBy?.length||0) >= totalS;
+                if (taskKpiFilter === 'pending')   return (task.submittedBy?.length||0) < totalS;
+                if (taskKpiFilter === 'overdue')   return task.dueDate && new Date(task.dueDate)<new Date() && (task.submittedBy?.length||0)<totalS;
+                return true;
+              }).map(task => {
                 const submitted = task.submittedBy?.length || 0;
                 const total = batchStudents.length || 1;
                 const pctDone = Math.round(submitted / total * 100);
                 const isOverdue = task.dueDate && new Date(task.dueDate) < new Date() && submitted < total;
                 const isSelected = selectedTask === task.id;
                 return (
-                  <div
-                    key={task.id}
-                    onClick={() => { setSelectedTask(task.id); setTaskFilter('all'); setTaskSearch(''); }}
-                    style={{
-                      background: isSelected ? '#1A1A2E' : '#fff',
-                      borderRadius: 10, border: `2px solid ${isSelected ? '#E53935' : isOverdue ? '#FECACA' : '#E5E7EB'}`,
-                      padding: '12px 14px', cursor: 'pointer', transition: 'all 0.15s',
-                    }}
-                  >
-                    <div style={{ fontSize: 13, fontWeight: 600, color: isSelected ? '#fff' : '#1A1A2E', marginBottom: 4 }}>{task.title}</div>
-                    {task.subject && (
-                      <span style={{ fontSize: 10, padding: '1px 7px', borderRadius: 10, background: isSelected ? 'rgba(255,255,255,0.15)' : '#EDE9FE', color: isSelected ? '#fff' : '#6D28D9', fontWeight: 600, marginBottom: 4, display: 'inline-block' }}>
-                        {task.subject}
-                      </span>
-                    )}
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 6 }}>
-                      <div style={{ height: 4, flex: 1, background: isSelected ? 'rgba(255,255,255,0.15)' : '#E5E7EB', borderRadius: 2, overflow: 'hidden', marginRight: 8 }}>
-                        <div style={{ height: '100%', width: `${pctDone}%`, background: pctDone === 100 ? '#10B981' : '#F59E0B', transition: 'width 0.3s' }} />
+                  <div key={task.id} style={{ position:'relative' }}>
+                    {/* Edit inline */}
+                    {editingTask?.id === task.id ? (
+                      <div style={{ background:'var(--surface)', borderRadius:10, border:'2px solid var(--brand)', padding:'10px 12px', display:'flex', gap:6 }}>
+                        <input
+                          className="form-input"
+                          style={{ flex:1, fontSize:12, height:32 }}
+                          value={editingTask.title}
+                          onChange={e => setEditingTask({ ...editingTask, title: e.target.value })}
+                          onKeyDown={e => { if(e.key==='Enter') handleSaveTaskEdit(); if(e.key==='Escape') setEditingTask(null); }}
+                          autoFocus
+                        />
+                        <button className="btn btn-primary btn-sm" onClick={handleSaveTaskEdit}>Save</button>
+                        <button className="btn btn-ghost btn-sm" onClick={() => setEditingTask(null)}>✕</button>
                       </div>
-                      <span style={{ fontSize: 11, fontWeight: 700, color: isSelected ? '#fff' : (pctDone === 100 ? '#10B981' : '#F59E0B'), whiteSpace: 'nowrap' }}>
-                        {pctDone === 100 ? '✅ All done' : `${submitted}/${total}`}
-                      </span>
-                    </div>
-                    {isOverdue && <div style={{ fontSize: 10, color: isSelected ? '#FCA5A5' : '#EF4444', marginTop: 4, fontWeight: 600 }}>⚠ Overdue</div>}
+                    ) : (
+                      <div
+                        onClick={() => { setSelectedTask(task.id); setTaskFilter('all'); setTaskSearch(''); }}
+                        style={{
+                          background: isSelected ? 'var(--n-800)' : 'var(--surface)',
+                          borderRadius:10, border:`2px solid ${isSelected?'var(--brand)':isOverdue?'var(--red-soft)':'var(--border)'}`,
+                          padding:'11px 12px', cursor:'pointer', transition:'all 0.15s',
+                        }}
+                      >
+                        <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', gap:4 }}>
+                          <div style={{ fontSize:13, fontWeight:600, color:isSelected?'#fff':'var(--text)', marginBottom:4, flex:1 }}>{task.title}</div>
+                          <div style={{ display:'flex', gap:3, flexShrink:0 }} onClick={e => e.stopPropagation()}>
+                            <button title="Rename" onClick={() => setEditingTask({ id:task.id, title:task.title })}
+                              style={{ background:'transparent', border:'none', cursor:'pointer', color:isSelected?'rgba(255,255,255,0.5)':'var(--text-muted)', padding:2, borderRadius:4, lineHeight:1 }}>
+                              <Pencil size={12}/>
+                            </button>
+                            <button title="Delete" onClick={() => handleDeleteTask(task)}
+                              style={{ background:'transparent', border:'none', cursor:'pointer', color:isSelected?'#FCA5A5':'var(--red)', padding:2, borderRadius:4, lineHeight:1 }}>
+                              <Trash2 size={12}/>
+                            </button>
+                          </div>
+                        </div>
+                        {task.subject && (
+                          <span style={{ fontSize:10, padding:'1px 7px', borderRadius:10, background:isSelected?'rgba(255,255,255,0.15)':'var(--indigo-soft)', color:isSelected?'#fff':'var(--indigo-ink)', fontWeight:600, marginBottom:4, display:'inline-block' }}>
+                            {task.subject}
+                          </span>
+                        )}
+                        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginTop:6 }}>
+                          <div style={{ height:4, flex:1, background:isSelected?'rgba(255,255,255,0.15)':'var(--n-150)', borderRadius:2, overflow:'hidden', marginRight:8 }}>
+                            <div style={{ height:'100%', width:`${pctDone}%`, background:pctDone===100?'var(--green)':'var(--amber)', transition:'width 0.3s' }} />
+                          </div>
+                          <span style={{ fontSize:11, fontWeight:700, color:isSelected?'#fff':(pctDone===100?'var(--green-ink)':'var(--amber-ink)'), whiteSpace:'nowrap' }}>
+                            {pctDone===100?'All done':`${submitted}/${total}`}
+                          </span>
+                        </div>
+                        {isOverdue && <div style={{ fontSize:10, color:isSelected?'#FCA5A5':'var(--red)', marginTop:4, fontWeight:600 }}>⚠ Overdue</div>}
+                      </div>
+                    )}
                   </div>
                 );
               })}

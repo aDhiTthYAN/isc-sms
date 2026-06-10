@@ -240,6 +240,9 @@ export const markTaskSubmitted = async (taskId, studentId, studentName) => {
 export const updateBatchTask = async (id, data) =>
   updateDoc(doc(db,'batchTasks', id), data);
 
+export const deleteBatchTask = async (id) =>
+  deleteDoc(doc(db,'batchTasks', id));
+
 // ── Assessments ────────────────────────────────────────────────
 export const getAssessments = async (batchId) => {
   const q = batchId
