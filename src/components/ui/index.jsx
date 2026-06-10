@@ -21,7 +21,10 @@ export function Modal({ title, onClose, children, wide }) {
             <X size={16} />
           </button>
         </div>
-        {children}
+        <div style={{ overflowY: 'auto', flex: 1, padding: '18px 20px' }}>
+          {children}
+        </div>
+      </div>
       </div>
     </div>
   );

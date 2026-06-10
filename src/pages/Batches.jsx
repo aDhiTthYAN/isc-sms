@@ -1139,8 +1139,8 @@ export default function Batches() {
                 </div>
               </div>
 
-              <div className="table-container">
-                <table>
+              <div className="table-container" style={{ overflowX: 'auto' }}>
+                <table style={{ minWidth: 900 }}>
                   <thead>
                     <tr>
                       <th>Kids Name</th>
