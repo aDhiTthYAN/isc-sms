@@ -45,7 +45,7 @@ export default function Sidebar({ navItems = [] }) {
 
   return (
     <aside style={{
-      width: 248,
+      width: 224,
       background: 'var(--surface)',
       borderRight: '1px solid var(--border)',
       display: 'flex', flexDirection: 'column',

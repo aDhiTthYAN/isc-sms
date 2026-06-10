@@ -37,7 +37,7 @@ export default function Topbar() {
       background: 'var(--surface)',
       borderBottom: '1px solid var(--border)',
       padding: '0 28px',
-      height: 60,
+      height: 54,
       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
       flexShrink: 0, gap: 16,
     }}>
