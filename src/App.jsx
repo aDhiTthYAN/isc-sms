@@ -79,9 +79,6 @@ const NAV_BY_ROLE = {
   ],
 };
 
-const SIDEBAR_COLOR = { ceo: '#1A1A2E', admin: '#1B1B2F', staff: '#0F3460' };
-const ROLE_LABEL    = { ceo: 'CEO · Full access', admin: 'Admin', staff: 'Staff' };
-
 function AppShell() {
   const { user, profile, loading } = useAuth();
   if (loading) return <Loading text="Authenticating..." />;
@@ -89,15 +86,14 @@ function AppShell() {
 
   const role     = profile?.role || 'staff';
   const navItems = NAV_BY_ROLE[role] || NAV_BY_ROLE.staff;
-  const sbColor  = SIDEBAR_COLOR[role];
 
   return (
     <NotifProvider>
-      <div style={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
-        <Sidebar navItems={navItems} sidebarColor={sbColor} roleLabel={ROLE_LABEL[role]} />
+      <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', background: 'var(--canvas)' }}>
+        <Sidebar navItems={navItems} />
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
           <Topbar />
-          <main style={{ flex: 1, overflowY: 'auto', padding: 24 }}>
+          <main style={{ flex: 1, overflowY: 'auto', padding: 'var(--page-pad)' }}>
             <Outlet />
           </main>
         </div>
