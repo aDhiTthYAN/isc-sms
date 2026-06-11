@@ -25,7 +25,6 @@ export function Modal({ title, onClose, children, wide }) {
           {children}
         </div>
       </div>
-      </div>
     </div>
   );
 }
