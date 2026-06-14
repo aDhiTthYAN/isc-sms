@@ -56,13 +56,7 @@ export default function Sidebar({ navItems = [] }) {
       {/* Logo */}
       <div style={{ padding: '18px 18px 16px', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div style={{
-            width: 36, height: 36, borderRadius: 10, flexShrink: 0,
-            background: 'var(--grad-brand)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 14, color: '#fff',
-            letterSpacing: '-0.01em',
-          }}>ISC</div>
+          <img src="/logo.svg" alt="ISC" style={{ width: 36, height: 36, borderRadius: 10, flexShrink: 0 }} />
           <div>
             <div style={{ fontWeight: 700, fontSize: 13.5, color: 'var(--text)', lineHeight: 1.2, fontFamily: 'var(--font-display)' }}>Int'l Skills Club</div>
             <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Management System</div>

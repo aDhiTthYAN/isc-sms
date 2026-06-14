@@ -16,6 +16,7 @@ import {
 import { db } from '../firebase/config';
 import { Modal, Toast, Loading, FormRow, Avatar, StatusBadge } from '../components/ui';
 import { useAuth } from '../context/AuthContext';
+import { sendAssignmentEmail } from '../firebase/emailService';
 import {
   Plus, Upload, UserPlus, ChevronRight, ArrowLeft,
   Download, CheckSquare, Users, Trash2, Settings,
@@ -166,6 +167,7 @@ function OnboardingStepPanel({ step, onClose, onMarkComplete, onMarkVark, onRevo
   const [tab, setTab] = useState('not');
   const [search, setSearch] = useState('');
   const [varkSelections, setVarkSelections] = useState({});
+  const [assessNotes, setAssessNotes] = useState({}); // studentId → note (for initial_assess)
   const [marking, setMarking] = useState({});
   // Local lists for instant UI update (optimistic)
   const [localCompleted, setLocalCompleted]       = useState([]);
@@ -175,11 +177,13 @@ function OnboardingStepPanel({ step, onClose, onMarkComplete, onMarkVark, onRevo
     setLocalCompleted(step?.completedStudents || []);
     setLocalNotCompleted(step?.notCompletedStudents || []);
     setSearch('');
+    setAssessNotes({});
   }, [step?.key]);
 
   if (!step) return null;
 
-  const isVark = step.key === 'vark_analysis';
+  const isVark    = step.key === 'vark_analysis';
+  const isAssess  = step.key === 'initial_assess';
 
   const filteredNot = localNotCompleted.filter(s =>
     !search || s.name?.toLowerCase().includes(search.toLowerCase()) || s.phone?.includes(search)
@@ -197,7 +201,7 @@ function OnboardingStepPanel({ step, onClose, onMarkComplete, onMarkVark, onRevo
     setLocalCompleted(prev => [...prev, { ...s, varkResult: isVark ? varkSelections[s.id] : s.varkResult }]);
     try {
       if (isVark) await onMarkVark(s.id, step.key, varkSelections[s.id]);
-      else await onMarkComplete(s.id, step.key);
+      else await onMarkComplete(s.id, step.key, isAssess ? (assessNotes[s.id] || '') : undefined);
     } catch {
       // Revert on error
       setLocalCompleted(prev => prev.filter(x => x.id !== s.id));
@@ -270,6 +274,15 @@ function OnboardingStepPanel({ step, onClose, onMarkComplete, onMarkVark, onRevo
                         {VARK_OPTIONS.map(v => <option key={v} value={v}>{v}</option>)}
                       </select>
                     )}
+                    {!isDropped && isAssess && (
+                      <textarea
+                        rows={2}
+                        value={assessNotes[s.id] || ''}
+                        onChange={e => setAssessNotes(p => ({ ...p, [s.id]: e.target.value }))}
+                        placeholder="Add assessment notes (optional)…"
+                        style={{ fontSize:11, padding:'4px 8px', borderRadius:6, border:'1px solid #E5E7EB', width:'100%', marginBottom:6, resize:'vertical', fontFamily:'inherit' }}
+                      />
+                    )}
                     {!isDropped && (
                       <button disabled={marking[s.id] || (isVark && !varkSelections[s.id])}
                         onClick={() => doMark(s)}
@@ -300,6 +313,9 @@ function OnboardingStepPanel({ step, onClose, onMarkComplete, onMarkVark, onRevo
                     {s.phone||'—'}
                     {isVark && s.varkResult && <span style={{ marginLeft:6, fontWeight:600, color:'#6D28D9' }}>· {s.varkResult}</span>}
                   </div>
+                  {isAssess && s.assessmentNote && (
+                    <div style={{ fontSize:11, color:'#64748B', marginTop:2, fontStyle:'italic' }}>Note: {s.assessmentNote}</div>
+                  )}
                 </div>
                 <CheckCircle size={14} style={{ color:'#10B981', flexShrink:0 }}/>
                 <button disabled={marking[s.id]} onClick={() => doRevoke(s)}
@@ -620,6 +636,12 @@ export default function Batches() {
             body: `You have been added to batch ${selectedBatch.name}`,
             type: 'batch_assignment', read: false,
           });
+          sendAssignmentEmail({
+            toEmail: staff.email, toName: staff.name,
+            title: 'New Batch Assignment',
+            detail: `You have been added to batch ${selectedBatch.name}`,
+            assignedBy: profile?.name || 'ISC SMS',
+          }).catch(()=>{});
         }
       }
       const updated = { ...selectedBatch, staffIds: updatedStaffIds, staffDetails: updatedStaffDetails };
@@ -672,6 +694,12 @@ export default function Batches() {
             body: `${profile?.name} requested removal from ${showRemovalModal.targetName}`,
             type: 'removal_request', read: false,
           });
+          sendAssignmentEmail({
+            toEmail: ceo.email, toName: ceo.name || 'CEO',
+            title: 'Staff Removal Request',
+            detail: `${profile?.name} requested removal from ${showRemovalModal.targetName}. Reason: ${removalReason}`,
+            assignedBy: profile?.name || 'Staff',
+          }).catch(()=>{});
         }
       }
       setShowRemovalModal(null);
@@ -701,6 +729,12 @@ export default function Batches() {
             body: `${profile?.name} created assessment "${assessmentForm.title}" for ${selectedBatch.name} — you are listed as conducting staff.`,
             type: 'assessment_added', read: false,
           });
+          sendAssignmentEmail({
+            toEmail: staffDetail.email, toName: staffDetail.name,
+            title: `New Assessment: ${assessmentForm.title}`,
+            detail: `${profile?.name} created assessment "${assessmentForm.title}" for ${selectedBatch.name} — you are listed as conducting staff.`,
+            assignedBy: profile?.name || 'ISC SMS',
+          }).catch(()=>{});
         }
       }
       const asmts = await getAssessments(selectedBatch.id);
@@ -757,9 +791,13 @@ export default function Batches() {
     setSaving(false);
   };
 
-  const handleMarkStepComplete = async (studentId, stepKey) => {
-    await updateStudent(studentId, { [`courseFlow.${stepKey}.done`]: true, [`courseFlow.${stepKey}.doneAt`]: new Date().toISOString() });
-    // Refresh in background so local optimistic update already shows
+  const handleMarkStepComplete = async (studentId, stepKey, note) => {
+    const update = {
+      [`courseFlow.${stepKey}.done`]: true,
+      [`courseFlow.${stepKey}.doneAt`]: new Date().toISOString(),
+    };
+    if (note !== undefined && note !== '') update[`courseFlow.${stepKey}.note`] = note;
+    await updateStudent(studentId, update);
     loadBatchDetail(selectedBatch);
   };
 
@@ -790,6 +828,23 @@ export default function Batches() {
   const handleAddTask = async (e) => {
     e.preventDefault(); setSaving(true);
     await addBatchTask({ ...taskForm, batchId:selectedBatch.id, batchName:selectedBatch.name, createdBy:profile?.name });
+    // Notify the assigned faculty (in-app + email)
+    if (taskForm.assignedFaculty) {
+      const staff = staffList.find(s => s.name === taskForm.assignedFaculty);
+      if (staff?.email) {
+        await addNotification({
+          toEmail: staff.email, title: 'New Task Assigned',
+          body: `${profile?.name} assigned you "${taskForm.title}" in batch ${selectedBatch.name}${taskForm.dueDate ? ` (due ${taskForm.dueDate})` : ''}`,
+          type: 'task_assigned', read: false,
+        }).catch(()=>{});
+        sendAssignmentEmail({
+          toEmail: staff.email, toName: staff.name,
+          title: `New Task: ${taskForm.title}`,
+          detail: `Batch ${selectedBatch.name}${taskForm.dueDate ? ` — due ${taskForm.dueDate}` : ''}`,
+          assignedBy: profile?.name || 'ISC SMS',
+        }).catch(()=>{});
+      }
+    }
     setToast({ message:'Task created!', type:'success' });
     setShowTask(false);
     setTaskForm({ title:'', subject:'', description:'', dueDate:'', assignedFaculty:'' });
@@ -835,7 +890,8 @@ export default function Batches() {
   const getFlowAnalytics = () => {
     const flow = selectedBatch?.courseFlow || DEFAULT_COURSE_FLOW;
     return flow.map(step => {
-      const completed = batchStudents.filter(s => s.courseFlow?.[step.key]?.done);
+      const completed = batchStudents.filter(s => s.courseFlow?.[step.key]?.done)
+        .map(s => ({ ...s, assessmentNote: s.courseFlow?.[step.key]?.note || '' }));
       const notCompleted = batchStudents.filter(s => !s.courseFlow?.[step.key]?.done);
       return {
         ...step,
@@ -1137,6 +1193,25 @@ export default function Batches() {
                 <div style={{ display:'flex', alignItems:'center', fontSize:12, color:'#6B7280', whiteSpace:'nowrap' }}>
                   {filtered.length} of {batchStudents.length} students
                 </div>
+                <button className="btn btn-secondary" style={{ whiteSpace:'nowrap' }} onClick={() => {
+                  const cols = ['name','fatherName','motherName','phone','whatsappNumber','email','classStd','schoolName','varkResult','syllabus','gender','age','status'];
+                  const esc = (v) => {
+                    const s = v == null ? '' : String(v);
+                    return /[",\n\r]/.test(s) ? `"${s.replace(/"/g,'""')}"` : s;
+                  };
+                  const csv = [cols.join(','), ...filtered.map(s => cols.map(c => esc(s[c])).join(','))].join('\r\n');
+                  const blob = new Blob([csv], { type:'text/csv;charset=utf-8' });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = `students-${selectedBatch.name}.csv`;
+                  document.body.appendChild(a);
+                  a.click();
+                  document.body.removeChild(a);
+                  URL.revokeObjectURL(url);
+                }}>
+                  <Download size={14}/> Export CSV
+                </button>
               </div>
 
               <div className="table-container" style={{ overflowX: 'auto' }}>
