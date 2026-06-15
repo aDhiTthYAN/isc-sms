@@ -27,24 +27,26 @@ const COURSES = ['Python','Data Science','Web Development','Machine Learning','D
 const DAYS    = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
 const PHASES  = ['onboarding', 'course'];
 
+// fieldType: 'none' | 'note' | 'dropdown' | 'text'
+// displayInTable: show captured value in student list
 const DEFAULT_COURSE_FLOW = [
-  { key: 'admission',         label: 'Student Admission',                    phase: 'onboarding' },
-  { key: 'parent_onboarding', label: 'Parent Onboarding',                    phase: 'onboarding' },
-  { key: 'group_admission',   label: 'Group Admission',                      phase: 'onboarding' },
-  { key: 'initial_assess',    label: 'Primary Assessment',                   phase: 'onboarding' },
-  { key: 'vark_analysis',     label: 'VARK Analysis',                        phase: 'onboarding' },
-  { key: 'kit_dispatch',      label: 'Kit Packing & Dispatch',               phase: 'onboarding' },
-  { key: 'instagram_setup',   label: 'Instagram Account Open',               phase: 'onboarding' },
-  { key: 'kit_activities',    label: 'Kit Activities',                       phase: 'course'     },
-  { key: 'kit_insta',         label: 'Kit Activity on Instagram',            phase: 'course'     },
-  { key: 'class_start',       label: 'Classes Started',                      phase: 'course'     },
-  { key: 'first_recheck',     label: 'First Recheck on Progress',            phase: 'course'     },
-  { key: 'action_plan',       label: 'Action Plan on First Assessment',      phase: 'course'     },
-  { key: 'malayalam_activity',label: 'Malayalam Activity',                   phase: 'course'     },
-  { key: 'english_activity',  label: 'English Activity',                     phase: 'course'     },
-  { key: 'maths_activity',    label: 'Maths Activity',                       phase: 'course'     },
-  { key: 'science_activity',  label: 'Science Activity',                     phase: 'course'     },
-  { key: 'followup_monitor',  label: 'Regular Follow-up & Progress Monitoring', phase: 'course' },
+  { key: 'admission',         label: 'Student Admission',                    phase: 'onboarding', fieldType: 'none' },
+  { key: 'parent_onboarding', label: 'Parent Onboarding',                    phase: 'onboarding', fieldType: 'none' },
+  { key: 'group_admission',   label: 'Group Admission',                      phase: 'onboarding', fieldType: 'none' },
+  { key: 'initial_assess',    label: 'Primary Assessment',                   phase: 'onboarding', fieldType: 'note', fieldLabel: 'Assessment Notes' },
+  { key: 'vark_analysis',     label: 'VARK Analysis',                        phase: 'onboarding', fieldType: 'dropdown', fieldLabel: 'VARK Learning Style', fieldOptions: ['Visual','Auditory','Read/Write','Kinesthetic','Visual-Auditory','Visual-Kinesthetic','Auditory-Kinesthetic','Multimodal'], displayInTable: true },
+  { key: 'kit_dispatch',      label: 'Kit Packing & Dispatch',               phase: 'onboarding', fieldType: 'none' },
+  { key: 'instagram_setup',   label: 'Instagram Account Open',               phase: 'onboarding', fieldType: 'none' },
+  { key: 'kit_activities',    label: 'Kit Activities',                       phase: 'course',     fieldType: 'none' },
+  { key: 'kit_insta',         label: 'Kit Activity on Instagram',            phase: 'course',     fieldType: 'none' },
+  { key: 'class_start',       label: 'Classes Started',                      phase: 'course',     fieldType: 'none' },
+  { key: 'first_recheck',     label: 'First Recheck on Progress',            phase: 'course',     fieldType: 'note', fieldLabel: 'Notes' },
+  { key: 'action_plan',       label: 'Action Plan on First Assessment',      phase: 'course',     fieldType: 'note', fieldLabel: 'Action Plan Details' },
+  { key: 'malayalam_activity',label: 'Malayalam Activity',                   phase: 'course',     fieldType: 'none' },
+  { key: 'english_activity',  label: 'English Activity',                     phase: 'course',     fieldType: 'none' },
+  { key: 'maths_activity',    label: 'Maths Activity',                       phase: 'course',     fieldType: 'none' },
+  { key: 'science_activity',  label: 'Science Activity',                     phase: 'course',     fieldType: 'none' },
+  { key: 'followup_monitor',  label: 'Regular Follow-up & Progress Monitoring', phase: 'course', fieldType: 'none' },
 ];
 
 // Fields match the Google Form CSV columns in order:
@@ -160,50 +162,41 @@ function downloadTemplate(batchName, fields) {
   a.click();
 }
 
-// ─── Onboarding Step Side Panel ───────────────────────────────────────────────
-const VARK_OPTIONS = ['Visual', 'Auditory', 'Read/Write', 'Kinesthetic', 'Visual-Auditory', 'Visual-Kinesthetic', 'Auditory-Kinesthetic', 'Multimodal'];
-
-function OnboardingStepPanel({ step, onClose, onMarkComplete, onMarkVark, onRevoke }) {
-  const [tab, setTab] = useState('not');
-  const [search, setSearch] = useState('');
-  const [varkSelections, setVarkSelections] = useState({});
-  const [assessNotes, setAssessNotes] = useState({}); // studentId → note (for initial_assess)
-  const [marking, setMarking] = useState({});
-  // Local lists for instant UI update (optimistic)
-  const [localCompleted, setLocalCompleted]       = useState([]);
+// ─── Onboarding Step Side Panel (dynamic field types) ────────────────────────
+function OnboardingStepPanel({ step, onClose, onMarkComplete, onRevoke }) {
+  const [tab, setTab]                         = useState('not');
+  const [search, setSearch]                   = useState('');
+  const [fieldValues, setFieldValues]         = useState({}); // studentId → captured value
+  const [marking, setMarking]                 = useState({});
+  const [localCompleted, setLocalCompleted]   = useState([]);
   const [localNotCompleted, setLocalNotCompleted] = useState([]);
 
   useEffect(() => {
     setLocalCompleted(step?.completedStudents || []);
     setLocalNotCompleted(step?.notCompletedStudents || []);
     setSearch('');
-    setAssessNotes({});
+    setFieldValues({});
   }, [step?.key]);
 
   if (!step) return null;
 
-  const isVark    = step.key === 'vark_analysis';
-  const isAssess  = step.key === 'initial_assess';
+  const ft       = step.fieldType || 'none';
+  const opts     = step.fieldOptions || [];
+  const needsVal = ft === 'dropdown'; // required before marking
 
-  const filteredNot = localNotCompleted.filter(s =>
-    !search || s.name?.toLowerCase().includes(search.toLowerCase()) || s.phone?.includes(search)
-  );
-  const filteredDone = localCompleted.filter(s =>
-    !search || s.name?.toLowerCase().includes(search.toLowerCase()) || s.phone?.includes(search)
-  );
+  const filteredNot  = localNotCompleted.filter(s => !search || s.name?.toLowerCase().includes(search.toLowerCase()) || s.phone?.includes(search));
+  const filteredDone = localCompleted.filter(s => !search || s.name?.toLowerCase().includes(search.toLowerCase()) || s.phone?.includes(search));
 
   const doMark = async (s) => {
     if (s.status === 'dropped') { alert(`${s.name} is a dropped student — cannot mark steps.`); return; }
-    if (isVark && !varkSelections[s.id]) return;
+    const val = fieldValues[s.id] || '';
+    if (needsVal && !val) return;
     setMarking(prev => ({ ...prev, [s.id]: true }));
-    // Optimistic update
     setLocalNotCompleted(prev => prev.filter(x => x.id !== s.id));
-    setLocalCompleted(prev => [...prev, { ...s, varkResult: isVark ? varkSelections[s.id] : s.varkResult }]);
+    setLocalCompleted(prev => [...prev, { ...s, stepFieldValue: val }]);
     try {
-      if (isVark) await onMarkVark(s.id, step.key, varkSelections[s.id]);
-      else await onMarkComplete(s.id, step.key, isAssess ? (assessNotes[s.id] || '') : undefined);
+      await onMarkComplete(s.id, step.key, val || undefined);
     } catch {
-      // Revert on error
       setLocalCompleted(prev => prev.filter(x => x.id !== s.id));
       setLocalNotCompleted(prev => [...prev, s]);
     }
@@ -223,18 +216,22 @@ function OnboardingStepPanel({ step, onClose, onMarkComplete, onMarkVark, onRevo
     setMarking(prev => ({ ...prev, [s.id]: false }));
   };
 
+  const setVal = (sid, v) => setFieldValues(p => ({ ...p, [sid]: v }));
+
   return (
     <div style={{ position:'fixed', top:0, right:0, width:440, height:'100vh', background:'#fff', boxShadow:'-4px 0 24px rgba(0,0,0,0.12)', zIndex:1000, display:'flex', flexDirection:'column' }}>
       <div style={{ padding:'18px 20px', borderBottom:'1px solid #E5E7EB', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
         <div>
           <div style={{ fontWeight:700, fontSize:15, color:'#1A1A2E' }}>{step.label}</div>
-          <div style={{ fontSize:12, color:'#9CA3AF', textTransform:'capitalize' }}>{step.phase} phase</div>
+          <div style={{ fontSize:12, color:'#9CA3AF', textTransform:'capitalize' }}>
+            {step.phase} phase
+            {ft !== 'none' && <span style={{ marginLeft:6, background:'#EDE9FE', color:'#6D28D9', borderRadius:8, padding:'1px 7px', fontSize:10, fontWeight:600 }}>{ft}</span>}
+          </div>
         </div>
         <button onClick={onClose} style={{ background:'none', border:'none', cursor:'pointer', color:'#9CA3AF', padding:4 }}><X size={18}/></button>
       </div>
-      {/* Search */}
       <div style={{ padding:'10px 16px', borderBottom:'1px solid #F3F4F6' }}>
-        <input className="form-input" placeholder="Search student by name or phone..." value={search}
+        <input className="form-input" placeholder="Search by name or phone…" value={search}
           onChange={e => setSearch(e.target.value)} style={{ fontSize:12 }}/>
       </div>
       <div style={{ display:'flex', borderBottom:'1px solid #E5E7EB' }}>
@@ -253,9 +250,15 @@ function OnboardingStepPanel({ step, onClose, onMarkComplete, onMarkVark, onRevo
       <div style={{ flex:1, overflowY:'auto', padding:'12px 16px' }}>
         {tab === 'not' && (
           <>
-            {filteredNot.length === 0 && <div style={{ color:'#9CA3AF', fontSize:13, textAlign:'center', paddingTop:40 }}>{search ? 'No match.' : 'All students completed this step!'}</div>}
+            {filteredNot.length === 0 && (
+              <div style={{ color:'#9CA3AF', fontSize:13, textAlign:'center', paddingTop:40 }}>
+                {search ? 'No match.' : 'All students completed this step!'}
+              </div>
+            )}
             {filteredNot.map(s => {
               const isDropped = s.status === 'dropped';
+              const val       = fieldValues[s.id] || '';
+              const canMark   = !isDropped && (!needsVal || !!val);
               return (
                 <div key={s.id} style={{ display:'flex', alignItems:'flex-start', gap:10, padding:10, borderRadius:8, marginBottom:6, background: isDropped ? '#F9FAFB' : '#FFF8F8', border:`1px solid ${isDropped ? '#E5E7EB' : '#FEE2E2'}` }}>
                   <div style={{ width:28, height:28, borderRadius:'50%', background: isDropped ? '#E5E7EB' : '#FEE2E2', display:'flex', alignItems:'center', justifyContent:'center', fontSize:11, fontWeight:700, color: isDropped ? '#9CA3AF' : '#E53935', flexShrink:0, marginTop:2 }}>
@@ -266,30 +269,34 @@ function OnboardingStepPanel({ step, onClose, onMarkComplete, onMarkVark, onRevo
                       {s.name}
                       {isDropped && <span style={{ fontSize:10, padding:'1px 6px', borderRadius:8, background:'#E5E7EB', color:'#6B7280', fontWeight:600 }}>Dropped</span>}
                     </div>
-                    <div style={{ fontSize:11, color:'#9CA3AF', marginBottom: isVark ? 6 : 0 }}>{s.phone||'—'}</div>
-                    {!isDropped && isVark && (
-                      <select value={varkSelections[s.id]||''} onChange={e => setVarkSelections(p => ({ ...p, [s.id]:e.target.value }))}
+                    <div style={{ fontSize:11, color:'#9CA3AF', marginBottom: ft !== 'none' ? 6 : 0 }}>{s.phone||'—'}</div>
+
+                    {/* Dynamic field input */}
+                    {!isDropped && ft === 'dropdown' && (
+                      <select value={val} onChange={e => setVal(s.id, e.target.value)}
                         style={{ fontSize:11, padding:'3px 6px', borderRadius:6, border:'1px solid #E5E7EB', width:'100%', marginBottom:6 }}>
-                        <option value="">Select VARK result...</option>
-                        {VARK_OPTIONS.map(v => <option key={v} value={v}>{v}</option>)}
+                        <option value="">Select {step.fieldLabel || 'option'}…</option>
+                        {opts.map(o => <option key={o} value={o}>{o}</option>)}
                       </select>
                     )}
-                    {!isDropped && isAssess && (
-                      <textarea
-                        rows={2}
-                        value={assessNotes[s.id] || ''}
-                        onChange={e => setAssessNotes(p => ({ ...p, [s.id]: e.target.value }))}
-                        placeholder="Add assessment notes (optional)…"
-                        style={{ fontSize:11, padding:'4px 8px', borderRadius:6, border:'1px solid #E5E7EB', width:'100%', marginBottom:6, resize:'vertical', fontFamily:'inherit' }}
-                      />
+                    {!isDropped && ft === 'note' && (
+                      <textarea rows={2} value={val} onChange={e => setVal(s.id, e.target.value)}
+                        placeholder={`${step.fieldLabel || 'Notes'} (optional)…`}
+                        style={{ fontSize:11, padding:'4px 8px', borderRadius:6, border:'1px solid #E5E7EB', width:'100%', marginBottom:6, resize:'vertical', fontFamily:'inherit' }}/>
                     )}
+                    {!isDropped && ft === 'text' && (
+                      <input value={val} onChange={e => setVal(s.id, e.target.value)}
+                        placeholder={step.fieldLabel || 'Enter value…'}
+                        style={{ fontSize:11, padding:'3px 8px', borderRadius:6, border:'1px solid #E5E7EB', width:'100%', marginBottom:6 }}/>
+                    )}
+
                     {!isDropped && (
-                      <button disabled={marking[s.id] || (isVark && !varkSelections[s.id])}
+                      <button disabled={marking[s.id] || !canMark}
                         onClick={() => doMark(s)}
-                        style={{ fontSize:11, padding:'4px 10px', borderRadius:6, border:'none', cursor:'pointer', fontWeight:600,
+                        style={{ fontSize:11, padding:'4px 10px', borderRadius:6, border:'none', cursor: canMark ? 'pointer' : 'default', fontWeight:600,
                           background: marking[s.id] ? '#E5E7EB' : '#D1FAE5', color: marking[s.id] ? '#9CA3AF' : '#065F46',
-                          opacity: isVark && !varkSelections[s.id] ? 0.5 : 1 }}>
-                        {marking[s.id] ? 'Saving...' : isVark ? '✓ Mark Complete + Save VARK' : '✓ Mark Complete'}
+                          opacity: canMark ? 1 : 0.5 }}>
+                        {marking[s.id] ? 'Saving…' : ft === 'dropdown' ? `✓ Mark Complete + Save ${step.fieldLabel||'Value'}` : '✓ Mark Complete'}
                       </button>
                     )}
                     {isDropped && <div style={{ fontSize:11, color:'#9CA3AF', fontStyle:'italic' }}>Cannot mark — student is dropped</div>}
@@ -301,29 +308,35 @@ function OnboardingStepPanel({ step, onClose, onMarkComplete, onMarkVark, onRevo
         )}
         {tab === 'completed' && (
           <>
-            {filteredDone.length === 0 && <div style={{ color:'#9CA3AF', fontSize:13, textAlign:'center', paddingTop:40 }}>{search ? 'No match.' : 'No students completed yet.'}</div>}
-            {filteredDone.map(s => (
-              <div key={s.id} style={{ display:'flex', alignItems:'center', gap:10, padding:'9px 10px', borderRadius:8, marginBottom:4, background:'#F0FDF4', border:'1px solid #BBF7D0' }}>
-                <div style={{ width:28, height:28, borderRadius:'50%', background:'#D1FAE5', display:'flex', alignItems:'center', justifyContent:'center', fontSize:11, fontWeight:700, color:'#065F46', flexShrink:0 }}>
-                  {(s.name||'?').charAt(0).toUpperCase()}
-                </div>
-                <div style={{ flex:1, minWidth:0 }}>
-                  <div style={{ fontSize:13, fontWeight:500 }}>{s.name}</div>
-                  <div style={{ fontSize:11, color:'#9CA3AF' }}>
-                    {s.phone||'—'}
-                    {isVark && s.varkResult && <span style={{ marginLeft:6, fontWeight:600, color:'#6D28D9' }}>· {s.varkResult}</span>}
-                  </div>
-                  {isAssess && s.assessmentNote && (
-                    <div style={{ fontSize:11, color:'#64748B', marginTop:2, fontStyle:'italic' }}>Note: {s.assessmentNote}</div>
-                  )}
-                </div>
-                <CheckCircle size={14} style={{ color:'#10B981', flexShrink:0 }}/>
-                <button disabled={marking[s.id]} onClick={() => doRevoke(s)}
-                  style={{ fontSize:10, padding:'2px 8px', borderRadius:8, border:'1px solid #E5E7EB', background:'#fff', color:'#9CA3AF', cursor:'pointer', flexShrink:0 }}>
-                  {marking[s.id] ? '...' : 'Undo'}
-                </button>
+            {filteredDone.length === 0 && (
+              <div style={{ color:'#9CA3AF', fontSize:13, textAlign:'center', paddingTop:40 }}>
+                {search ? 'No match.' : 'No students completed yet.'}
               </div>
-            ))}
+            )}
+            {filteredDone.map(s => {
+              const savedVal = s.stepFieldValue || s.courseFlow?.[step.key]?.value || '';
+              return (
+                <div key={s.id} style={{ display:'flex', alignItems:'center', gap:10, padding:'9px 10px', borderRadius:8, marginBottom:4, background:'#F0FDF4', border:'1px solid #BBF7D0' }}>
+                  <div style={{ width:28, height:28, borderRadius:'50%', background:'#D1FAE5', display:'flex', alignItems:'center', justifyContent:'center', fontSize:11, fontWeight:700, color:'#065F46', flexShrink:0 }}>
+                    {(s.name||'?').charAt(0).toUpperCase()}
+                  </div>
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <div style={{ fontSize:13, fontWeight:500 }}>{s.name}</div>
+                    <div style={{ fontSize:11, color:'#9CA3AF' }}>{s.phone||'—'}</div>
+                    {savedVal && (
+                      <div style={{ fontSize:11, marginTop:2, color: ft === 'note' ? '#64748B' : '#6D28D9', fontStyle: ft === 'note' ? 'italic' : 'normal', fontWeight: ft !== 'note' ? 600 : 400 }}>
+                        {step.fieldLabel ? `${step.fieldLabel}: ` : ''}{savedVal}
+                      </div>
+                    )}
+                  </div>
+                  <CheckCircle size={14} style={{ color:'#10B981', flexShrink:0 }}/>
+                  <button disabled={marking[s.id]} onClick={() => doRevoke(s)}
+                    style={{ fontSize:10, padding:'2px 8px', borderRadius:8, border:'1px solid #E5E7EB', background:'#fff', color:'#9CA3AF', cursor:'pointer', flexShrink:0 }}>
+                    {marking[s.id] ? '…' : 'Undo'}
+                  </button>
+                </div>
+              );
+            })}
           </>
         )}
       </div>
@@ -376,6 +389,7 @@ export default function Batches() {
 
   // Delete batch / student confirmation
   const [deleteStudentConfirm, setDeleteStudentConfirm] = useState(null); // student object
+  const [bulkStaffAssign, setBulkStaffAssign] = useState(''); // staff name for bulk import
 
   // Onboarding analytics side panel
   const [selectedStep, setSelectedStep]     = useState(null);
@@ -421,7 +435,7 @@ export default function Batches() {
   const [studentForm, setStudentForm] = useState({});
 
   const [scheduleForm, setScheduleForm] = useState({
-    title:'', day:'Monday', scheduledDate:'', time:'', duration:'60', type:'live-class',
+    title:'', day:'Monday', scheduledDate:'', recurring:false, time:'', duration:'60', type:'live-class',
     facultyName:'', meetLink:'', notes:''
   });
   const [taskForm, setTaskForm] = useState({
@@ -528,7 +542,7 @@ export default function Batches() {
     if (!csvPreview) return; setImporting(true);
     const fields = selectedBatch.studentFields || DEFAULT_STUDENT_FIELDS;
     const students = csvPreview.map(row => {
-      const obj = { batchId:selectedBatch.id, batchName:selectedBatch.name, course:selectedBatch.course, courseDurationMonths:selectedBatch.courseDurationMonths||'', status:row.status||'active' };
+      const obj = { batchId:selectedBatch.id, batchName:selectedBatch.name, course:selectedBatch.course, courseDurationMonths:selectedBatch.courseDurationMonths||'', status:row.status||'active', ...(bulkStaffAssign ? { staffAssigned: bulkStaffAssign } : {}) };
       // Extract join date from Timestamp column if present
       const ts = row['timestamp'] || row['Timestamp'] || row['timestamp'];
       if (ts) {
@@ -791,22 +805,21 @@ export default function Batches() {
     setSaving(false);
   };
 
-  const handleMarkStepComplete = async (studentId, stepKey, note) => {
+  const handleMarkStepComplete = async (studentId, stepKey, fieldValue) => {
+    const flow = selectedBatch?.courseFlow || DEFAULT_COURSE_FLOW;
+    const step = flow.find(s => s.key === stepKey);
     const update = {
-      [`courseFlow.${stepKey}.done`]: true,
+      [`courseFlow.${stepKey}.done`]:   true,
       [`courseFlow.${stepKey}.doneAt`]: new Date().toISOString(),
     };
-    if (note !== undefined && note !== '') update[`courseFlow.${stepKey}.note`] = note;
+    if (fieldValue !== undefined && fieldValue !== '') {
+      update[`courseFlow.${stepKey}.value`] = fieldValue;
+      // Keep top-level varkResult for backward compat with student list
+      if (step?.displayInTable && stepKey === 'vark_analysis') {
+        update.varkResult = fieldValue;
+      }
+    }
     await updateStudent(studentId, update);
-    loadBatchDetail(selectedBatch);
-  };
-
-  const handleMarkVark = async (studentId, stepKey, varkResult) => {
-    await updateStudent(studentId, {
-      [`courseFlow.${stepKey}.done`]: true,
-      [`courseFlow.${stepKey}.doneAt`]: new Date().toISOString(),
-      varkResult,
-    });
     loadBatchDetail(selectedBatch);
   };
 
@@ -818,9 +831,30 @@ export default function Batches() {
   const handleAddSchedule = async (e) => {
     e.preventDefault(); setSaving(true);
     await addBatchSchedule({ ...scheduleForm, batchId:selectedBatch.id, batchName:selectedBatch.name });
+    // Notify assigned faculty (in-app + email)
+    if (scheduleForm.facultyName) {
+      const faculty = staffList.find(s => s.name === scheduleForm.facultyName);
+      if (faculty?.email) {
+        const when = scheduleForm.recurring
+          ? `Every ${scheduleForm.day} at ${scheduleForm.time}`
+          : `${scheduleForm.scheduledDate} at ${scheduleForm.time}`;
+        addNotification({
+          toEmail: faculty.email, fromName: profile?.name || 'ISC SMS',
+          title: 'Class Scheduled', type: 'task',
+          message: `You have been assigned to "${scheduleForm.title}" — ${when} (${selectedBatch.name})`,
+          read: false,
+        }).catch(()=>{});
+        sendAssignmentEmail({
+          toEmail: faculty.email, toName: faculty.name,
+          title: `Class Scheduled: ${scheduleForm.title}`,
+          detail: `${when} — Batch: ${selectedBatch.name}`,
+          assignedBy: profile?.name || 'ISC SMS',
+        }).catch(()=>{});
+      }
+    }
     setToast({ message:'Schedule added!', type:'success' });
     setShowSchedule(false);
-    setScheduleForm({ title:'', day:'Monday', scheduledDate:'', time:'', duration:'60', type:'live-class', facultyName:'', meetLink:'', notes:'' });
+    setScheduleForm({ title:'', day:'Monday', scheduledDate:'', recurring:false, time:'', duration:'60', type:'live-class', facultyName:'', meetLink:'', notes:'' });
     const sch = await getBatchSchedules(selectedBatch.id);
     setSchedules(sch); setSaving(false);
   };
@@ -891,7 +925,7 @@ export default function Batches() {
     const flow = selectedBatch?.courseFlow || DEFAULT_COURSE_FLOW;
     return flow.map(step => {
       const completed = batchStudents.filter(s => s.courseFlow?.[step.key]?.done)
-        .map(s => ({ ...s, assessmentNote: s.courseFlow?.[step.key]?.note || '' }));
+        .map(s => ({ ...s, stepFieldValue: s.courseFlow?.[step.key]?.value || '' }));
       const notCompleted = batchStudents.filter(s => !s.courseFlow?.[step.key]?.done);
       return {
         ...step,
@@ -1009,7 +1043,7 @@ export default function Batches() {
         {selectedStep && (
           <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.2)', zIndex: 999 }} onClick={() => setSelectedStep(null)} />
         )}
-        <OnboardingStepPanel step={selectedStep} onClose={() => setSelectedStep(null)} onMarkComplete={handleMarkStepComplete} onMarkVark={handleMarkVark} onRevoke={handleRevokeStep} />
+        <OnboardingStepPanel step={selectedStep} onClose={() => setSelectedStep(null)} onMarkComplete={handleMarkStepComplete} onRevoke={handleRevokeStep} />
 
         {/* Header */}
         <div className="page-header">
@@ -1260,7 +1294,21 @@ export default function Batches() {
                           <td style={{ fontSize:13 }}>{s.whatsappNumber||'—'}</td>
                           <td style={{ fontSize:13 }}>{s.classStd||'—'}</td>
                           <td style={{ fontSize:12 }}>{s.varkResult||'—'}</td>
-                          <td style={{ fontSize:12 }}>{s.syllabus||'—'}</td>
+                          <td style={{ fontSize:12 }}>
+                            <input
+                              defaultValue={s.syllabus||''}
+                              onBlur={async e => {
+                                const val = e.target.value.trim();
+                                if (val !== (s.syllabus||'')) {
+                                  await updateStudent(s.id, { syllabus: val });
+                                }
+                              }}
+                              style={{ border:'1px solid transparent', borderRadius:6, padding:'2px 6px', fontSize:12, width:'100%', background:'transparent', cursor:'text' }}
+                              onFocus={e => { e.target.style.borderColor='#E5E7EB'; e.target.style.background='#fff'; }}
+                              onBlurCapture={e => { e.target.style.borderColor='transparent'; e.target.style.background='transparent'; }}
+                              placeholder="—"
+                            />
+                          </td>
                           <td>
                             <select
                               value={s.status||'active'}
@@ -2000,8 +2048,8 @@ export default function Batches() {
                           <Trash2 size={12}/>
                         </button>
                       )}
-                      {/* Staff request removal */}
-                      {(asmt.conductingStaff||[]).some(s => s.uid === profile?.uid) && profile?.role !== 'ceo' && (
+                      {/* Staff request removal — only when assessment not yet completed */}
+                      {(asmt.conductingStaff||[]).some(s => s.uid === profile?.uid) && profile?.role !== 'ceo' && asmt.status !== 'completed' && (
                         <button className="btn btn-ghost btn-sm"
                           onClick={() => setShowRemovalModal({ uid: profile?.uid, name: profile?.name, targetType:'assessment', targetId:asmt.id, targetName:asmt.title })}>
                           Request Removal
@@ -2266,9 +2314,17 @@ export default function Batches() {
               If your CSV has a <strong>Timestamp</strong> column, the date will be auto-captured as the joining date.<br/>
               Expected columns: <strong>{batchFields.map(f=>f.label).join(', ')}</strong>
             </div>
-            <button className="btn btn-ghost btn-sm" style={{ marginBottom:14 }} onClick={() => downloadTemplate(selectedBatch.name, batchFields)}>
-              <Download size={13}/> Download CSV Template
-            </button>
+            <div style={{ display:'flex', gap:10, alignItems:'center', marginBottom:14 }}>
+              <button className="btn btn-ghost btn-sm" onClick={() => downloadTemplate(selectedBatch.name, batchFields)}>
+                <Download size={13}/> Download CSV Template
+              </button>
+              <div className="form-group" style={{ flex:1, margin:0 }}>
+                <select className="form-input" style={{ fontSize:12 }} value={bulkStaffAssign} onChange={e => setBulkStaffAssign(e.target.value)}>
+                  <option value="">Assign all to staff (optional)</option>
+                  {staffList.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
+                </select>
+              </div>
+            </div>
             <input ref={fileRef} type="file" accept=".csv" style={{ display:'none' }}
               onChange={async e => { const t = await e.target.files[0]?.text(); if(t) setCsvPreview(parseCSV(t, selectedBatch.studentFields || DEFAULT_STUDENT_FIELDS)); }}/>
             <div onClick={() => fileRef.current.click()} style={{ border:'2px dashed #E5E7EB', borderRadius:10, padding:'24px', textAlign:'center', cursor:'pointer', background:'#FAFAFA', marginBottom:14 }}>
@@ -2300,21 +2356,53 @@ export default function Batches() {
         {/* Course Flow Config */}
         {showFlowConfig && (
           <Modal title={`Configure Course Flow — ${selectedBatch.name}`} onClose={() => setShowFlowConfig(false)} wide>
-            <div style={{ display:'flex', flexDirection:'column', gap:8, marginBottom:16 }}>
-              {editFlow.map((step, idx) => (
-                <div key={idx} style={{ display:'flex', gap:8, alignItems:'center', padding:'8px 12px', background:'#F9FAFB', borderRadius:8 }}>
-                  <span style={{ width:24, height:24, borderRadius:'50%', background:'#E53935', color:'#fff', fontSize:11, fontWeight:700, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>{idx+1}</span>
-                  <input className="form-input" style={{ flex:2 }} value={step.label}
-                    onChange={e => { const u=[...editFlow]; u[idx]={...u[idx],label:e.target.value}; setEditFlow(u); }}/>
-                  <select className="form-input" style={{ flex:1 }} value={step.phase}
-                    onChange={e => { const u=[...editFlow]; u[idx]={...u[idx],phase:e.target.value}; setEditFlow(u); }}>
-                    {PHASES.map(p => <option key={p} value={p}>{p}</option>)}
-                  </select>
-                  <button className="btn btn-ghost btn-sm" style={{ color:'#EF4444' }} onClick={() => setEditFlow(editFlow.filter((_,i)=>i!==idx))}><Trash2 size={13}/></button>
-                </div>
-              ))}
+            <div style={{ display:'flex', flexDirection:'column', gap:10, marginBottom:16 }}>
+              {editFlow.map((step, idx) => {
+                const upd = (patch) => { const u=[...editFlow]; u[idx]={...u[idx],...patch}; setEditFlow(u); };
+                return (
+                  <div key={idx} style={{ background:'#F9FAFB', borderRadius:10, border:'1px solid #E5E7EB', padding:'10px 12px' }}>
+                    <div style={{ display:'flex', gap:8, alignItems:'center', marginBottom: (step.fieldType && step.fieldType !== 'none') ? 8 : 0 }}>
+                      <span style={{ width:22, height:22, borderRadius:'50%', background:'#E53935', color:'#fff', fontSize:10, fontWeight:700, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>{idx+1}</span>
+                      <input className="form-input" style={{ flex:2 }} placeholder="Step name" value={step.label}
+                        onChange={e => upd({ label: e.target.value })}/>
+                      <select className="form-input" style={{ flex:1 }} value={step.phase} onChange={e => upd({ phase: e.target.value })}>
+                        {PHASES.map(p => <option key={p} value={p}>{p}</option>)}
+                      </select>
+                      <select className="form-input" style={{ flex:1 }} value={step.fieldType||'none'}
+                        onChange={e => upd({ fieldType: e.target.value, fieldOptions: e.target.value === 'dropdown' ? (step.fieldOptions||[]) : [] })}>
+                        <option value="none">No field</option>
+                        <option value="note">Note (textarea)</option>
+                        <option value="text">Text input</option>
+                        <option value="dropdown">Dropdown</option>
+                      </select>
+                      <button className="btn btn-ghost btn-sm" style={{ color:'#EF4444' }} onClick={() => setEditFlow(editFlow.filter((_,i)=>i!==idx))}><Trash2 size={13}/></button>
+                    </div>
+                    {step.fieldType && step.fieldType !== 'none' && (
+                      <div style={{ paddingLeft:30, display:'flex', flexDirection:'column', gap:6 }}>
+                        <input className="form-input" style={{ fontSize:12 }} placeholder="Field label (e.g. VARK Learning Style)"
+                          value={step.fieldLabel||''} onChange={e => upd({ fieldLabel: e.target.value })}/>
+                        {step.fieldType === 'dropdown' && (
+                          <>
+                            <div style={{ fontSize:11, color:'#6B7280' }}>Options (one per line):</div>
+                            <textarea className="form-input" rows={3} style={{ fontSize:11 }}
+                              value={(step.fieldOptions||[]).join('\n')}
+                              onChange={e => upd({ fieldOptions: e.target.value.split('\n').map(s=>s.trim()).filter(Boolean) })}
+                              placeholder={'Option 1\nOption 2\nOption 3'}/>
+                            <label style={{ display:'flex', alignItems:'center', gap:6, fontSize:12, cursor:'pointer' }}>
+                              <input type="checkbox" checked={!!step.displayInTable}
+                                onChange={e => upd({ displayInTable: e.target.checked })}/>
+                              Show selected value in student table
+                            </label>
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
-            <button className="btn btn-ghost btn-sm" style={{ marginBottom:16 }} onClick={() => setEditFlow([...editFlow, { key:generateKey('step'), label:'New Step', phase:'course' }])}>
+            <button className="btn btn-ghost btn-sm" style={{ marginBottom:16 }}
+              onClick={() => setEditFlow([...editFlow, { key:generateKey('step'), label:'New Step', phase:'course', fieldType:'none' }])}>
               <Plus size={13}/> Add Step
             </button>
             <div style={{ display:'flex', gap:10, justifyContent:'flex-end' }}>
@@ -2387,15 +2475,25 @@ export default function Batches() {
           <Modal title="Add Class" onClose={() => setShowSchedule(false)}>
             <form onSubmit={handleAddSchedule} style={{ display:'flex', flexDirection:'column', gap:12 }}>
               <div className="form-group"><label className="form-label">Title *</label><input className="form-input" required placeholder="e.g. Python Basics — Chapter 3" value={scheduleForm.title} onChange={e=>setScheduleForm({...scheduleForm,title:e.target.value})}/></div>
-              <div className="form-group">
-                <label className="form-label">Date (optional — for one-time classes)</label>
-                <input className="form-input" type="date" value={scheduleForm.scheduledDate} onChange={e=>setScheduleForm({...scheduleForm,scheduledDate:e.target.value})}/>
-                <div style={{ fontSize:11, color:'#9CA3AF', marginTop:3 }}>Leave blank to make this a recurring weekly class using the day below.</div>
+              {/* Recurring toggle */}
+              <div style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 12px', background:'#F9FAFB', borderRadius:8, border:'1px solid #E5E7EB' }}>
+                <label style={{ display:'flex', alignItems:'center', gap:8, fontSize:13, cursor:'pointer', flex:1 }}>
+                  <input type="checkbox" checked={!!scheduleForm.recurring}
+                    onChange={e => setScheduleForm({...scheduleForm, recurring: e.target.checked, scheduledDate: e.target.checked ? '' : scheduleForm.scheduledDate})}/>
+                  <span>Recurring weekly class</span>
+                </label>
+                <span style={{ fontSize:11, color:'#9CA3AF' }}>{scheduleForm.recurring ? 'Repeats every week on the selected day' : 'One-time class on a specific date'}</span>
               </div>
+              {!scheduleForm.recurring && (
+                <div className="form-group">
+                  <label className="form-label">Date *</label>
+                  <input className="form-input" type="date" required={!scheduleForm.recurring} value={scheduleForm.scheduledDate} onChange={e=>setScheduleForm({...scheduleForm,scheduledDate:e.target.value})}/>
+                </div>
+              )}
               <FormRow>
                 <div className="form-group">
-                  <label className="form-label">Day of week (for recurring)</label>
-                  <select className="form-input" value={scheduleForm.day} onChange={e=>setScheduleForm({...scheduleForm,day:e.target.value})} disabled={!!scheduleForm.scheduledDate}>
+                  <label className="form-label">Day of week {scheduleForm.recurring ? '*' : '(optional)'}</label>
+                  <select className="form-input" value={scheduleForm.day} onChange={e=>setScheduleForm({...scheduleForm,day:e.target.value})} disabled={!scheduleForm.recurring}>
                     {DAYS.map(d=><option key={d}>{d}</option>)}
                   </select>
                 </div>
