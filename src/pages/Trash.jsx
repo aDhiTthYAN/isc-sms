@@ -46,6 +46,20 @@ export default function Trash() {
     setBusy(false);
   };
 
+  const handleDeleteAll = async () => {
+    if (items.length === 0) return;
+    if (!window.confirm(`Permanently delete all ${items.length} item(s) in ${tab}s? This cannot be undone.`)) return;
+    setBusy(true);
+    try {
+      await Promise.all(items.map(item => permanentDelete(item.id)));
+      setToast({ message: `All ${tab}s permanently deleted.`, type: 'success' });
+      load(tab);
+    } catch (err) {
+      setToast({ message: 'Error: ' + err.message, type: 'error' });
+    }
+    setBusy(false);
+  };
+
   const formatDate = (ts) => {
     if (!ts) return '—';
     const d = ts.seconds ? new Date(ts.seconds * 1000) : new Date(ts);
@@ -56,6 +70,16 @@ export default function Trash() {
     <div>
       <div className="page-header">
         <h2><Trash2 size={20} style={{ marginRight: 8, verticalAlign: 'middle' }} />Trash</h2>
+        {items.length > 0 && (
+          <button
+            className="btn btn-sm"
+            style={{ background: '#EF4444', color: '#fff', border: 'none' }}
+            disabled={busy}
+            onClick={handleDeleteAll}
+          >
+            <Trash2 size={13} /> Delete All ({items.length})
+          </button>
+        )}
       </div>
 
       <div className="tab-bar" style={{ marginBottom: 16 }}>

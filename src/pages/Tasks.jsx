@@ -20,8 +20,17 @@ export default function Tasks() {
   const [toast, setToast]         = useState(null);
   const [saving, setSaving]       = useState(false);
   const [form, setForm] = useState({
-    title: '', staffId: '', dueDate: '', priority: 'normal', notes: ''
+    title: '', staffIds: [], dueDate: '', priority: 'normal', notes: ''
   });
+
+  const toggleStaff = (id) => {
+    setForm(prev => ({
+      ...prev,
+      staffIds: prev.staffIds.includes(id)
+        ? prev.staffIds.filter(x => x !== id)
+        : [...prev.staffIds, id],
+    }));
+  };
 
   const isCEOorAdmin = profile?.role === 'ceo' || profile?.role === 'admin';
 
@@ -43,49 +52,49 @@ export default function Tasks() {
     e.preventDefault();
     setSaving(true);
     try {
-      // Find the selected staff member — email is pulled automatically from Firestore
-      const selectedStaff = staff.find(s => s.id === form.staffId);
-      if (!selectedStaff) {
-        setToast({ message: 'Please select a staff member.', type: 'error' });
+      const selectedStaff = staff.filter(s => form.staffIds.includes(s.id));
+      if (selectedStaff.length === 0) {
+        setToast({ message: 'Please select at least one staff member.', type: 'error' });
         setSaving(false);
         return;
       }
 
-      const taskData = {
-        title:          form.title,
-        assignedTo:     selectedStaff.name,
-        assignedToEmail:selectedStaff.email,  // ← auto from Firestore, no manual entry
-        dueDate:        form.dueDate,
-        priority:       form.priority,
-        notes:          form.notes,
-        assignedBy:     profile?.name,
-        assignedByEmail:user?.email,
-      };
+      const notifMessage = `New task assigned by ${profile?.name}: "${form.title}"${form.dueDate ? ` — due ${form.dueDate}` : ''}${form.notes ? ` | ${form.notes}` : ''}`;
 
-      await addTask(taskData);
+      await Promise.all(selectedStaff.map(async (s) => {
+        await addTask({
+          title:           form.title,
+          assignedTo:      s.name,
+          assignedToEmail: s.email,
+          dueDate:         form.dueDate,
+          priority:        form.priority,
+          notes:           form.notes,
+          assignedBy:      profile?.name,
+          assignedByEmail: user?.email,
+        });
 
-      // In-app notification — appears in staff's bell icon instantly
-      await addNotification({
-        toEmail:  selectedStaff.email,
-        toName:   selectedStaff.name,
-        fromName: profile?.name,
-        type:     'task',
-        message:  `New task: "${form.title}"${form.dueDate ? ` — due ${form.dueDate}` : ''}`,
-      });
+        addNotification({
+          toEmail:  s.email,
+          toName:   s.name,
+          fromName: profile?.name,
+          type:     'task',
+          message:  notifMessage,
+        }).catch(() => {});
 
-      // Email notification — goes to staff's registered email automatically
-      await sendTaskEmail({
-        toEmail:    selectedStaff.email,
-        toName:     selectedStaff.name,
-        taskTitle:  form.title,
-        dueDate:    form.dueDate,
-        priority:   form.priority,
-        assignedBy: profile?.name,
-      });
+        sendTaskEmail({
+          toEmail:    s.email,
+          toName:     s.name,
+          taskTitle:  form.title,
+          dueDate:    form.dueDate,
+          priority:   form.priority,
+          assignedBy: profile?.name,
+        }).catch(() => {});
+      }));
 
-      setToast({ message: `Task assigned to ${selectedStaff.name}! Email sent to ${selectedStaff.email}`, type: 'success' });
+      const names = selectedStaff.map(s => s.name).join(', ');
+      setToast({ message: `Task assigned to ${names}!`, type: 'success' });
       setShowModal(false);
-      setForm({ title: '', staffId: '', dueDate: '', priority: 'normal', notes: '' });
+      setForm({ title: '', staffIds: [], dueDate: '', priority: 'normal', notes: '' });
       load();
     } catch (err) {
       setToast({ message: 'Failed to assign task: ' + err.message, type: 'error' });
@@ -185,19 +194,19 @@ export default function Tasks() {
                 value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} />
             </div>
             <div className="form-group">
-              <label className="form-label">Assign To *</label>
-              <select className="form-input" required value={form.staffId}
-                onChange={e => setForm({ ...form, staffId: e.target.value })}>
-                <option value="">Select staff member</option>
+              <label className="form-label">Assign To * <span style={{ fontWeight: 400, color: '#6B7280' }}>(select one or more)</span></label>
+              <div style={{ border: '1px solid var(--border)', borderRadius: 8, padding: '8px 10px', maxHeight: 160, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 6 }}>
                 {staff.map(s => (
-                  <option key={s.id} value={s.id}>
-                    {s.name} — {s.role}
-                  </option>
+                  <label key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13 }}>
+                    <input type="checkbox" checked={form.staffIds.includes(s.id)} onChange={() => toggleStaff(s.id)} />
+                    <span style={{ flex: 1 }}>{s.name}</span>
+                    <span style={{ fontSize: 11, color: '#9CA3AF' }}>{s.role}</span>
+                  </label>
                 ))}
-              </select>
-              {form.staffId && (
+              </div>
+              {form.staffIds.length > 0 && (
                 <div style={{ fontSize: 11, color: '#6B7280', marginTop: 4 }}>
-                  📧 Email notification will go to: <strong>{staff.find(s => s.id === form.staffId)?.email}</strong>
+                  📧 Notifying {form.staffIds.length} staff member{form.staffIds.length > 1 ? 's' : ''}
                 </div>
               )}
             </div>

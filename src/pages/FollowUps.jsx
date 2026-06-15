@@ -20,9 +20,18 @@ export default function FollowUps() {
   const [saving, setSaving]         = useState(false);
   const [form, setForm] = useState({
     studentId: '', studentName: '',
-    staffId: '',
+    staffIds: [],
     note: '', nextAction: '', priority: 'normal'
   });
+
+  const toggleStaff = (id) => {
+    setForm(prev => ({
+      ...prev,
+      staffIds: prev.staffIds.includes(id)
+        ? prev.staffIds.filter(x => x !== id)
+        : [...prev.staffIds, id],
+    }));
+  };
 
   const isCEOorAdmin = profile?.role === 'ceo' || profile?.role === 'admin';
 
@@ -50,48 +59,50 @@ export default function FollowUps() {
     e.preventDefault();
     setSaving(true);
     try {
-      // Email pulled automatically from selected staff's Firestore record
-      const selectedStaff = staff.find(s => s.id === form.staffId);
-      if (!selectedStaff) {
-        setToast({ message: 'Please select a staff member.', type: 'error' });
+      const selectedStaff = staff.filter(s => form.staffIds.includes(s.id));
+      if (selectedStaff.length === 0) {
+        setToast({ message: 'Please select at least one staff member.', type: 'error' });
         setSaving(false);
         return;
       }
 
-      await addFollowUp({
-        studentId:       form.studentId,
-        studentName:     form.studentName,
-        assignedTo:      selectedStaff.name,
-        assignedToEmail: selectedStaff.email, // ← auto from Firestore
-        note:            form.note,
-        nextAction:      form.nextAction,
-        priority:        form.priority,
-        assignedBy:      profile?.name,
-        assignedByEmail: user?.email,
-      });
+      const fullMessage = `Follow-up assigned by ${profile?.name}: "${form.studentName}" — ${form.note}`;
 
-      // In-app notification bell
-      await addNotification({
-        toEmail:  selectedStaff.email,
-        toName:   selectedStaff.name,
-        fromName: profile?.name,
-        type:     'followup',
-        message:  `Follow-up assigned: "${form.studentName}" — ${form.note.slice(0, 60)}`,
-      });
+      await Promise.all(selectedStaff.map(async (s) => {
+        await addFollowUp({
+          studentId:       form.studentId,
+          studentName:     form.studentName,
+          assignedTo:      s.name,
+          assignedToEmail: s.email,
+          note:            form.note,
+          nextAction:      form.nextAction,
+          priority:        form.priority,
+          assignedBy:      profile?.name,
+          assignedByEmail: user?.email,
+        });
 
-      // Email to staff's registered email — no manual entry needed
-      await sendFollowUpEmail({
-        toEmail:     selectedStaff.email,
-        toName:      selectedStaff.name,
-        studentName: form.studentName,
-        note:        form.note,
-        priority:    form.priority,
-        assignedBy:  profile?.name,
-      });
+        addNotification({
+          toEmail:  s.email,
+          toName:   s.name,
+          fromName: profile?.name,
+          type:     'followup',
+          message:  fullMessage,
+        }).catch(() => {});
 
-      setToast({ message: `Follow-up assigned to ${selectedStaff.name}! Notified via email.`, type: 'success' });
+        sendFollowUpEmail({
+          toEmail:     s.email,
+          toName:      s.name,
+          studentName: form.studentName,
+          note:        form.note,
+          priority:    form.priority,
+          assignedBy:  profile?.name,
+        }).catch(() => {});
+      }));
+
+      const names = selectedStaff.map(s => s.name).join(', ');
+      setToast({ message: `Follow-up assigned to ${names}!`, type: 'success' });
       setShowModal(false);
-      setForm({ studentId: '', studentName: '', staffId: '', note: '', nextAction: '', priority: 'normal' });
+      setForm({ studentId: '', studentName: '', staffIds: [], note: '', nextAction: '', priority: 'normal' });
       load();
     } catch (err) {
       setToast({ message: 'Failed: ' + err.message, type: 'error' });
@@ -227,15 +238,19 @@ export default function FollowUps() {
               </select>
             </div>
             <div className="form-group">
-              <label className="form-label">Assign To *</label>
-              <select className="form-input" required value={form.staffId}
-                onChange={e => setForm({ ...form, staffId: e.target.value })}>
-                <option value="">Select staff member</option>
-                {staff.map(s => <option key={s.id} value={s.id}>{s.name} — {s.role}</option>)}
-              </select>
-              {form.staffId && (
+              <label className="form-label">Assign To * <span style={{ fontWeight: 400, color: '#6B7280' }}>(select one or more)</span></label>
+              <div style={{ border: '1px solid var(--border)', borderRadius: 8, padding: '8px 10px', maxHeight: 160, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {staff.map(s => (
+                  <label key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13 }}>
+                    <input type="checkbox" checked={form.staffIds.includes(s.id)} onChange={() => toggleStaff(s.id)} />
+                    <span style={{ flex: 1 }}>{s.name}</span>
+                    <span style={{ fontSize: 11, color: '#9CA3AF' }}>{s.role}</span>
+                  </label>
+                ))}
+              </div>
+              {form.staffIds.length > 0 && (
                 <div style={{ fontSize: 11, color: '#6B7280', marginTop: 4 }}>
-                  📧 Will notify: <strong>{staff.find(s => s.id === form.staffId)?.email}</strong>
+                  📧 Notifying {form.staffIds.length} staff member{form.staffIds.length > 1 ? 's' : ''}
                 </div>
               )}
             </div>

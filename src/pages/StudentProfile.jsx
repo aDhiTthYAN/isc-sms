@@ -489,7 +489,7 @@ export default function StudentProfile() {
                         </div>
                         {fs?.done && (
                           <div style={{ fontSize:11, color:'#9CA3AF', marginTop:2 }}>
-                            ✅ Done {fs.date && `on ${fs.date}`}{fs.note && ` — ${fs.note}`}
+                            ✅ Done {fs.date && `on ${fs.date}`}{(fs.value || fs.note) && ` — ${fs.value || fs.note}`}
                           </div>
                         )}
                       </div>
