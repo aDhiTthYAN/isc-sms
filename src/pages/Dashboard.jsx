@@ -91,9 +91,16 @@ export default function Dashboard() {
         const arStudentsSnap = await getDocs(query(collection(db, 'students'), where('status', '==', 'at-risk'), limit(10)));
         setAtRiskStudents(arStudentsSnap.docs.map(d => ({ id: d.id, ...d.data() })));
 
-        // Batches
-        const batchList = await getBatches();
+        // Batches — staff see only their assigned ones
+        const allBatches = await getBatches();
+        const uid = profile?.uid;
+        const isStaff = profile?.role !== 'ceo' && profile?.role !== 'admin';
+        const batchList = isStaff
+          ? allBatches.filter(b => b.mentorId === uid || (b.staffIds || []).includes(uid))
+          : allBatches;
         setBatches(batchList);
+        // Auto-select first batch for staff
+        if (isStaff && batchList.length > 0) setSchedBatch(batchList[0].id);
 
         // Pending tasks (limit 50)
         const tasks = await getTasks().catch(() => []);
@@ -353,12 +360,37 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* KPI Cards */}
+      {/* KPI Cards — staff see a simpler 3-card strip */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14, marginBottom: 24 }}>
-        {kpis.map(k => <KPICard key={k.label} {...k} />)}
+        {(profile?.role !== 'ceo' && profile?.role !== 'admin'
+          ? kpis.filter(k => ['Active Batches','Pending Tasks','Recent Activity'].includes(k.label))
+          : kpis
+        ).map(k => <KPICard key={k.label} {...k} />)}
       </div>
 
-      {/* Batches Overview Table */}
+      {/* Staff: My Batches quick info banner */}
+      {profile?.role !== 'ceo' && profile?.role !== 'admin' && batches.length > 0 && (
+        <div style={{ background: 'linear-gradient(135deg,#0F3460 0%,#1E40AF 100%)', borderRadius: 14, padding: '16px 20px', marginBottom: 20, display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>Your Assigned Batches</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              {batches.map(b => (
+                <span
+                  key={b.id}
+                  onClick={() => { setSchedBatch(b.id); setSchedFilter('all'); }}
+                  style={{ padding: '4px 12px', borderRadius: 20, background: schedBatch === b.id ? '#fff' : 'rgba(255,255,255,0.15)', color: schedBatch === b.id ? '#0F3460' : '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s' }}
+                >
+                  {b.name}
+                </span>
+              ))}
+            </div>
+          </div>
+          <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: 12 }}>Click a batch to view its schedule below ↓</div>
+        </div>
+      )}
+
+      {/* Batches Overview Table — CEO/Admin only */}
+      {(profile?.role === 'ceo' || profile?.role === 'admin') &&
       <div style={{ background: '#fff', borderRadius: 14, border: '1px solid #E5E7EB', padding: '20px 22px', boxShadow: '0 1px 3px rgba(0,0,0,0.08), 0 4px 12px rgba(0,0,0,0.04)', marginBottom: 20 }}>
         {sectionHead('Batches Overview', '/batches', 'Manage Batches')}
         <div style={{ overflowX: 'auto' }}>
@@ -414,7 +446,7 @@ export default function Dashboard() {
             </tbody>
           </table>
         </div>
-      </div>
+      </div>}
 
       <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: 16, marginBottom: 20 }}>
         {/* Recent Activity Feed */}

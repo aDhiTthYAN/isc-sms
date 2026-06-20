@@ -438,6 +438,7 @@ export default function Batches() {
     title:'', day:'Monday', scheduledDate:'', recurring:false, time:'', duration:'60', type:'live-class',
     facultyName:'', meetLink:'', notes:''
   });
+  const [facultySearch, setFacultySearch] = useState('');
   const [taskForm, setTaskForm] = useState({
     title:'', subject:'', description:'', dueDate:'', assignedFaculty:''
   });
@@ -2513,11 +2514,37 @@ export default function Batches() {
               <FormRow>
                 <div className="form-group">
                   <label className="form-label">Faculty</label>
-                  <select className="form-input" value={scheduleForm.facultyName} onChange={e=>setScheduleForm({...scheduleForm,facultyName:e.target.value})}>
-                    <option value="">Select faculty</option>
-                    {(selectedBatch.faculties||[]).map((f,i)=><option key={i}>{f}</option>)}
-                    {staffList.map(s=><option key={s.id}>{s.name}</option>)}
-                  </select>
+                  <div style={{ position: 'relative' }}>
+                    <input
+                      className="form-input"
+                      placeholder="Search faculty name…"
+                      value={facultySearch || scheduleForm.facultyName}
+                      onChange={e => { setFacultySearch(e.target.value); setScheduleForm({...scheduleForm, facultyName: ''}); }}
+                      autoComplete="off"
+                    />
+                    {facultySearch && (
+                      <div style={{ position:'absolute', top:'100%', left:0, right:0, background:'#fff', border:'1px solid #E5E7EB', borderRadius:8, boxShadow:'0 4px 12px rgba(0,0,0,0.1)', zIndex:200, maxHeight:180, overflowY:'auto' }}>
+                        {[
+                          ...(selectedBatch.faculties||[]).map(f => ({ name: f, role:'faculty', email:'' })),
+                          ...staffList,
+                        ].filter(s => s.name?.toLowerCase().includes(facultySearch.toLowerCase())).map((s, i) => (
+                          <div key={i} onClick={() => { setScheduleForm({...scheduleForm, facultyName: s.name}); setFacultySearch(''); }}
+                            style={{ padding:'9px 12px', cursor:'pointer', fontSize:13, display:'flex', justifyContent:'space-between', alignItems:'center' }}
+                            onMouseEnter={e=>e.currentTarget.style.background='#F0F4FF'}
+                            onMouseLeave={e=>e.currentTarget.style.background='#fff'}>
+                            <span style={{ fontWeight:500 }}>{s.name}</span>
+                            <span style={{ fontSize:11, color:'#9CA3AF' }}>{s.role||'faculty'}</span>
+                          </div>
+                        ))}
+                        {[...(selectedBatch.faculties||[]), ...staffList].filter(s => s.name?.toLowerCase().includes(facultySearch.toLowerCase())).length === 0 && (
+                          <div style={{ padding:'10px 12px', fontSize:12, color:'#9CA3AF' }}>No match found</div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  {scheduleForm.facultyName && (
+                    <div style={{ fontSize:11, color:'#10B981', marginTop:4 }}>✓ Selected: <strong>{scheduleForm.facultyName}</strong></div>
+                  )}
                 </div>
                 <div className="form-group"><label className="form-label">Meet / Zoom Link</label><input className="form-input" type="url" placeholder="https://..." value={scheduleForm.meetLink} onChange={e=>setScheduleForm({...scheduleForm,meetLink:e.target.value})}/></div>
               </FormRow>
