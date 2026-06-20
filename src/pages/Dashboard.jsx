@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import {
   getBatches, getBatchStudentCount, getTasks, getAllFollowUps,
   getStudentCount, getBatchTasks, getRequests, addNotification, updateRequest, markNotificationRead,
+  getBatchSchedules, getAssessments,
 } from '../firebase/services';
 import { query, collection, where, limit, getDocs, getCountFromServer } from 'firebase/firestore';
 import { db } from '../firebase/config';
@@ -10,7 +11,8 @@ import { Loading, StatusBadge } from '../components/ui';
 import { useAuth } from '../context/AuthContext';
 import {
   Users, AlertTriangle, School, CheckSquare, TrendingUp,
-  Calendar, ChevronRight, Clock, Activity, ArrowRight, Inbox, X, Bell
+  Calendar, ChevronRight, Clock, Activity, ArrowRight, Inbox, X, Bell,
+  BookOpen, ClipboardCheck
 } from 'lucide-react';
 
 const KPI_STYLE = {
@@ -60,6 +62,11 @@ export default function Dashboard() {
   const [atRiskStudents, setAtRiskStudents] = useState([]);
   const [actPage, setActPage]           = useState(0);
   const ACT_PAGE = 10;
+
+  const [schedBatch, setSchedBatch]   = useState('');
+  const [schedItems, setSchedItems]   = useState([]);
+  const [schedLoading, setSchedLoading] = useState(false);
+  const [schedFilter, setSchedFilter] = useState('all'); // 'all' | 'schedule' | 'assessment' | 'task'
 
   // Sidebar state
   const [showSidebar, setShowSidebar]   = useState(false);
@@ -176,6 +183,27 @@ export default function Dashboard() {
     } catch (e) { console.error(e); }
     setProcessingReq(null);
   };
+
+  const loadBatchActivity = async (batchId) => {
+    if (!batchId) return setSchedItems([]);
+    setSchedLoading(true);
+    try {
+      const [scheds, asmts, bTasks] = await Promise.all([
+        getBatchSchedules(batchId).catch(() => []),
+        getAssessments(batchId).catch(() => []),
+        getBatchTasks(batchId).catch(() => []),
+      ]);
+      const items = [
+        ...scheds.map(s => ({ ...s, _kind: 'schedule', _label: s.title || 'Class', _sub: s.recurring ? `Every ${s.day} at ${s.time}` : `${s.scheduledDate} at ${s.time}`, _nav: '/batches' })),
+        ...asmts.map(a => ({ ...a, _kind: 'assessment', _label: a.title || 'Assessment', _sub: `${a.date || '—'} · ${a.totalMarks} marks`, _nav: '/assessments' })),
+        ...bTasks.map(t => ({ ...t, _kind: 'task', _label: t.title || 'Task', _sub: t.assignedTo || '', _nav: '/tasks' })),
+      ];
+      setSchedItems(items);
+    } catch {}
+    setSchedLoading(false);
+  };
+
+  useEffect(() => { loadBatchActivity(schedBatch); }, [schedBatch]);
 
   const handleMarkNotifRead = async (notif) => {
     if (notif.read) return;
@@ -519,6 +547,93 @@ export default function Dashboard() {
           </div>
         </div>
       )}
+
+      {/* Batch Activity Hub */}
+      <div style={{ background: '#fff', borderRadius: 14, border: '1px solid #E5E7EB', padding: '20px 22px', boxShadow: '0 1px 3px rgba(0,0,0,0.08), 0 4px 12px rgba(0,0,0,0.04)', marginTop: 20 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, flexWrap: 'wrap', gap: 10 }}>
+          <h3 style={{ fontSize: 15, fontWeight: 700, color: '#1A1A2E' }}>📅 Batch Activity Hub</h3>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+            <select
+              value={schedBatch}
+              onChange={e => setSchedBatch(e.target.value)}
+              style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid #E5E7EB', fontSize: 13, background: '#F9FAFB', minWidth: 180 }}
+            >
+              <option value="">Select a batch…</option>
+              {batches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+            </select>
+            {schedBatch && (
+              <div style={{ display: 'flex', gap: 4 }}>
+                {[
+                  { key: 'all', label: 'All' },
+                  { key: 'schedule', label: '🗓 Classes' },
+                  { key: 'assessment', label: '📝 Assessments' },
+                  { key: 'task', label: '✅ Tasks' },
+                ].map(f => (
+                  <button
+                    key={f.key}
+                    onClick={() => setSchedFilter(f.key)}
+                    style={{ padding: '5px 12px', borderRadius: 20, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 600,
+                      background: schedFilter === f.key ? '#0F3460' : '#F3F4F6',
+                      color: schedFilter === f.key ? '#fff' : '#374151' }}
+                  >{f.label}</button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {!schedBatch && (
+          <div style={{ textAlign: 'center', color: '#9CA3AF', padding: '32px 0', fontSize: 13 }}>
+            <Calendar size={28} style={{ color: '#D1D5DB', marginBottom: 8, display: 'block', margin: '0 auto 8px' }} />
+            Select a batch to view its scheduled classes, assessments, and tasks
+          </div>
+        )}
+
+        {schedBatch && schedLoading && (
+          <div style={{ textAlign: 'center', color: '#9CA3AF', padding: '24px 0', fontSize: 13 }}>Loading…</div>
+        )}
+
+        {schedBatch && !schedLoading && (() => {
+          const filtered = schedFilter === 'all' ? schedItems : schedItems.filter(i => i._kind === schedFilter);
+          const kindColor = { schedule: { bg: '#DBEAFE', color: '#1E40AF', dot: '#3B82F6' }, assessment: { bg: '#D1FAE5', color: '#065F46', dot: '#10B981' }, task: { bg: '#FEF3C7', color: '#92400E', dot: '#F59E0B' } };
+          return (
+            <div>
+              {filtered.length === 0 && (
+                <div style={{ textAlign: 'center', color: '#9CA3AF', padding: '24px 0', fontSize: 13 }}>No items found for this filter.</div>
+              )}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {filtered.map((item, i) => {
+                  const c = kindColor[item._kind] || kindColor.task;
+                  return (
+                    <div
+                      key={item.id || i}
+                      onClick={() => navigate(item._nav)}
+                      style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', borderRadius: 10, border: '1px solid #E5E7EB', cursor: 'pointer', transition: 'background 0.12s' }}
+                      onMouseEnter={e => e.currentTarget.style.background = '#F8FAFC'}
+                      onMouseLeave={e => e.currentTarget.style.background = '#fff'}
+                    >
+                      <div style={{ width: 10, height: 10, borderRadius: '50%', background: c.dot, flexShrink: 0 }} />
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: '#1A1A2E', marginBottom: 2 }}>{item._label}</div>
+                        {item._sub && <div style={{ fontSize: 12, color: '#6B7280' }}>{item._sub}</div>}
+                      </div>
+                      <span style={{ fontSize: 11, padding: '3px 10px', borderRadius: 20, background: c.bg, color: c.color, fontWeight: 600, flexShrink: 0 }}>
+                        {item._kind === 'schedule' ? 'Class' : item._kind === 'assessment' ? 'Assessment' : 'Task'}
+                      </span>
+                      <span style={{ fontSize: 11, color: '#9CA3AF', flexShrink: 0 }}>→</span>
+                    </div>
+                  );
+                })}
+              </div>
+              <div style={{ marginTop: 14, padding: '10px 14px', background: '#F8FAFC', borderRadius: 8, fontSize: 12, color: '#6B7280', display: 'flex', gap: 16 }}>
+                <span>🗓 {schedItems.filter(i=>i._kind==='schedule').length} classes</span>
+                <span>📝 {schedItems.filter(i=>i._kind==='assessment').length} assessments</span>
+                <span>✅ {schedItems.filter(i=>i._kind==='task').length} tasks</span>
+              </div>
+            </div>
+          );
+        })()}
+      </div>
     </div>
   );
 }

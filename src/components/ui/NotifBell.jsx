@@ -106,8 +106,13 @@ export default function NotifBell() {
                   {TYPE_ICONS[n.type] || <Bell size={14} />}
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
+                  {n.title && (
+                    <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)', marginBottom: 2, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                      {n.title}
+                    </div>
+                  )}
                   <div style={{ fontSize: 13, fontWeight: n.read ? 400 : 600, color: 'var(--text)', lineHeight: 1.4 }}>
-                    {n.message}
+                    {n.message || n.title}
                   </div>
                   <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 3 }}>
                     {n.fromName && `From ${n.fromName} · `}{timeAgo(n.createdAt)}

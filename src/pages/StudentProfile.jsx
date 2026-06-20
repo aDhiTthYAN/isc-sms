@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import {
   getStudent, updateStudent, getBatches,
   getFollowUps, addFollowUp, getAssessments, addAssessment,
-  getStaffProfiles, updateWeakSubjects, updateCourseFlowStep
+  getStaffProfiles, updateWeakSubjects, updateCourseFlowStep, addNotification
 } from '../firebase/services';
 import { Modal, Toast, Avatar, StatusBadge, Loading, FormRow } from '../components/ui';
 import { useAuth } from '../context/AuthContext';
@@ -60,7 +60,7 @@ export default function StudentProfile() {
 
   // Assessment modal
   const [assessModal, setAssessModal] = useState(false);
-  const [assessForm,  setAssessForm]  = useState({ testName:'', subject:'', date:'', marks:'', totalMarks:'' });
+  const [assessForm,  setAssessForm]  = useState({ testName:'', subject:'', date:'', marks:'', totalMarks:'', conductingStaffIds:[] });
 
   // Follow-up note
   const [newNote,    setNewNote]    = useState('');
@@ -178,10 +178,30 @@ export default function StudentProfile() {
   const handleAddAssessment = async (e) => {
     e.preventDefault();
     const pct = Math.round(Number(assessForm.marks) / Number(assessForm.totalMarks) * 100);
-    await addAssessment({ studentId: id, studentName: student.name, ...assessForm, percentage: pct });
+    const conductingStaff = staffList.filter(s => assessForm.conductingStaffIds.includes(s.id))
+      .map(s => ({ uid: s.id, name: s.name, email: s.email || '' }));
+    await addAssessment({
+      studentId: id, studentName: student.name,
+      testName: assessForm.testName, subject: assessForm.subject,
+      date: assessForm.date, marks: assessForm.marks, totalMarks: assessForm.totalMarks,
+      percentage: pct, conductingStaff,
+      createdBy: profile?.uid, createdByName: profile?.name,
+    });
+    // Notify each conducting staff member
+    for (const s of conductingStaff) {
+      if (s.uid !== profile?.uid && s.email) {
+        addNotification({
+          toEmail: s.email,
+          title: 'Assessment Assigned',
+          message: `${profile?.name} assigned you to conduct "${assessForm.testName}" for student ${student.name}`,
+          type: 'task',
+          fromName: profile?.name,
+        }).catch(() => {});
+      }
+    }
     setToast({ message: 'Assessment added!', type: 'success' });
     setAssessModal(false);
-    setAssessForm({ testName:'', subject:'', date:'', marks:'', totalMarks:'' });
+    setAssessForm({ testName:'', subject:'', date:'', marks:'', totalMarks:'', conductingStaffIds:[] });
     const upd = await getAssessments(id);
     setAssessments(upd);
   };
@@ -198,6 +218,15 @@ export default function StudentProfile() {
 
   const toggleWeak = (sub) => {
     setWeakSubjects(prev => prev.includes(sub) ? prev.filter(s => s !== sub) : [...prev, sub]);
+  };
+
+  const toggleConductingStaff = (staffId) => {
+    setAssessForm(prev => ({
+      ...prev,
+      conductingStaffIds: prev.conductingStaffIds.includes(staffId)
+        ? prev.conductingStaffIds.filter(id => id !== staffId)
+        : [...prev.conductingStaffIds, staffId],
+    }));
   };
 
   if (loading) return <Loading />;
@@ -694,6 +723,23 @@ export default function StudentProfile() {
               <div className="form-group"><label className="form-label">Marks Scored *</label><input className="form-input" type="number" required value={assessForm.marks} onChange={e=>setAssessForm({...assessForm,marks:e.target.value})}/></div>
               <div className="form-group"><label className="form-label">Total Marks *</label><input className="form-input" type="number" required value={assessForm.totalMarks} onChange={e=>setAssessForm({...assessForm,totalMarks:e.target.value})}/></div>
             </FormRow>
+            <div className="form-group">
+              <label className="form-label">Conducting Staff <span style={{ fontWeight: 400, color: '#6B7280' }}>(optional — select all involved)</span></label>
+              <div style={{ border: '1px solid var(--border)', borderRadius: 8, padding: '8px 10px', maxHeight: 130, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 5 }}>
+                {staffList.filter(s => s.active !== false).map(s => (
+                  <label key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13 }}>
+                    <input type="checkbox"
+                      checked={assessForm.conductingStaffIds.includes(s.id)}
+                      onChange={() => toggleConductingStaff(s.id)} />
+                    <span style={{ flex: 1 }}>{s.name}</span>
+                    <span style={{ fontSize: 11, color: '#9CA3AF' }}>{s.role}</span>
+                  </label>
+                ))}
+                {staffList.filter(s => s.active !== false).length === 0 && (
+                  <div style={{ fontSize: 12, color: '#9CA3AF' }}>No staff found</div>
+                )}
+              </div>
+            </div>
             {assessForm.marks && assessForm.totalMarks && (
               <div style={{ padding:'8px 12px', background:'#F0FDF4', borderRadius:8, fontSize:13, color:'#065F46' }}>
                 Percentage: <strong>{Math.round(Number(assessForm.marks)/Number(assessForm.totalMarks)*100)}%</strong>
