@@ -49,6 +49,102 @@ function KPICard({ label, value, sub, color, bg, icon: Icon, link }) {
   );
 }
 
+function BatchActivityHub({ batches, schedBatch, setSchedBatch, schedFilter, setSchedFilter, schedItems, schedLoading, navigate, Calendar }) {
+  const kindColor = {
+    schedule:   { bg: '#DBEAFE', color: '#1E40AF', dot: '#3B82F6' },
+    assessment: { bg: '#D1FAE5', color: '#065F46', dot: '#10B981' },
+    task:       { bg: '#FEF3C7', color: '#92400E', dot: '#F59E0B' },
+  };
+  const filtered = schedFilter === 'all' ? schedItems : schedItems.filter(i => i._kind === schedFilter);
+
+  return (
+    <div style={{ background: '#fff', borderRadius: 14, border: '1px solid #E5E7EB', padding: '20px 22px', boxShadow: '0 1px 3px rgba(0,0,0,0.08), 0 4px 12px rgba(0,0,0,0.04)', marginBottom: 20 }}>
+      {/* Header row */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, flexWrap: 'wrap', gap: 10 }}>
+        <h3 style={{ fontSize: 15, fontWeight: 700, color: '#1A1A2E' }}>📅 Batch Activity Hub</h3>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+          {/* Batch tabs — one chip per batch */}
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            {batches.map(b => (
+              <button key={b.id} onClick={() => setSchedBatch(b.id)}
+                style={{ padding: '5px 14px', borderRadius: 20, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 600,
+                  background: schedBatch === b.id ? '#0F3460' : '#F3F4F6',
+                  color: schedBatch === b.id ? '#fff' : '#374151', transition: 'all 0.15s' }}>
+                {b.name}
+              </button>
+            ))}
+          </div>
+          {/* Filter pills */}
+          {schedBatch && (
+            <div style={{ display: 'flex', gap: 4 }}>
+              {[
+                { key: 'all',        label: 'All'           },
+                { key: 'schedule',   label: '🗓 Classes'    },
+                { key: 'assessment', label: '📝 Assessments'},
+                { key: 'task',       label: '✅ Tasks'      },
+              ].map(f => (
+                <button key={f.key} onClick={() => setSchedFilter(f.key)}
+                  style={{ padding: '5px 11px', borderRadius: 20, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 600,
+                    background: schedFilter === f.key ? '#E53935' : '#F3F4F6',
+                    color: schedFilter === f.key ? '#fff' : '#374151' }}>
+                  {f.label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Empty state */}
+      {!schedBatch && (
+        <div style={{ textAlign: 'center', color: '#9CA3AF', padding: '36px 0', fontSize: 13 }}>
+          <Calendar size={28} style={{ color: '#D1D5DB', display: 'block', margin: '0 auto 8px' }} />
+          Select a batch above to view its classes, assessments and tasks
+        </div>
+      )}
+
+      {schedBatch && schedLoading && (
+        <div style={{ textAlign: 'center', color: '#9CA3AF', padding: '24px 0', fontSize: 13 }}>Loading…</div>
+      )}
+
+      {schedBatch && !schedLoading && (
+        <>
+          {filtered.length === 0 ? (
+            <div style={{ textAlign: 'center', color: '#9CA3AF', padding: '24px 0', fontSize: 13 }}>No items in this category.</div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 420, overflowY: 'auto' }}>
+              {filtered.map((item, i) => {
+                const c = kindColor[item._kind] || kindColor.task;
+                return (
+                  <div key={item.id || i} onClick={() => navigate(item._nav)}
+                    style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', borderRadius: 10, border: '1px solid #E5E7EB', cursor: 'pointer', background: '#fff', transition: 'background 0.12s' }}
+                    onMouseEnter={e => e.currentTarget.style.background = '#F8FAFC'}
+                    onMouseLeave={e => e.currentTarget.style.background = '#fff'}>
+                    <div style={{ width: 10, height: 10, borderRadius: '50%', background: c.dot, flexShrink: 0 }} />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: '#1A1A2E', marginBottom: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item._label}</div>
+                      {item._sub && <div style={{ fontSize: 12, color: '#6B7280' }}>{item._sub}</div>}
+                    </div>
+                    <span style={{ fontSize: 11, padding: '3px 10px', borderRadius: 20, background: c.bg, color: c.color, fontWeight: 600, flexShrink: 0, whiteSpace: 'nowrap' }}>
+                      {item._kind === 'schedule' ? 'Class' : item._kind === 'assessment' ? 'Assessment' : 'Task'}
+                    </span>
+                    <span style={{ fontSize: 11, color: '#9CA3AF', flexShrink: 0 }}>→</span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          <div style={{ marginTop: 12, padding: '9px 14px', background: '#F8FAFC', borderRadius: 8, fontSize: 12, color: '#6B7280', display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+            <span>🗓 {schedItems.filter(i=>i._kind==='schedule').length} classes</span>
+            <span>📝 {schedItems.filter(i=>i._kind==='assessment').length} assessments</span>
+            <span>✅ {schedItems.filter(i=>i._kind==='task').length} tasks</span>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 export default function Dashboard() {
   const navigate = useNavigate();
   const { profile } = useAuth();
@@ -368,26 +464,8 @@ export default function Dashboard() {
         ).map(k => <KPICard key={k.label} {...k} />)}
       </div>
 
-      {/* Staff: My Batches quick info banner */}
-      {profile?.role !== 'ceo' && profile?.role !== 'admin' && batches.length > 0 && (
-        <div style={{ background: 'linear-gradient(135deg,#0F3460 0%,#1E40AF 100%)', borderRadius: 14, padding: '16px 20px', marginBottom: 20, display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
-          <div style={{ flex: 1 }}>
-            <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>Your Assigned Batches</div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-              {batches.map(b => (
-                <span
-                  key={b.id}
-                  onClick={() => { setSchedBatch(b.id); setSchedFilter('all'); }}
-                  style={{ padding: '4px 12px', borderRadius: 20, background: schedBatch === b.id ? '#fff' : 'rgba(255,255,255,0.15)', color: schedBatch === b.id ? '#0F3460' : '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s' }}
-                >
-                  {b.name}
-                </span>
-              ))}
-            </div>
-          </div>
-          <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: 12 }}>Click a batch to view its schedule below ↓</div>
-        </div>
-      )}
+      {/* Batch Activity Hub — shown here for STAFF (right after KPIs), at bottom for CEO */}
+      {(profile?.role !== 'ceo' && profile?.role !== 'admin') && <BatchActivityHub batches={batches} schedBatch={schedBatch} setSchedBatch={setSchedBatch} schedFilter={schedFilter} setSchedFilter={setSchedFilter} schedItems={schedItems} schedLoading={schedLoading} navigate={navigate} Calendar={Calendar} />}
 
       {/* Batches Overview Table — CEO/Admin only */}
       {(profile?.role === 'ceo' || profile?.role === 'admin') &&
@@ -580,92 +658,8 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* Batch Activity Hub */}
-      <div style={{ background: '#fff', borderRadius: 14, border: '1px solid #E5E7EB', padding: '20px 22px', boxShadow: '0 1px 3px rgba(0,0,0,0.08), 0 4px 12px rgba(0,0,0,0.04)', marginTop: 20 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, flexWrap: 'wrap', gap: 10 }}>
-          <h3 style={{ fontSize: 15, fontWeight: 700, color: '#1A1A2E' }}>📅 Batch Activity Hub</h3>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-            <select
-              value={schedBatch}
-              onChange={e => setSchedBatch(e.target.value)}
-              style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid #E5E7EB', fontSize: 13, background: '#F9FAFB', minWidth: 180 }}
-            >
-              <option value="">Select a batch…</option>
-              {batches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
-            </select>
-            {schedBatch && (
-              <div style={{ display: 'flex', gap: 4 }}>
-                {[
-                  { key: 'all', label: 'All' },
-                  { key: 'schedule', label: '🗓 Classes' },
-                  { key: 'assessment', label: '📝 Assessments' },
-                  { key: 'task', label: '✅ Tasks' },
-                ].map(f => (
-                  <button
-                    key={f.key}
-                    onClick={() => setSchedFilter(f.key)}
-                    style={{ padding: '5px 12px', borderRadius: 20, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 600,
-                      background: schedFilter === f.key ? '#0F3460' : '#F3F4F6',
-                      color: schedFilter === f.key ? '#fff' : '#374151' }}
-                  >{f.label}</button>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {!schedBatch && (
-          <div style={{ textAlign: 'center', color: '#9CA3AF', padding: '32px 0', fontSize: 13 }}>
-            <Calendar size={28} style={{ color: '#D1D5DB', marginBottom: 8, display: 'block', margin: '0 auto 8px' }} />
-            Select a batch to view its scheduled classes, assessments, and tasks
-          </div>
-        )}
-
-        {schedBatch && schedLoading && (
-          <div style={{ textAlign: 'center', color: '#9CA3AF', padding: '24px 0', fontSize: 13 }}>Loading…</div>
-        )}
-
-        {schedBatch && !schedLoading && (() => {
-          const filtered = schedFilter === 'all' ? schedItems : schedItems.filter(i => i._kind === schedFilter);
-          const kindColor = { schedule: { bg: '#DBEAFE', color: '#1E40AF', dot: '#3B82F6' }, assessment: { bg: '#D1FAE5', color: '#065F46', dot: '#10B981' }, task: { bg: '#FEF3C7', color: '#92400E', dot: '#F59E0B' } };
-          return (
-            <div>
-              {filtered.length === 0 && (
-                <div style={{ textAlign: 'center', color: '#9CA3AF', padding: '24px 0', fontSize: 13 }}>No items found for this filter.</div>
-              )}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {filtered.map((item, i) => {
-                  const c = kindColor[item._kind] || kindColor.task;
-                  return (
-                    <div
-                      key={item.id || i}
-                      onClick={() => navigate(item._nav)}
-                      style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', borderRadius: 10, border: '1px solid #E5E7EB', cursor: 'pointer', transition: 'background 0.12s' }}
-                      onMouseEnter={e => e.currentTarget.style.background = '#F8FAFC'}
-                      onMouseLeave={e => e.currentTarget.style.background = '#fff'}
-                    >
-                      <div style={{ width: 10, height: 10, borderRadius: '50%', background: c.dot, flexShrink: 0 }} />
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 13, fontWeight: 600, color: '#1A1A2E', marginBottom: 2 }}>{item._label}</div>
-                        {item._sub && <div style={{ fontSize: 12, color: '#6B7280' }}>{item._sub}</div>}
-                      </div>
-                      <span style={{ fontSize: 11, padding: '3px 10px', borderRadius: 20, background: c.bg, color: c.color, fontWeight: 600, flexShrink: 0 }}>
-                        {item._kind === 'schedule' ? 'Class' : item._kind === 'assessment' ? 'Assessment' : 'Task'}
-                      </span>
-                      <span style={{ fontSize: 11, color: '#9CA3AF', flexShrink: 0 }}>→</span>
-                    </div>
-                  );
-                })}
-              </div>
-              <div style={{ marginTop: 14, padding: '10px 14px', background: '#F8FAFC', borderRadius: 8, fontSize: 12, color: '#6B7280', display: 'flex', gap: 16 }}>
-                <span>🗓 {schedItems.filter(i=>i._kind==='schedule').length} classes</span>
-                <span>📝 {schedItems.filter(i=>i._kind==='assessment').length} assessments</span>
-                <span>✅ {schedItems.filter(i=>i._kind==='task').length} tasks</span>
-              </div>
-            </div>
-          );
-        })()}
-      </div>
+      {/* Batch Activity Hub — CEO/Admin sees it here at the bottom */}
+      {(profile?.role === 'ceo' || profile?.role === 'admin') && <BatchActivityHub batches={batches} schedBatch={schedBatch} setSchedBatch={setSchedBatch} schedFilter={schedFilter} setSchedFilter={setSchedFilter} schedItems={schedItems} schedLoading={schedLoading} navigate={navigate} Calendar={Calendar} />}
     </div>
   );
 }
