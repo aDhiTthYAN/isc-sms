@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="_ds/isc-design-system-44b9e318-905b-4330-a4ea-d1d6b542217b/tokens/fonts.css">
+  <link rel="stylesheet" href="_ds/isc-design-system-44b9e318-905b-4330-a4ea-d1d6b542217b/tokens/colors.css">
+  <link rel="stylesheet" href="_ds/isc-design-system-44b9e318-905b-4330-a4ea-d1d6b542217b/tokens/typography.css">
+  <link rel="stylesheet" href="_ds/isc-design-system-44b9e318-905b-4330-a4ea-d1d6b542217b/tokens/spacing.css">
+  <link rel="stylesheet" href="_ds/isc-design-system-44b9e318-905b-4330-a4ea-d1d6b542217b/base.css">
+  <link rel="stylesheet" href="_ds/isc-design-system-44b9e318-905b-4330-a4ea-d1d6b542217b/styles.css">
+  <link rel="stylesheet" href="theme.css">
+  <style>
+    html,body{background:var(--canvas);}
+    .navlink:hover{ background:var(--n-100); }
+    .navlink.is-active:hover{ background:var(--brand-50); }
+    .frow:hover{ background: var(--surface-hover); }
+    ::-webkit-scrollbar{ width:9px; height:9px; }
+  </style>
+</helmet>
+
+<div style="display:flex; height:100vh; overflow:hidden; background:var(--canvas); font-family:var(--font-body); color:var(--text);">
+
+  <!-- ===================== SIDEBAR ===================== -->
+  <dc-import name="Sidebar" active="followups" hint-size="230px,100%"></dc-import>
+
+  <!-- ===================== MAIN ===================== -->
+  <div style="flex:1; display:flex; flex-direction:column; min-width:0; height:100vh;">
+
+    <header style="background:var(--surface); border-bottom:1px solid var(--border); padding:0 26px; height:56px; display:flex; align-items:center; justify-content:space-between; gap:16px; flex-shrink:0;">
+      <div style="display:flex; align-items:center; gap:8px; font-size:12.5px; color:var(--text-muted);">
+        <span>Overview</span>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+        <span style="color:var(--text); font-weight:600;">Follow-Ups</span>
+      </div>
+      <div style="display:flex; align-items:center; gap:12px;">
+        <div class="search-bar" style="width:240px;">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+          <input placeholder="Search students, tasks…" />
+        </div>
+        <button style="position:relative; width:36px; height:36px; border-radius:10px; border:1px solid var(--border); background:var(--surface); display:flex; align-items:center; justify-content:center; cursor:pointer; color:var(--text-sub);">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.268 21a2 2 0 0 0 3.464 0"/><path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"/></svg>
+          <span style="position:absolute; top:-4px; right:-4px; width:8px; height:8px; border-radius:50%; background:var(--brand); border:2px solid var(--surface);"></span>
+        </button>
+        <div style="width:1px; height:26px; background:var(--border);"></div>
+        <div style="display:flex; align-items:center; gap:9px;">
+          <div style="width:32px; height:32px; border-radius:50%; background:var(--grad-brand); display:flex; align-items:center; justify-content:center; font-family:var(--font-display); font-weight:700; font-size:12px; color:#fff;">AD</div>
+          <div>
+            <div style="font-size:13px; font-weight:600; line-height:1.2;">Adithyan R</div>
+            <div style="font-size:11px; color:var(--text-muted);">CEO</div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <main style="flex:1; overflow-y:auto; padding:24px 26px 32px;">
+
+      <!-- Page header -->
+      <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:16px; flex-wrap:wrap; margin-bottom:18px;">
+        <div>
+          <div style="display:flex; align-items:center; gap:10px;">
+            <h2 style="font-size:24px; font-weight:700;">Follow-Up Tracker</h2>
+            <span class="badge badge-amber" style="font-size:11.5px;"><span class="dot"></span>{{ pendingCount }} pending</span>
+          </div>
+          <div style="font-size:13px; color:var(--text-muted); margin-top:3px;">Stay on top of every student touchpoint — assign, track, and close the loop.</div>
+        </div>
+        <button class="btn btn-primary">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+          Assign Follow-Up
+        </button>
+      </div>
+
+      <!-- Toolbar: search + tabs -->
+      <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:16px;">
+        <div class="search-bar" style="width:300px;">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+          <input value="{{ query }}" onInput="{{ onQuery }}" placeholder="Search student, staff, note…" />
+        </div>
+        <div style="flex:1;"></div>
+        <div style="display:inline-flex; background:var(--surface-sunken); border-radius:10px; padding:3px; gap:2px;">
+          <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="4">
+            <button onClick="{{ t.onClick }}" style="display:flex; align-items:center; gap:6px; padding:6px 14px; border:none; border-radius:8px; font-size:12.5px; font-weight:600; cursor:pointer; background:{{ t.bg }}; color:{{ t.color }}; box-shadow:{{ t.shadow }};">
+              {{ t.label }}
+              <sc-if value="{{ t.hasCount }}" hint-placeholder-val="{{ false }}">
+                <span style="font-size:11px; opacity:.7;">{{ t.count }}</span>
+              </sc-if>
+            </button>
+          </sc-for>
+        </div>
+      </div>
+
+      <!-- Table -->
+      <div class="table-container">
+        <div class="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>Student</th>
+                <th style="width:160px;">Assigned To</th>
+                <th>Note</th>
+                <th style="width:110px;">Priority</th>
+                <th style="width:90px;">Date</th>
+                <th style="width:120px;">Status</th>
+                <th style="width:120px;"></th>
+              </tr>
+            </thead>
+            <tbody>
+              <sc-for list="{{ rows }}" as="f" hint-placeholder-count="8">
+                <tr class="frow">
+                  <td>
+                    <div style="display:flex; align-items:center; gap:10px;">
+                      <div style="width:32px; height:32px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-family:var(--font-display); font-weight:700; font-size:11px; color:#fff; flex-shrink:0; background:{{ f.color }};">{{ f.initials }}</div>
+                      <div style="min-width:0;">
+                        <div style="font-size:13.5px; font-weight:600;">{{ f.studentName }}</div>
+                        <div style="font-size:11px; color:var(--text-muted);">by {{ f.assignedBy }}</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td style="font-size:12.5px; color:var(--text-sub);">{{ f.assignedTo }}</td>
+                  <td style="font-size:12.5px; color:var(--text-sub); max-width:280px;">{{ f.note }}</td>
+                  <td><span class="badge {{ f.prioCls }}"><span class="dot"></span>{{ f.prioLabel }}</span></td>
+                  <td style="font-size:12px; color:var(--text-muted);">{{ f.date }}</td>
+                  <td><span class="badge {{ f.statusCls }}"><span class="dot"></span>{{ f.statusLabel }}</span></td>
+                  <td>
+                    <sc-if value="{{ f.open }}" hint-placeholder-val="{{ true }}">
+                      <button onClick="{{ f.onClose }}" class="btn btn-secondary btn-sm">Log &amp; Close</button>
+                    </sc-if>
+                    <sc-if value="{{ f.done }}" hint-placeholder-val="{{ false }}">
+                      <span style="display:inline-flex; align-items:center; gap:5px; font-size:12px; color:var(--green-ink); font-weight:600;">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+                        Closed
+                      </span>
+                    </sc-if>
+                  </td>
+                </tr>
+              </sc-for>
+            </tbody>
+          </table>
+        </div>
+        <sc-if value="{{ isEmpty }}" hint-placeholder-val="{{ false }}">
+          <div style="padding:48px 20px; text-align:center; color:var(--text-muted); font-size:13.5px;">No follow-ups match this view.</div>
+        </sc-if>
+      </div>
+
+    </main>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1320,&quot;height&quot;:850}}">
+class Component extends DCLogic {
+  ACCENTS = ['#E81620','#F4683B','#F5A623','#16A974','#11B4C6','#3B6EF6','#6366F1','#8B5CF6','#EC4899','#6E7488'];
+
+  PRIO = {
+    urgent:{ label:'Urgent', cls:'badge-red' },
+    high:  { label:'High',   cls:'badge-amber' },
+    normal:{ label:'Normal', cls:'badge-gray' },
+  };
+
+  FOLLOWUPS = [
+    { id:'f1', student:'Meera Nair',     by:'Priya Sharma', staff:'Priya Sharma', note:'Confirm batch shift to B-14 and resend the new schedule.', priority:'urgent', date:'Jun 20', completed:false },
+    { id:'f2', student:'Karthik Reddy',  by:'Aisha Khan',   staff:'Aisha Khan',   note:'No login for 14 days — call parent and re-engage.', priority:'urgent', date:'Jun 20', completed:false },
+    { id:'f3', student:'Sahil Gupta',    by:'Vikram Nair',  staff:'Vikram Nair',  note:'Missed 3 mock interviews — reschedule for this week.', priority:'high', date:'Jun 19', completed:false },
+    { id:'f4', student:'Divya Suresh',   by:'Aisha Khan',   staff:'Sneha Patel',  note:'Fees overdue by 12 days — share payment link.', priority:'high', date:'Jun 19', completed:false },
+    { id:'f5', student:'Imran Ali',      by:'Rahul Verma',  staff:'Rahul Verma',  note:'Check IELTS prep progress and clear doubts.', priority:'normal', date:'Jun 18', completed:false },
+    { id:'f6', student:'Pooja Reddy',    by:'Sneha Patel',  staff:'Sneha Patel',  note:'Sent welcome kit — confirm she received it.', priority:'normal', date:'Jun 18', completed:true },
+    { id:'f7', student:'Ananya Iyer',    by:'Priya Sharma', staff:'Priya Sharma', note:'Called — happy with progress, no action needed.', priority:'normal', date:'Jun 17', completed:true },
+    { id:'f8', student:'Vivek Menon',    by:'Arjun Mehta',  staff:'Arjun Mehta',  note:'Explained the new assessment format — resolved.', priority:'high', date:'Jun 16', completed:true },
+  ];
+
+  state = { query:'', filter:'all' };
+
+  initials(name){ const p=name.trim().split(/\s+/); return ((p[0]||'')[0]+((p[1]||'')[0]||'')).toUpperCase(); }
+  color(name){ let h=0; for(const c of name) h=(h*31+c.charCodeAt(0))>>>0; return this.ACCENTS[h%this.ACCENTS.length]; }
+  seg(active){ return { bg:active?'var(--surface)':'transparent', color:active?'var(--text)':'var(--text-muted)', shadow:active?'var(--shadow-xs)':'none' }; }
+
+  renderVals(){
+    const q = this.state.query.trim().toLowerCase();
+    const f = this.state.filter;
+    const pendingCount = this.FOLLOWUPS.filter(x=>!x.completed).length;
+    const urgentCount  = this.FOLLOWUPS.filter(x=>x.priority==='urgent' && !x.completed).length;
+
+    const match = x => {
+      const matchQ = !q || x.student.toLowerCase().includes(q) || x.note.toLowerCase().includes(q) || x.staff.toLowerCase().includes(q);
+      if(f==='pending')   return matchQ && !x.completed;
+      if(f==='urgent')    return matchQ && x.priority==='urgent' && !x.completed;
+      if(f==='completed') return matchQ && x.completed;
+      return matchQ;
+    };
+
+    const rows = this.FOLLOWUPS.filter(match).map(x => {
+      const p = this.PRIO[x.priority] || this.PRIO.normal;
+      return {
+        ...x,
+        studentName:x.student, assignedBy:x.by, assignedTo:x.staff,
+        initials:this.initials(x.student), color:this.color(x.student),
+        prioLabel:p.label, prioCls:p.cls,
+        statusLabel: x.completed ? 'Done' : 'Pending',
+        statusCls: x.completed ? 'badge-green' : 'badge-amber',
+        open: !x.completed, done: x.completed,
+        onClose: () => this.setState(s => ({})),
+      };
+    });
+
+    const mk = (key,label,count) => {
+      const s = this.seg(f===key);
+      return { label, count, hasCount: count!=null, bg:s.bg, color:s.color, shadow:s.shadow, onClick:()=>this.setState({filter:key}) };
+    };
+    const tabs = [
+      mk('all','All', null),
+      mk('pending','Pending', pendingCount),
+      mk('urgent','Urgent', urgentCount),
+      mk('completed','Done', null),
+    ];
+
+    return {
+      rows, tabs, pendingCount,
+      isEmpty: rows.length===0,
+      query:this.state.query, onQuery:(e)=>this.setState({query:e.target.value}),
+    };
+  }
+}
+</script>
+</body>
+</html>

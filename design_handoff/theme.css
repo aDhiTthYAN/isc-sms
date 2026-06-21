@@ -1,0 +1,29 @@
+/* ISC SMS — "Indigo" app theme override (v3)
+   Shifts the product's primary identity from signal-red to a deep indigo-violet,
+   in the spirit of Linear / Height. The real ISC mark stays red; red is now
+   reserved purely for danger / urgent. Loaded AFTER styles.css so these
+   :root values win by source order. Accent families (blue/green/amber/…) are
+   untouched, so the app keeps its colorful lozenges. */
+:root {
+  /* ── Brand → Indigo ─────────────────────────────────── */
+  --brand:        #4F46E5;
+  --brand-600:    #4338CA;   /* hover   */
+  --brand-700:    #3730A3;   /* pressed */
+  --brand-100:    #E0E0FB;   /* soft wash */
+  --brand-50:     #EEEDFE;   /* active nav pill / selected rows */
+  --brand-ink:    #3A30C4;   /* text on brand-50 */
+
+  /* signature gradient + button glow follow the new hue */
+  --grad-brand:   linear-gradient(135deg, #8B83FF 0%, #4F46E5 55%, #3A30C4 100%);
+  --shadow-brand: 0 8px 22px -8px rgba(79, 70, 229, .55);
+
+  /* cooler canvas to pair with indigo chrome */
+  --canvas:         #F4F5FB;
+  --surface-sunken: #EEEFF7;
+  --surface-hover:  #F6F6FC;
+
+  /* a fresh night gradient for hero panels / login, indigo-tinted */
+  --grad-night:   linear-gradient(150deg, #2D2A55 0%, #1A1830 55%, #131124 100%);
+  --grad-indigo:  linear-gradient(135deg, #8B83FF 0%, #4F46E5 50%, #3A30C4 100%);
+  --grad-mesh:    radial-gradient(120% 120% at 10% 0%, #6D63F0 0%, #4F46E5 38%, #3A2FB8 70%, #2A2280 100%);
+}

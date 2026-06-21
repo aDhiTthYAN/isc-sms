@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="_ds/isc-design-system-44b9e318-905b-4330-a4ea-d1d6b542217b/tokens/fonts.css">
+  <link rel="stylesheet" href="_ds/isc-design-system-44b9e318-905b-4330-a4ea-d1d6b542217b/tokens/colors.css">
+  <link rel="stylesheet" href="_ds/isc-design-system-44b9e318-905b-4330-a4ea-d1d6b542217b/tokens/typography.css">
+  <link rel="stylesheet" href="_ds/isc-design-system-44b9e318-905b-4330-a4ea-d1d6b542217b/tokens/spacing.css">
+  <link rel="stylesheet" href="_ds/isc-design-system-44b9e318-905b-4330-a4ea-d1d6b542217b/base.css">
+  <link rel="stylesheet" href="_ds/isc-design-system-44b9e318-905b-4330-a4ea-d1d6b542217b/styles.css">
+  <link rel="stylesheet" href="theme.css">
+  <style>
+    html,body{background:var(--canvas);}
+    .navlink:hover{ background:var(--n-100); }
+    .navlink.is-active:hover{ background:var(--brand-50); }
+    .srow{ transition: background .12s var(--ease); cursor:pointer; }
+    .srow:hover{ background: var(--surface-hover); }
+    .fchip{ transition: all .15s var(--ease); cursor:pointer; }
+    ::-webkit-scrollbar{ width:9px; height:9px; }
+  </style>
+</helmet>
+
+<div style="display:flex; height:100vh; overflow:hidden; background:var(--canvas); font-family:var(--font-body); color:var(--text);">
+
+  <!-- ===================== SIDEBAR ===================== -->
+  <dc-import name="Sidebar" active="students" hint-size="230px,100%"></dc-import>
+
+  <!-- ===================== MAIN ===================== -->
+  <div style="flex:1; display:flex; flex-direction:column; min-width:0; height:100vh;">
+
+    <header style="background:var(--surface); border-bottom:1px solid var(--border); padding:0 26px; height:56px; display:flex; align-items:center; justify-content:space-between; gap:16px; flex-shrink:0;">
+      <div style="display:flex; align-items:center; gap:8px; font-size:12.5px; color:var(--text-muted);">
+        <span>Overview</span>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+        <span style="color:var(--text); font-weight:600;">All Students</span>
+      </div>
+      <div style="display:flex; align-items:center; gap:12px;">
+        <div class="search-bar" style="width:240px;">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+          <input placeholder="Search students, tasks…" />
+        </div>
+        <button style="position:relative; width:36px; height:36px; border-radius:10px; border:1px solid var(--border); background:var(--surface); display:flex; align-items:center; justify-content:center; cursor:pointer; color:var(--text-sub);">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.268 21a2 2 0 0 0 3.464 0"/><path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"/></svg>
+          <span style="position:absolute; top:-4px; right:-4px; width:8px; height:8px; border-radius:50%; background:var(--brand); border:2px solid var(--surface);"></span>
+        </button>
+        <div style="width:1px; height:26px; background:var(--border);"></div>
+        <div style="display:flex; align-items:center; gap:9px;">
+          <div style="width:32px; height:32px; border-radius:50%; background:var(--grad-brand); display:flex; align-items:center; justify-content:center; font-family:var(--font-display); font-weight:700; font-size:12px; color:#fff;">AD</div>
+          <div>
+            <div style="font-size:13px; font-weight:600; line-height:1.2;">Adithyan R</div>
+            <div style="font-size:11px; color:var(--text-muted);">CEO</div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <main style="flex:1; overflow-y:auto; padding:24px 26px 32px;">
+
+      <!-- Page header -->
+      <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:16px; flex-wrap:wrap; margin-bottom:18px;">
+        <div>
+          <h2 style="font-size:24px; font-weight:700;">All Students</h2>
+          <div style="font-size:13px; color:var(--text-muted); margin-top:3px;">Track and manage every enrolled student across all batches.</div>
+        </div>
+        <div style="display:flex; align-items:center; gap:10px;">
+          <button class="btn btn-secondary btn-sm" style="height:38px;">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            Bulk Import
+          </button>
+          <button class="btn btn-primary btn-sm" style="height:38px;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+            Add Student
+          </button>
+        </div>
+      </div>
+
+      <!-- Toolbar -->
+      <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:14px;">
+        <div class="search-bar" style="width:320px;">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+          <input value="{{ query }}" onInput="{{ onQuery }}" placeholder="Search name, phone, ClassPlus ID, email…" />
+        </div>
+        <select class="form-input" value="{{ batch }}" onChange="{{ onBatch }}" style="width:auto; height:38px; min-width:150px;">
+          <option value="all">All batches</option>
+          <option value="B-15 · Spoken English">B-15 · Spoken English</option>
+          <option value="B-14 · IELTS Prep">B-14 · IELTS Prep</option>
+          <option value="B-12 · Soft Skills">B-12 · Soft Skills</option>
+          <option value="A-09 · Interview Prep">A-09 · Interview Prep</option>
+        </select>
+        <div style="flex:1;"></div>
+        <span style="font-size:12.5px; color:var(--text-muted);">{{ filteredCount }} students</span>
+      </div>
+
+      <!-- Status filter chips -->
+      <div style="display:flex; align-items:center; gap:8px; margin-bottom:16px;">
+        <sc-for list="{{ statusChips }}" as="c" hint-placeholder-count="5">
+          <button onClick="{{ c.onClick }}" class="fchip" style="display:inline-flex; align-items:center; gap:7px; padding:6px 13px; border-radius:9999px; border:1px solid {{ c.border }}; background:{{ c.bg }}; color:{{ c.color }}; font-size:12.5px; font-weight:600;">
+            <span style="width:7px; height:7px; border-radius:50%; background:{{ c.dot }};"></span>
+            {{ c.label }}
+            <span style="font-size:11px; opacity:.75;">{{ c.count }}</span>
+          </button>
+        </sc-for>
+      </div>
+
+      <!-- Table -->
+      <div class="table-container">
+        <div class="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>Student</th>
+                <th style="width:140px;">Batch</th>
+                <th style="width:120px;">ClassPlus ID</th>
+                <th style="width:200px;">Progress</th>
+                <th style="width:130px;">Status</th>
+                <th style="width:110px;">Joined</th>
+                <th style="width:50px;"></th>
+              </tr>
+            </thead>
+            <tbody>
+              <sc-for list="{{ rows }}" as="s" hint-placeholder-count="10">
+                <tr class="srow" onClick="{{ s.onOpen }}">
+                  <td>
+                    <div style="display:flex; align-items:center; gap:11px;">
+                      <div style="width:34px; height:34px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-family:var(--font-display); font-weight:700; font-size:12px; color:#fff; flex-shrink:0; background:{{ s.color }};">{{ s.initials }}</div>
+                      <div style="min-width:0;">
+                        <div style="font-size:13.5px; font-weight:600;">{{ s.name }}</div>
+                        <div style="font-size:11.5px; color:var(--text-muted);">{{ s.email }}</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td><span class="chip" style="font-size:11.5px; white-space:nowrap;">{{ s.batchShort }}</span></td>
+                  <td style="font-family:var(--font-display); font-size:12.5px; color:var(--text-sub);">{{ s.cpid }}</td>
+                  <td>
+                    <div style="display:flex; align-items:center; gap:10px;">
+                      <div class="progress-bar" style="flex:1; min-width:80px;">
+                        <div class="progress-fill" style="width:{{ s.progress }}%; background:{{ s.barColor }};"></div>
+                      </div>
+                      <span style="font-size:12px; font-weight:600; color:var(--text-sub); min-width:32px;">{{ s.progress }}%</span>
+                    </div>
+                  </td>
+                  <td><span class="badge {{ s.statusCls }}"><span class="dot"></span>{{ s.statusLabel }}</span></td>
+                  <td style="font-size:12.5px; color:var(--text-sub);">{{ s.joined }}</td>
+                  <td>
+                    <span style="display:flex; color:var(--text-muted); cursor:pointer;"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg></span>
+                  </td>
+                </tr>
+              </sc-for>
+            </tbody>
+          </table>
+        </div>
+        <!-- footer / pagination -->
+        <div style="display:flex; align-items:center; justify-content:space-between; padding:13px 18px; border-top:1px solid var(--border);">
+          <span style="font-size:12.5px; color:var(--text-muted);">Showing <b style="color:var(--text);">{{ filteredCount }}</b> of 248 students</span>
+          <div style="display:flex; align-items:center; gap:6px;">
+            <button class="btn btn-ghost btn-sm" disabled>Prev</button>
+            <button style="width:30px; height:30px; border-radius:8px; border:none; background:var(--brand); color:#fff; font-size:12.5px; font-weight:600; cursor:pointer;">1</button>
+            <button style="width:30px; height:30px; border-radius:8px; border:1px solid var(--border); background:var(--surface); color:var(--text-sub); font-size:12.5px; font-weight:600; cursor:pointer;">2</button>
+            <button style="width:30px; height:30px; border-radius:8px; border:1px solid var(--border); background:var(--surface); color:var(--text-sub); font-size:12.5px; font-weight:600; cursor:pointer;">3</button>
+            <span style="font-size:12.5px; color:var(--text-muted); padding:0 4px;">…</span>
+            <button style="width:30px; height:30px; border-radius:8px; border:1px solid var(--border); background:var(--surface); color:var(--text-sub); font-size:12.5px; font-weight:600; cursor:pointer;">25</button>
+            <button class="btn btn-secondary btn-sm">Next</button>
+          </div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1320,&quot;height&quot;:850}}">
+class Component extends DCLogic {
+  ACCENTS = ['#E81620','#F4683B','#F5A623','#16A974','#11B4C6','#3B6EF6','#6366F1','#8B5CF6','#EC4899','#6E7488'];
+
+  STATUS = {
+    active:   { label:'Active',   cls:'badge-green', dot:'var(--green)' },
+    moderate: { label:'Moderate', cls:'badge-amber', dot:'var(--amber)' },
+    'at-risk':{ label:'At-Risk',  cls:'badge-red',   dot:'var(--red)' },
+    dropped:  { label:'Dropped',  cls:'badge-gray',  dot:'var(--n-400)' },
+  };
+
+  STUDENTS = [
+    { name:'Ananya Iyer',     email:'ananya.iyer@gmail.com',    batch:'B-12 · Soft Skills',    cpid:'CP-10293', progress:88, status:'active',   joined:'May 02' },
+    { name:'Rahul Krishnan',  email:'rahul.k@gmail.com',        batch:'B-14 · IELTS Prep',     cpid:'CP-10288', progress:64, status:'active',   joined:'May 04' },
+    { name:'Meera Nair',      email:'meera.nair@gmail.com',     batch:'B-14 · IELTS Prep',     cpid:'CP-10277', progress:21, status:'at-risk',  joined:'May 06' },
+    { name:'Karthik Reddy',   email:'karthik.r@gmail.com',      batch:'B-12 · Soft Skills',    cpid:'CP-10264', progress:12, status:'at-risk',  joined:'Apr 28' },
+    { name:'Sneha Pillai',    email:'sneha.pillai@gmail.com',   batch:'A-09 · Interview Prep', cpid:'CP-10251', progress:100,status:'active',   joined:'Apr 18' },
+    { name:'Vivek Menon',     email:'vivek.menon@gmail.com',    batch:'B-15 · Spoken English', cpid:'CP-10245', progress:46, status:'moderate', joined:'May 11' },
+    { name:'Divya Suresh',    email:'divya.s@gmail.com',        batch:'B-12 · Soft Skills',    cpid:'CP-10239', progress:18, status:'at-risk',  joined:'Apr 30' },
+    { name:'Arjun Pillai',    email:'arjun.pillai@gmail.com',   batch:'A-09 · Interview Prep', cpid:'CP-10231', progress:77, status:'active',   joined:'Apr 22' },
+    { name:'Fatima Sheikh',   email:'fatima.s@gmail.com',       batch:'B-14 · IELTS Prep',     cpid:'CP-10228', progress:58, status:'moderate', joined:'May 09' },
+    { name:'Imran Ali',       email:'imran.ali@gmail.com',      batch:'B-14 · IELTS Prep',     cpid:'CP-10219', progress:30, status:'at-risk',  joined:'May 01' },
+    { name:'Pooja Reddy',     email:'pooja.reddy@gmail.com',    batch:'B-15 · Spoken English', cpid:'CP-10212', progress:52, status:'moderate', joined:'May 13' },
+    { name:'Sahil Gupta',     email:'sahil.gupta@gmail.com',    batch:'A-09 · Interview Prep', cpid:'CP-10204', progress:8,  status:'dropped',  joined:'Apr 15' },
+  ];
+
+  state = { query:'', batch:'all', status:'all' };
+
+  initials(name){ const p=name.trim().split(/\s+/); return ((p[0]||'')[0]+((p[1]||'')[0]||'')).toUpperCase(); }
+  color(name){ let h=0; for(const c of name) h=(h*31+c.charCodeAt(0))>>>0; return this.ACCENTS[h%this.ACCENTS.length]; }
+  batchShort(b){ return (b.split('·')[0]||b).trim(); }
+
+  renderVals(){
+    const q = this.state.query.trim().toLowerCase();
+    const match = s =>
+      (!q || s.name.toLowerCase().includes(q) || s.email.toLowerCase().includes(q) || s.cpid.toLowerCase().includes(q)) &&
+      (this.state.batch==='all' || s.batch===this.state.batch) &&
+      (this.state.status==='all' || s.status===this.state.status);
+
+    const filtered = this.STUDENTS.filter(match);
+
+    const rows = filtered.map(s => {
+      const st = this.STATUS[s.status];
+      return {
+        ...s,
+        initials:this.initials(s.name), color:this.color(s.name),
+        onOpen: () => { window.location.href = 'Student%20Profile.dc.html'; },
+        batchShort:this.batchShort(s.batch),
+        barColor: s.progress>=80 ? 'var(--green)' : s.progress>=40 ? 'var(--amber)' : 'var(--red)',
+        statusLabel: st.label, statusCls: st.cls,
+      };
+    });
+
+    const counts = { all:this.STUDENTS.length };
+    for(const k of Object.keys(this.STATUS)) counts[k] = this.STUDENTS.filter(s=>s.status===k).length;
+
+    const chip = (key, label, dot) => {
+      const active = this.state.status===key;
+      return {
+        label, count:counts[key], dot,
+        bg: active ? 'var(--brand-50)' : 'var(--surface)',
+        border: active ? 'var(--brand)' : 'var(--border)',
+        color: active ? 'var(--brand-ink)' : 'var(--text-sub)',
+        onClick: () => this.setState(s => ({ status: s.status===key ? 'all' : key })),
+      };
+    };
+    const statusChips = [
+      chip('all','All','var(--n-400)'),
+      chip('active','Active','var(--green)'),
+      chip('moderate','Moderate','var(--amber)'),
+      chip('at-risk','At-Risk','var(--red)'),
+      chip('dropped','Dropped','var(--n-400)'),
+    ];
+
+    return {
+      rows, statusChips, filteredCount: filtered.length,
+      query:this.state.query, onQuery:(e)=>this.setState({query:e.target.value}),
+      batch:this.state.batch, onBatch:(e)=>this.setState({batch:e.target.value}),
+    };
+  }
+}
+</script>
+</body>
+</html>

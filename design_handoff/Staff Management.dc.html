@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="_ds/isc-design-system-44b9e318-905b-4330-a4ea-d1d6b542217b/tokens/fonts.css">
+  <link rel="stylesheet" href="_ds/isc-design-system-44b9e318-905b-4330-a4ea-d1d6b542217b/tokens/colors.css">
+  <link rel="stylesheet" href="_ds/isc-design-system-44b9e318-905b-4330-a4ea-d1d6b542217b/tokens/typography.css">
+  <link rel="stylesheet" href="_ds/isc-design-system-44b9e318-905b-4330-a4ea-d1d6b542217b/tokens/spacing.css">
+  <link rel="stylesheet" href="_ds/isc-design-system-44b9e318-905b-4330-a4ea-d1d6b542217b/base.css">
+  <link rel="stylesheet" href="_ds/isc-design-system-44b9e318-905b-4330-a4ea-d1d6b542217b/styles.css">
+  <link rel="stylesheet" href="theme.css">
+  <style>
+    html,body{background:var(--canvas);}
+    .srow:hover{ background: var(--surface-hover); }
+    ::-webkit-scrollbar{ width:9px; height:9px; }
+  </style>
+</helmet>
+
+<div style="display:flex; height:100vh; overflow:hidden; background:var(--canvas); font-family:var(--font-body); color:var(--text);">
+
+  <dc-import name="Sidebar" active="staff" hint-size="230px,100%"></dc-import>
+
+  <div style="flex:1; display:flex; flex-direction:column; min-width:0; height:100vh;">
+
+    <header style="background:var(--surface); border-bottom:1px solid var(--border); padding:0 26px; height:56px; display:flex; align-items:center; justify-content:space-between; gap:16px; flex-shrink:0;">
+      <div style="display:flex; align-items:center; gap:8px; font-size:12.5px; color:var(--text-muted);">
+        <span>Management</span>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+        <span style="color:var(--text); font-weight:600;">Staff Management</span>
+      </div>
+      <div style="display:flex; align-items:center; gap:9px;">
+        <div style="width:32px; height:32px; border-radius:50%; background:var(--grad-brand); display:flex; align-items:center; justify-content:center; font-family:var(--font-display); font-weight:700; font-size:12px; color:#fff;">AD</div>
+        <div>
+          <div style="font-size:13px; font-weight:600; line-height:1.2;">Adithyan R</div>
+          <div style="font-size:11px; color:var(--text-muted);">CEO</div>
+        </div>
+      </div>
+    </header>
+
+    <main style="flex:1; overflow-y:auto; padding:24px 26px 32px;">
+
+      <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:16px; flex-wrap:wrap; margin-bottom:18px;">
+        <div>
+          <h2 style="font-size:24px; font-weight:700;">Staff Management</h2>
+          <div style="font-size:13px; color:var(--text-muted); margin-top:3px;">Manage team roles, access and batch assignments.</div>
+        </div>
+        <button class="btn btn-primary">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+          Add Staff
+        </button>
+      </div>
+
+      <!-- stat tiles -->
+      <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:16px; margin-bottom:18px;">
+        <div style="background:var(--surface); border:1px solid var(--border); border-radius:14px; box-shadow:var(--shadow-sm); padding:16px 20px; display:flex; align-items:center; gap:14px;">
+          <div style="width:42px; height:42px; border-radius:11px; background:var(--blue-soft); display:flex; align-items:center; justify-content:center;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--blue-ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 21a8 8 0 0 0-16 0"/><circle cx="10" cy="8" r="5"/><path d="M22 20c0-3.37-2-6.5-4-8a5 5 0 0 0-.45-8.3"/></svg></div>
+          <div><div style="font-family:var(--font-display); font-size:24px; font-weight:700; line-height:1;">{{ total }}</div><div style="font-size:12px; color:var(--text-muted); margin-top:3px;">Total staff</div></div>
+        </div>
+        <div style="background:var(--surface); border:1px solid var(--border); border-radius:14px; box-shadow:var(--shadow-sm); padding:16px 20px; display:flex; align-items:center; gap:14px;">
+          <div style="width:42px; height:42px; border-radius:11px; background:var(--violet-soft); display:flex; align-items:center; justify-content:center;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--violet-ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/></svg></div>
+          <div><div style="font-family:var(--font-display); font-size:24px; font-weight:700; line-height:1;">{{ admins }}</div><div style="font-size:12px; color:var(--text-muted); margin-top:3px;">Admins</div></div>
+        </div>
+        <div style="background:var(--surface); border:1px solid var(--border); border-radius:14px; box-shadow:var(--shadow-sm); padding:16px 20px; display:flex; align-items:center; gap:14px;">
+          <div style="width:42px; height:42px; border-radius:11px; background:var(--green-soft); display:flex; align-items:center; justify-content:center;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--green-ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="m9 11 3 3L22 4"/></svg></div>
+          <div><div style="font-family:var(--font-display); font-size:24px; font-weight:700; line-height:1;">{{ active }}</div><div style="font-size:12px; color:var(--text-muted); margin-top:3px;">Active</div></div>
+        </div>
+      </div>
+
+      <!-- table -->
+      <div class="table-container">
+        <div class="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>Member</th>
+                <th style="width:120px;">Role</th>
+                <th style="width:220px;">Email</th>
+                <th style="width:120px;">Batches</th>
+                <th style="width:120px;">Status</th>
+                <th style="width:60px;"></th>
+              </tr>
+            </thead>
+            <tbody>
+              <sc-for list="{{ rows }}" as="s" hint-placeholder-count="7">
+                <tr class="srow">
+                  <td>
+                    <div style="display:flex; align-items:center; gap:11px;">
+                      <div style="width:34px; height:34px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-family:var(--font-display); font-weight:700; font-size:12px; color:#fff; flex-shrink:0; background:{{ s.color }};">{{ s.initials }}</div>
+                      <div style="font-size:13.5px; font-weight:600;">{{ s.name }}</div>
+                    </div>
+                  </td>
+                  <td><span class="badge {{ s.roleCls }}">{{ s.roleLabel }}</span></td>
+                  <td style="font-size:12.5px; color:var(--text-sub);">{{ s.email }}</td>
+                  <td style="font-size:12.5px; color:var(--text-sub);">{{ s.batches }} assigned</td>
+                  <td><span class="badge {{ s.statusCls }}"><span class="dot"></span>{{ s.statusLabel }}</span></td>
+                  <td><span style="display:flex; color:var(--text-muted); cursor:pointer;"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg></span></td>
+                </tr>
+              </sc-for>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </main>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1320,&quot;height&quot;:850}}">
+class Component extends DCLogic {
+  ACCENTS = ['#E81620','#F4683B','#F5A623','#16A974','#11B4C6','#3B6EF6','#6366F1','#8B5CF6','#EC4899','#6E7488'];
+
+  STAFF = [
+    { name:'Priya Sharma', role:'admin', email:'priya@internationalskillsclub.com', batches:3, active:true },
+    { name:'Aisha Khan',   role:'admin', email:'aisha@internationalskillsclub.com', batches:4, active:true },
+    { name:'Rahul Verma',  role:'staff', email:'rahul@internationalskillsclub.com', batches:2, active:true },
+    { name:'Vikram Nair',  role:'staff', email:'vikram@internationalskillsclub.com', batches:2, active:true },
+    { name:'Sneha Patel',  role:'staff', email:'sneha@internationalskillsclub.com', batches:1, active:true },
+    { name:'Arjun Mehta',  role:'staff', email:'arjun@internationalskillsclub.com', batches:2, active:true },
+    { name:'Deepak Rao',   role:'staff', email:'deepak@internationalskillsclub.com', batches:0, active:false },
+  ];
+
+  initials(name){ const p=name.trim().split(/\s+/); return ((p[0]||'')[0]+((p[1]||'')[0]||'')).toUpperCase(); }
+  color(name){ let h=0; for(const c of name) h=(h*31+c.charCodeAt(0))>>>0; return this.ACCENTS[h%this.ACCENTS.length]; }
+
+  renderVals(){
+    const rows = this.STAFF.map(s => ({
+      ...s,
+      initials:this.initials(s.name), color:this.color(s.name),
+      roleLabel: s.role==='admin' ? 'Admin' : 'Staff',
+      roleCls: s.role==='admin' ? 'badge-violet' : 'badge-gray',
+      statusLabel: s.active ? 'Active' : 'Inactive',
+      statusCls: s.active ? 'badge-green' : 'badge-gray',
+    }));
+    return {
+      rows,
+      total: this.STAFF.length,
+      admins: this.STAFF.filter(s=>s.role==='admin').length,
+      active: this.STAFF.filter(s=>s.active).length,
+    };
+  }
+}
+</script>
+</body>
+</html>

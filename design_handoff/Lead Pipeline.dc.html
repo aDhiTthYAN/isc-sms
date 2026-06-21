@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="_ds/isc-design-system-44b9e318-905b-4330-a4ea-d1d6b542217b/tokens/fonts.css">
+  <link rel="stylesheet" href="_ds/isc-design-system-44b9e318-905b-4330-a4ea-d1d6b542217b/tokens/colors.css">
+  <link rel="stylesheet" href="_ds/isc-design-system-44b9e318-905b-4330-a4ea-d1d6b542217b/tokens/typography.css">
+  <link rel="stylesheet" href="_ds/isc-design-system-44b9e318-905b-4330-a4ea-d1d6b542217b/tokens/spacing.css">
+  <link rel="stylesheet" href="_ds/isc-design-system-44b9e318-905b-4330-a4ea-d1d6b542217b/base.css">
+  <link rel="stylesheet" href="_ds/isc-design-system-44b9e318-905b-4330-a4ea-d1d6b542217b/styles.css">
+  <link rel="stylesheet" href="theme.css">
+  <style>
+    html,body{background:var(--canvas);}
+    .lcard{ transition: box-shadow .15s var(--ease), transform .12s var(--ease); }
+    .lcard:hover{ box-shadow: var(--shadow-md); transform: translateY(-1px); }
+    .lcard:active{ cursor:grabbing; }
+    ::-webkit-scrollbar{ width:9px; height:9px; }
+  </style>
+</helmet>
+
+<div style="display:flex; height:100vh; overflow:hidden; background:var(--canvas); font-family:var(--font-body); color:var(--text);">
+
+  <dc-import name="Sidebar" active="leads" hint-size="230px,100%"></dc-import>
+
+  <div style="flex:1; display:flex; flex-direction:column; min-width:0; height:100vh;">
+
+    <header style="background:var(--surface); border-bottom:1px solid var(--border); padding:0 26px; height:56px; display:flex; align-items:center; justify-content:space-between; gap:16px; flex-shrink:0;">
+      <div style="display:flex; align-items:center; gap:8px; font-size:12.5px; color:var(--text-muted);">
+        <span>Operations</span>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+        <span style="color:var(--text); font-weight:600;">Lead Pipeline</span>
+      </div>
+      <div style="display:flex; align-items:center; gap:9px;">
+        <div style="width:32px; height:32px; border-radius:50%; background:var(--grad-brand); display:flex; align-items:center; justify-content:center; font-family:var(--font-display); font-weight:700; font-size:12px; color:#fff;">AD</div>
+        <div><div style="font-size:13px; font-weight:600; line-height:1.2;">Adithyan R</div><div style="font-size:11px; color:var(--text-muted);">CEO</div></div>
+      </div>
+    </header>
+
+    <main style="flex:1; overflow-y:auto; padding:24px 26px 32px;">
+
+      <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:16px; flex-wrap:wrap; margin-bottom:18px;">
+        <div>
+          <h2 style="font-size:24px; font-weight:700;">Lead Pipeline</h2>
+          <div style="font-size:13px; color:var(--text-muted); margin-top:3px;">Track prospective students from first enquiry to enrolment — drag a card to move a stage.</div>
+        </div>
+        <div style="display:flex; align-items:center; gap:14px;">
+          <div style="text-align:right;">
+            <div style="font-size:11.5px; color:var(--text-muted);">Pipeline value</div>
+            <div style="font-family:var(--font-display); font-size:18px; font-weight:700; color:var(--green-ink);">₹4.8L</div>
+          </div>
+          <button class="btn btn-primary">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+            Add Lead
+          </button>
+        </div>
+      </div>
+
+      <div style="display:flex; gap:14px; align-items:flex-start;">
+        <sc-for list="{{ cols }}" as="col" hint-placeholder-count="5">
+          <div onDragOver="{{ col.onDragOver }}" onDrop="{{ col.onDrop }}" style="flex:1; min-width:0; background:{{ col.bg }}; border:1px solid {{ col.bd }}; border-radius:14px; padding:6px; transition:background .15s, border-color .15s;">
+            <div style="padding:11px 12px 9px;">
+              <div style="display:flex; align-items:center; gap:8px;">
+                <span style="width:9px; height:9px; border-radius:50%; background:{{ col.dot }}; flex-shrink:0;"></span>
+                <span style="font-size:11.5px; font-weight:700; text-transform:uppercase; letter-spacing:.03em; color:var(--text-sub); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{{ col.label }}</span>
+                <span class="badge {{ col.badge }}" style="font-size:10.5px; flex-shrink:0;">{{ col.count }}</span>
+              </div>
+              <div style="font-size:11px; color:var(--text-muted); font-family:var(--font-display); font-weight:600; margin-top:5px; padding-left:17px;">{{ col.value }}</div>
+            </div>
+            <div style="display:flex; flex-direction:column; gap:9px; padding:4px; min-height:120px;">
+              <sc-for list="{{ col.cards }}" as="card" hint-placeholder-count="3">
+                <div class="lcard" draggable="true" onDragStart="{{ card.onDragStart }}" onDragEnd="{{ card.onDragEnd }}" style="opacity:{{ card.opacity }}; background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:13px 14px; box-shadow:var(--shadow-sm); cursor:grab;">
+                  <div style="display:flex; align-items:center; gap:10px;">
+                    <div style="width:30px; height:30px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-family:var(--font-display); font-weight:700; font-size:11px; color:#fff; flex-shrink:0; background:{{ card.color }};">{{ card.initials }}</div>
+                    <div style="flex:1; min-width:0;">
+                      <div style="font-size:13.5px; font-weight:600; line-height:1.25;">{{ card.name }}</div>
+                      <div style="font-size:11.5px; color:var(--text-muted); margin-top:1px;">{{ card.phone }}</div>
+                    </div>
+                  </div>
+                  <div style="display:flex; align-items:center; gap:6px; margin-top:10px; flex-wrap:wrap;">
+                    <span class="badge {{ card.courseCls }}" style="font-size:10px;">{{ card.course }}</span>
+                    <span style="display:inline-flex; align-items:center; gap:4px; font-size:11px; color:var(--text-muted);">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="3"/></svg>
+                      {{ card.source }}
+                    </span>
+                  </div>
+                  <div style="display:flex; align-items:center; justify-content:space-between; margin-top:11px; padding-top:10px; border-top:1px solid var(--border);">
+                    <span style="font-family:var(--font-display); font-size:13px; font-weight:700; color:var(--green-ink);">{{ card.value }}</span>
+                    <span style="display:inline-flex; align-items:center; gap:4px; font-size:11px; color:var(--text-muted);">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                      {{ card.age }}
+                    </span>
+                  </div>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+
+    </main>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1320,&quot;height&quot;:850}}">
+class Component extends DCLogic {
+  ACCENTS = ['#E81620','#F4683B','#F5A623','#16A974','#11B4C6','#3B6EF6','#6366F1','#8B5CF6','#EC4899','#6E7488'];
+  COURSES = { 'Spoken English':'badge-blue', 'IELTS':'badge-violet', 'Soft Skills':'badge-teal', 'Interview Prep':'badge-amber', 'Business Eng':'badge-indigo' };
+  COLS = [
+    { key:'new',       label:'New Enquiry', dot:'var(--slate)',  badge:'badge-gray' },
+    { key:'contacted', label:'Contacted',   dot:'var(--blue)',   badge:'badge-blue' },
+    { key:'demo',      label:'Demo Booked', dot:'var(--violet)', badge:'badge-violet' },
+    { key:'negotiation', label:'Negotiation', dot:'var(--amber)', badge:'badge-amber' },
+    { key:'won',       label:'Enrolled',    dot:'var(--green)',  badge:'badge-green' },
+  ];
+
+  state = {
+    dragId:null, dragOver:null,
+    leads: [
+      { id:'l1', name:'Ananya Pillai',  phone:'98461 23410', course:'Spoken English', source:'Instagram', value:'₹18k', age:'2d', stage:'new' },
+      { id:'l2', name:'Joel Thomas',    phone:'90372 88120', course:'IELTS',          source:'Referral',  value:'₹35k', age:'1d', stage:'new' },
+      { id:'l3', name:'Riya Menon',     phone:'80890 55471', course:'Soft Skills',    source:'Website',   value:'₹12k', age:'4d', stage:'new' },
+      { id:'l4', name:'Hari Krishnan',  phone:'97441 09823', course:'Interview Prep', source:'Walk-in',   value:'₹22k', age:'3d', stage:'contacted' },
+      { id:'l5', name:'Nimisha S',      phone:'99465 21008', course:'IELTS',          source:'Instagram', value:'₹35k', age:'5d', stage:'contacted' },
+      { id:'l6', name:'Akhil Raj',      phone:'70128 44590', course:'Business Eng',   source:'Referral',  value:'₹28k', age:'2d', stage:'contacted' },
+      { id:'l7', name:'Sandra Jose',    phone:'85890 33271', course:'Spoken English', source:'Website',   value:'₹18k', age:'6d', stage:'demo' },
+      { id:'l8', name:'Vivek Anand',    phone:'94009 11823', course:'IELTS',          source:'Instagram', value:'₹35k', age:'1d', stage:'demo' },
+      { id:'l9', name:'Fathima Noor',   phone:'97890 22013', course:'Soft Skills',    source:'Walk-in',   value:'₹12k', age:'8d', stage:'negotiation' },
+      { id:'l10',name:'Rohit Varma',    phone:'80123 99457', course:'Interview Prep', source:'Referral',  value:'₹22k', age:'3d', stage:'negotiation' },
+      { id:'l11',name:'Lakshmi Nair',   phone:'99001 56743', course:'Spoken English', source:'Website',   value:'₹18k', age:'1d', stage:'won' },
+      { id:'l12',name:'Aravind P',      phone:'90087 33419', course:'Business Eng',   source:'Referral',  value:'₹28k', age:'2d', stage:'won' },
+    ],
+  };
+
+  initials(name){ const p=name.trim().split(/\s+/); return ((p[0]||'')[0]+((p[1]||'')[0]||'')).toUpperCase(); }
+  color(name){ let h=0; for(const c of name) h=(h*31+c.charCodeAt(0))>>>0; return this.ACCENTS[h%this.ACCENTS.length]; }
+  numVal(v){
+    const n = parseFloat(String(v).replace(/[^\d.]/g,'')) || 0;
+    if(/L/i.test(v)) return n*100000;
+    if(/k/i.test(v)) return n*1000;
+    return n;
+  }
+
+  drop(stage){
+    const id=this.state.dragId; if(!id){ this.setState({dragOver:null}); return; }
+    this.setState(s => ({ leads: s.leads.map(l => l.id===id ? {...l, stage} : l), dragId:null, dragOver:null }));
+  }
+
+  renderVals(){
+    const cols = this.COLS.map(c => {
+      const cards = this.state.leads.filter(l => l.stage===c.key).map(l => ({
+        ...l, initials:this.initials(l.name), color:this.color(l.name),
+        courseCls: this.COURSES[l.course] || 'badge-gray',
+        opacity: this.state.dragId===l.id ? 0.35 : 1,
+        onDragStart: () => this.setState({ dragId:l.id }),
+        onDragEnd: () => this.setState({ dragId:null, dragOver:null }),
+      }));
+      const sum = cards.reduce((a,l)=>a+this.numVal(l.value),0);
+      const over = this.state.dragOver===c.key;
+      return {
+        ...c, cards, count:cards.length,
+        value: sum>=100000 ? '₹'+(sum/100000).toFixed(1)+'L' : '₹'+Math.round(sum/1000)+'k',
+        bg: over ? 'var(--brand-50)' : 'var(--surface-sunken)',
+        bd: over ? 'var(--brand)' : 'transparent',
+        onDragOver: (e) => { e.preventDefault(); if(this.state.dragOver!==c.key) this.setState({ dragOver:c.key }); },
+        onDrop: (e) => { e.preventDefault(); this.drop(c.key); },
+      };
+    });
+    return { cols };
+  }
+}
+</script>
+</body>
+</html>
