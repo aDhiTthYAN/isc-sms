@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import {
   getMyStudents, getMyTasks, getMyFollowUps, getStaffBatches, updateTask,
   getMyNotifications, markNotificationRead, getMyRequests, updateRequest, addNotification, createRequest,
+  getBatchSchedules, getBatchTasks, getAssessments,
 } from '../firebase/services';
 import { collection, getDocs, query, where } from 'firebase/firestore';
 import { db } from '../firebase/config';
@@ -35,6 +36,12 @@ export default function StaffDashboard() {
   const [sidebarTab,      setSidebarTab]      = useState('notif'); // 'notif' | 'requests'
   const [reminding,       setReminding]       = useState({});
 
+  // Batch Activity Hub
+  const [hubBatch,    setHubBatch]    = useState('');
+  const [hubItems,    setHubItems]    = useState([]);
+  const [hubLoading,  setHubLoading]  = useState(false);
+  const [hubFilter,   setHubFilter]   = useState('all');
+
   useEffect(() => {
     const load = async () => {
       try {
@@ -60,6 +67,29 @@ export default function StaffDashboard() {
     };
     if (profile?.uid) load();
   }, [profile?.uid]);
+
+  // Auto-select first batch when myBatches loads
+  useEffect(() => {
+    if (myBatches.length > 0 && !hubBatch) setHubBatch(myBatches[0].id);
+  }, [myBatches]);
+
+  // Load hub items whenever selected batch changes
+  useEffect(() => {
+    if (!hubBatch) return setHubItems([]);
+    setHubLoading(true);
+    Promise.all([
+      getBatchSchedules(hubBatch).catch(() => []),
+      getAssessments(hubBatch).catch(() => []),
+      getBatchTasks(hubBatch).catch(() => []),
+    ]).then(([scheds, asmts, bTasks]) => {
+      setHubItems([
+        ...scheds.map(s => ({ ...s, _kind: 'schedule',   _label: s.title || 'Class',       _sub: s.recurring ? `Every ${s.day} at ${s.time}` : `${s.scheduledDate || ''} at ${s.time}` })),
+        ...asmts.map(a  => ({ ...a,  _kind: 'assessment', _label: a.title || 'Assessment',  _sub: `${a.date || '—'} · ${a.totalMarks || ''} marks` })),
+        ...bTasks.map(t => ({ ...t,  _kind: 'task',       _label: t.title || 'Task',        _sub: t.assignedFaculty || '' })),
+      ]);
+      setHubLoading(false);
+    });
+  }, [hubBatch]);
 
   if (loading) return <Loading text="Loading your dashboard..." />;
 
@@ -233,6 +263,96 @@ export default function StaffDashboard() {
             </div>
           );
         })}
+      </div>
+
+      {/* ── Batch Activity Hub ── */}
+      <div style={{ ...CARD, marginBottom: 20 }}>
+        {/* Header */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, flexWrap: 'wrap', gap: 10 }}>
+          <h3 style={{ fontSize: 15, fontWeight: 700, color: '#1A1A2E' }}>📅 Batch Activity Hub</h3>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+            {/* Batch chips */}
+            {myBatches.map(b => (
+              <button key={b.id} onClick={() => { setHubBatch(b.id); setHubFilter('all'); }}
+                style={{ padding: '5px 14px', borderRadius: 20, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 600, transition: 'all 0.15s',
+                  background: hubBatch === b.id ? '#0F3460' : '#F3F4F6',
+                  color:      hubBatch === b.id ? '#fff'    : '#374151' }}>
+                {b.name}
+              </button>
+            ))}
+            {/* Filter pills */}
+            {hubBatch && (
+              <div style={{ display: 'flex', gap: 4, marginLeft: 8 }}>
+                {[
+                  { key: 'all',        label: 'All'            },
+                  { key: 'schedule',   label: '🗓 Classes'     },
+                  { key: 'assessment', label: '📝 Assessments' },
+                  { key: 'task',       label: '✅ Tasks'       },
+                ].map(f => (
+                  <button key={f.key} onClick={() => setHubFilter(f.key)}
+                    style={{ padding: '4px 11px', borderRadius: 20, border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 600,
+                      background: hubFilter === f.key ? '#E53935' : '#F3F4F6',
+                      color:      hubFilter === f.key ? '#fff'    : '#374151' }}>
+                    {f.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Content */}
+        {!hubBatch && (
+          <div style={{ textAlign: 'center', color: '#9CA3AF', padding: '28px 0', fontSize: 13 }}>
+            No batches assigned yet.
+          </div>
+        )}
+        {hubBatch && hubLoading && (
+          <div style={{ textAlign: 'center', color: '#9CA3AF', padding: '20px 0', fontSize: 13 }}>Loading…</div>
+        )}
+        {hubBatch && !hubLoading && (() => {
+          const kindColor = {
+            schedule:   { bg: '#DBEAFE', color: '#1E40AF', dot: '#3B82F6' },
+            assessment: { bg: '#D1FAE5', color: '#065F46', dot: '#10B981' },
+            task:       { bg: '#FEF3C7', color: '#92400E', dot: '#F59E0B' },
+          };
+          const list = hubFilter === 'all' ? hubItems : hubItems.filter(i => i._kind === hubFilter);
+          return (
+            <>
+              {list.length === 0 ? (
+                <div style={{ textAlign: 'center', color: '#9CA3AF', padding: '20px 0', fontSize: 13 }}>Nothing here yet.</div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 380, overflowY: 'auto' }}>
+                  {list.map((item, i) => {
+                    const c = kindColor[item._kind] || kindColor.task;
+                    const nav = item._kind === 'schedule' ? '/batches' : item._kind === 'assessment' ? '/assessments' : '/tasks';
+                    return (
+                      <div key={item.id || i} onClick={() => navigate(nav)}
+                        style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 14px', borderRadius: 10, border: '1px solid #E5E7EB', cursor: 'pointer', background: '#fff', transition: 'background 0.12s' }}
+                        onMouseEnter={e => e.currentTarget.style.background = '#F8FAFC'}
+                        onMouseLeave={e => e.currentTarget.style.background = '#fff'}>
+                        <div style={{ width: 10, height: 10, borderRadius: '50%', background: c.dot, flexShrink: 0 }} />
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 13, fontWeight: 600, color: '#1A1A2E', marginBottom: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item._label}</div>
+                          {item._sub && <div style={{ fontSize: 12, color: '#6B7280' }}>{item._sub}</div>}
+                        </div>
+                        <span style={{ fontSize: 11, padding: '3px 10px', borderRadius: 20, background: c.bg, color: c.color, fontWeight: 600, flexShrink: 0, whiteSpace: 'nowrap' }}>
+                          {item._kind === 'schedule' ? 'Class' : item._kind === 'assessment' ? 'Assessment' : 'Task'}
+                        </span>
+                        <span style={{ fontSize: 11, color: '#9CA3AF' }}>→</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+              <div style={{ marginTop: 12, padding: '8px 12px', background: '#F8FAFC', borderRadius: 8, fontSize: 12, color: '#6B7280', display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+                <span>🗓 {hubItems.filter(i=>i._kind==='schedule').length} classes</span>
+                <span>📝 {hubItems.filter(i=>i._kind==='assessment').length} assessments</span>
+                <span>✅ {hubItems.filter(i=>i._kind==='task').length} tasks</span>
+              </div>
+            </>
+          );
+        })()}
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
