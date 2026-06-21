@@ -41,6 +41,10 @@ export default function StaffDashboard() {
   const [hubItems,    setHubItems]    = useState([]);
   const [hubLoading,  setHubLoading]  = useState(false);
   const [hubFilter,   setHubFilter]   = useState('all');
+  const [hubSearch,   setHubSearch]   = useState('');
+  const [hubTypeFilter, setHubTypeFilter] = useState(''); // dropdown type within category
+  const HUB_PAGE = 20;
+  const [hubPage, setHubPage] = useState(0);
 
   useEffect(() => {
     const load = async () => {
@@ -68,6 +72,107 @@ export default function StaffDashboard() {
     if (profile?.uid) load();
   }, [profile?.uid]);
 
+  // ── Due-today & 1-hour-before reminders ──────────────────────────────────
+  useEffect(() => {
+    if (!myBatches.length || !profile?.email) return;
+
+    const parseMinutes = (timeStr) => {
+      if (!timeStr) return null;
+      // handles "10:30 AM", "14:30", "2:30 PM"
+      const clean = timeStr.trim();
+      const match = clean.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)?$/i);
+      if (!match) return null;
+      let h = parseInt(match[1], 10);
+      const m = parseInt(match[2], 10);
+      const meridiem = (match[3] || '').toUpperCase();
+      if (meridiem === 'PM' && h !== 12) h += 12;
+      if (meridiem === 'AM' && h === 12) h = 0;
+      return h * 60 + m;
+    };
+
+    const DAYS = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+
+    const runChecks = async () => {
+      const now      = new Date();
+      const todayStr = now.toISOString().slice(0, 10);
+      const dayName  = DAYS[now.getDay()];
+      const nowMins  = now.getHours() * 60 + now.getMinutes();
+
+      for (const batch of myBatches) {
+        const [scheds, asmts, bTasks] = await Promise.all([
+          getBatchSchedules(batch.id).catch(() => []),
+          getAssessments(batch.id).catch(() => []),
+          getBatchTasks(batch.id).catch(() => []),
+        ]);
+
+        // 1-hour-before schedule reminder
+        for (const s of scheds) {
+          const key = `rem_sched_${s.id}_${todayStr}`;
+          if (localStorage.getItem(key)) continue;
+          const isToday =
+            (s.recurring && s.day === dayName) ||
+            (!s.recurring && s.scheduledDate === todayStr);
+          if (!isToday) continue;
+          const schedMins = parseMinutes(s.time);
+          if (schedMins === null) continue;
+          const diff = schedMins - nowMins;
+          if (diff >= 0 && diff <= 60) {
+            await addNotification({
+              toEmail: profile.email,
+              title: 'Class Starting Soon',
+              message: `"${s.title || 'Class'}" starts at ${s.time} in ${batch.name || 'your batch'}`,
+              type: 'followup',
+              fromName: 'Reminder',
+              read: false,
+              createdAt: new Date(),
+            }).catch(() => {});
+            localStorage.setItem(key, '1');
+          }
+        }
+
+        // Assessment due today
+        for (const a of asmts) {
+          if (a.status === 'completed') continue;
+          if (a.date !== todayStr) continue;
+          const key = `rem_asmt_${a.id}_${todayStr}`;
+          if (localStorage.getItem(key)) continue;
+          await addNotification({
+            toEmail: profile.email,
+            title: 'Assessment Due Today',
+            message: `"${a.title || 'Assessment'}" is due today in ${batch.name || 'your batch'}`,
+            type: 'concern',
+            fromName: 'Reminder',
+            read: false,
+            createdAt: new Date(),
+          }).catch(() => {});
+          localStorage.setItem(key, '1');
+        }
+
+        // Task/assignment due today
+        for (const t of bTasks) {
+          if (t.status === 'completed' || t.status === 'submitted') continue;
+          if (t.dueDate !== todayStr) continue;
+          const key = `rem_task_${t.id}_${todayStr}`;
+          if (localStorage.getItem(key)) continue;
+          await addNotification({
+            toEmail: profile.email,
+            title: 'Assignment Due Today',
+            message: `"${t.title || 'Assignment'}" is due today in ${batch.name || 'your batch'}`,
+            type: 'task',
+            fromName: 'Reminder',
+            read: false,
+            createdAt: new Date(),
+          }).catch(() => {});
+          localStorage.setItem(key, '1');
+        }
+      }
+    };
+
+    runChecks();
+    const interval = setInterval(runChecks, 5 * 60 * 1000); // recheck every 5 min
+    return () => clearInterval(interval);
+  }, [myBatches, profile?.email]);
+
   // Auto-select first batch when myBatches loads
   useEffect(() => {
     if (myBatches.length > 0 && !hubBatch) setHubBatch(myBatches[0].id);
@@ -83,10 +188,29 @@ export default function StaffDashboard() {
       getBatchTasks(hubBatch).catch(() => []),
     ]).then(([scheds, asmts, bTasks]) => {
       setHubItems([
-        ...scheds.map(s => ({ ...s, _kind: 'schedule',   _label: s.title || 'Class',       _sub: s.recurring ? `Every ${s.day} at ${s.time}` : `${s.scheduledDate || ''} at ${s.time}` })),
-        ...asmts.map(a  => ({ ...a,  _kind: 'assessment', _label: a.title || 'Assessment',  _sub: `${a.date || '—'} · ${a.totalMarks || ''} marks` })),
-        ...bTasks.map(t => ({ ...t,  _kind: 'task',       _label: t.title || 'Task',        _sub: t.assignedFaculty || '' })),
+        // Schedules — all are "active" (no completed state for schedules)
+        ...scheds.map(s => ({ ...s, _kind: 'schedule',
+          _label: s.title || 'Class',
+          _sub: s.recurring ? `Every ${s.day} at ${s.time}` : `${s.scheduledDate || ''} at ${s.time}`,
+          _type: s.type || 'live-class',
+          _course: s.course || '',
+        })),
+        // Assessments — exclude completed
+        ...asmts.filter(a => a.status !== 'completed').map(a => ({ ...a, _kind: 'assessment',
+          _label: a.title || 'Assessment',
+          _sub: `${a.date || '—'} · ${a.totalMarks || ''} marks`,
+          _type: a.subject || '',
+          _course: a.course || '',
+        })),
+        // Batch tasks — exclude completed/submitted
+        ...bTasks.filter(t => t.status !== 'completed' && t.status !== 'submitted').map(t => ({ ...t, _kind: 'task',
+          _label: t.title || 'Task',
+          _sub: `${t.subject || ''} · Due: ${t.dueDate || '—'}`,
+          _type: t.subject || '',
+          _course: t.course || '',
+        })),
       ]);
+      setHubPage(0);
       setHubLoading(false);
     });
   }, [hubBatch]);
@@ -266,94 +390,149 @@ export default function StaffDashboard() {
       </div>
 
       {/* ── Batch Activity Hub ── */}
-      <div style={{ ...CARD, marginBottom: 20 }}>
-        {/* Header */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, flexWrap: 'wrap', gap: 10 }}>
-          <h3 style={{ fontSize: 15, fontWeight: 700, color: '#1A1A2E' }}>📅 Batch Activity Hub</h3>
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
-            {/* Batch chips */}
-            {myBatches.map(b => (
-              <button key={b.id} onClick={() => { setHubBatch(b.id); setHubFilter('all'); }}
-                style={{ padding: '5px 14px', borderRadius: 20, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 600, transition: 'all 0.15s',
-                  background: hubBatch === b.id ? '#0F3460' : '#F3F4F6',
-                  color:      hubBatch === b.id ? '#fff'    : '#374151' }}>
-                {b.name}
-              </button>
-            ))}
-            {/* Filter pills */}
-            {hubBatch && (
-              <div style={{ display: 'flex', gap: 4, marginLeft: 8 }}>
-                {[
-                  { key: 'all',        label: 'All'            },
-                  { key: 'schedule',   label: '🗓 Classes'     },
-                  { key: 'assessment', label: '📝 Assessments' },
-                  { key: 'task',       label: '✅ Tasks'       },
-                ].map(f => (
-                  <button key={f.key} onClick={() => setHubFilter(f.key)}
-                    style={{ padding: '4px 11px', borderRadius: 20, border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 600,
-                      background: hubFilter === f.key ? '#E53935' : '#F3F4F6',
-                      color:      hubFilter === f.key ? '#fff'    : '#374151' }}>
-                    {f.label}
+      {(() => {
+        const kindColor = {
+          schedule:   { bg: '#DBEAFE', color: '#1E40AF', dot: '#3B82F6' },
+          assessment: { bg: '#D1FAE5', color: '#065F46', dot: '#10B981' },
+          task:       { bg: '#FEF3C7', color: '#92400E', dot: '#F59E0B' },
+        };
+        // Derive dropdown options from loaded items
+        const typeOptions = [...new Set(hubItems.filter(i => hubFilter === 'all' || i._kind === hubFilter).map(i => i._type).filter(Boolean))];
+        const courseOptions = [...new Set(hubItems.map(i => i._course).filter(Boolean))];
+
+        // Apply all filters
+        let list = hubItems;
+        if (hubFilter !== 'all') list = list.filter(i => i._kind === hubFilter);
+        if (hubTypeFilter)       list = list.filter(i => i._type === hubTypeFilter);
+        if (hubSearch.trim())    list = list.filter(i => i._label.toLowerCase().includes(hubSearch.toLowerCase()) || (i._sub||'').toLowerCase().includes(hubSearch.toLowerCase()));
+
+        const totalPages = Math.ceil(list.length / HUB_PAGE);
+        const pageList   = list.slice(hubPage * HUB_PAGE, (hubPage + 1) * HUB_PAGE);
+
+        return (
+          <div style={{ ...CARD, marginBottom: 20 }}>
+            {/* Title + batch chips row */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
+              <h3 style={{ fontSize: 15, fontWeight: 700, color: '#1A1A2E' }}>📅 Batch Activity Hub <span style={{ fontSize: 12, color: '#9CA3AF', fontWeight: 400 }}>(active only)</span></h3>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                {myBatches.map(b => (
+                  <button key={b.id} onClick={() => { setHubBatch(b.id); setHubFilter('all'); setHubTypeFilter(''); setHubSearch(''); setHubPage(0); }}
+                    style={{ padding: '5px 14px', borderRadius: 20, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 600, transition: 'all 0.15s',
+                      background: hubBatch === b.id ? '#0F3460' : '#F3F4F6',
+                      color:      hubBatch === b.id ? '#fff'    : '#374151' }}>
+                    {b.name}
                   </button>
                 ))}
               </div>
+            </div>
+
+            {/* Filter bar */}
+            {hubBatch && (
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: 12, padding: '10px 12px', background: '#F8FAFC', borderRadius: 10, border: '1px solid #E5E7EB' }}>
+                {/* Category pills */}
+                <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                  {[
+                    { key: 'all',        label: 'All'            },
+                    { key: 'schedule',   label: '🗓 Classes'     },
+                    { key: 'assessment', label: '📝 Assessments' },
+                    { key: 'task',       label: '✅ Assignments'  },
+                  ].map(f => (
+                    <button key={f.key} onClick={() => { setHubFilter(f.key); setHubTypeFilter(''); setHubPage(0); }}
+                      style={{ padding: '4px 12px', borderRadius: 20, border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 600,
+                        background: hubFilter === f.key ? '#0F3460' : '#E5E7EB',
+                        color:      hubFilter === f.key ? '#fff'    : '#374151' }}>
+                      {f.label}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Subject/type dropdown — only when meaningful */}
+                {typeOptions.length > 0 && (
+                  <select value={hubTypeFilter} onChange={e => { setHubTypeFilter(e.target.value); setHubPage(0); }}
+                    style={{ padding: '4px 10px', borderRadius: 8, border: '1px solid #E5E7EB', fontSize: 12, background: '#fff', color: '#374151' }}>
+                    <option value="">All {hubFilter === 'schedule' ? 'types' : hubFilter === 'assessment' ? 'subjects' : 'subjects'}</option>
+                    {typeOptions.map(t => <option key={t} value={t}>{t}</option>)}
+                  </select>
+                )}
+
+                {/* Search */}
+                <input
+                  placeholder="Search…"
+                  value={hubSearch}
+                  onChange={e => { setHubSearch(e.target.value); setHubPage(0); }}
+                  style={{ padding: '4px 10px', borderRadius: 8, border: '1px solid #E5E7EB', fontSize: 12, background: '#fff', minWidth: 140, flex: 1 }}
+                />
+
+                {/* Clear */}
+                {(hubSearch || hubTypeFilter || hubFilter !== 'all') && (
+                  <button onClick={() => { setHubFilter('all'); setHubTypeFilter(''); setHubSearch(''); setHubPage(0); }}
+                    style={{ padding: '4px 10px', borderRadius: 8, border: '1px solid #E5E7EB', fontSize: 11, background: '#fff', cursor: 'pointer', color: '#E53935', fontWeight: 600 }}>
+                    Clear
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* Content */}
+            {!hubBatch && (
+              <div style={{ textAlign: 'center', color: '#9CA3AF', padding: '28px 0', fontSize: 13 }}>No batches assigned yet.</div>
+            )}
+            {hubBatch && hubLoading && (
+              <div style={{ textAlign: 'center', color: '#9CA3AF', padding: '20px 0', fontSize: 13 }}>Loading…</div>
+            )}
+            {hubBatch && !hubLoading && (
+              <>
+                {/* Count row */}
+                <div style={{ display: 'flex', gap: 16, marginBottom: 10, fontSize: 12, color: '#6B7280', flexWrap: 'wrap' }}>
+                  <span style={{ fontWeight: 600, color: '#1A1A2E' }}>{list.length} item{list.length !== 1 ? 's' : ''}</span>
+                  <span>🗓 {hubItems.filter(i=>i._kind==='schedule').length} classes</span>
+                  <span>📝 {hubItems.filter(i=>i._kind==='assessment').length} assessments</span>
+                  <span>✅ {hubItems.filter(i=>i._kind==='task').length} assignments</span>
+                </div>
+
+                {pageList.length === 0 ? (
+                  <div style={{ textAlign: 'center', color: '#9CA3AF', padding: '20px 0', fontSize: 13 }}>No active items match your filters.</div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    {pageList.map((item, i) => {
+                      const c = kindColor[item._kind] || kindColor.task;
+                      const nav = item._kind === 'schedule' ? '/batches' : item._kind === 'assessment' ? '/assessments' : '/tasks';
+                      return (
+                        <div key={item.id || i} onClick={() => navigate(nav)}
+                          style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', borderRadius: 10, border: '1px solid #E5E7EB', cursor: 'pointer', background: '#fff', transition: 'background 0.12s' }}
+                          onMouseEnter={e => e.currentTarget.style.background = '#F8FAFC'}
+                          onMouseLeave={e => e.currentTarget.style.background = '#fff'}>
+                          <div style={{ width: 9, height: 9, borderRadius: '50%', background: c.dot, flexShrink: 0 }} />
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: 13, fontWeight: 600, color: '#1A1A2E', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item._label}</div>
+                            {item._sub && <div style={{ fontSize: 11, color: '#6B7280', marginTop: 1 }}>{item._sub}</div>}
+                          </div>
+                          {item._type && (
+                            <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 20, background: '#F3F4F6', color: '#374151', fontWeight: 500, flexShrink: 0, whiteSpace: 'nowrap' }}>{item._type}</span>
+                          )}
+                          <span style={{ fontSize: 11, padding: '3px 10px', borderRadius: 20, background: c.bg, color: c.color, fontWeight: 600, flexShrink: 0, whiteSpace: 'nowrap' }}>
+                            {item._kind === 'schedule' ? 'Class' : item._kind === 'assessment' ? 'Assessment' : 'Assignment'}
+                          </span>
+                          <span style={{ fontSize: 11, color: '#9CA3AF', flexShrink: 0 }}>→</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Pagination */}
+                {totalPages > 1 && (
+                  <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 8, marginTop: 14, paddingTop: 12, borderTop: '1px solid #F3F4F6' }}>
+                    <button className="btn btn-ghost btn-sm" disabled={hubPage === 0} onClick={() => setHubPage(p => p - 1)}>← Prev</button>
+                    <span style={{ fontSize: 12, color: '#6B7280' }}>Page {hubPage + 1} of {totalPages} · {list.length} items</span>
+                    <button className="btn btn-ghost btn-sm" disabled={hubPage >= totalPages - 1} onClick={() => setHubPage(p => p + 1)}>Next →</button>
+                  </div>
+                )}
+              </>
             )}
           </div>
-        </div>
-
-        {/* Content */}
-        {!hubBatch && (
-          <div style={{ textAlign: 'center', color: '#9CA3AF', padding: '28px 0', fontSize: 13 }}>
-            No batches assigned yet.
-          </div>
-        )}
-        {hubBatch && hubLoading && (
-          <div style={{ textAlign: 'center', color: '#9CA3AF', padding: '20px 0', fontSize: 13 }}>Loading…</div>
-        )}
-        {hubBatch && !hubLoading && (() => {
-          const kindColor = {
-            schedule:   { bg: '#DBEAFE', color: '#1E40AF', dot: '#3B82F6' },
-            assessment: { bg: '#D1FAE5', color: '#065F46', dot: '#10B981' },
-            task:       { bg: '#FEF3C7', color: '#92400E', dot: '#F59E0B' },
-          };
-          const list = hubFilter === 'all' ? hubItems : hubItems.filter(i => i._kind === hubFilter);
-          return (
-            <>
-              {list.length === 0 ? (
-                <div style={{ textAlign: 'center', color: '#9CA3AF', padding: '20px 0', fontSize: 13 }}>Nothing here yet.</div>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 380, overflowY: 'auto' }}>
-                  {list.map((item, i) => {
-                    const c = kindColor[item._kind] || kindColor.task;
-                    const nav = item._kind === 'schedule' ? '/batches' : item._kind === 'assessment' ? '/assessments' : '/tasks';
-                    return (
-                      <div key={item.id || i} onClick={() => navigate(nav)}
-                        style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 14px', borderRadius: 10, border: '1px solid #E5E7EB', cursor: 'pointer', background: '#fff', transition: 'background 0.12s' }}
-                        onMouseEnter={e => e.currentTarget.style.background = '#F8FAFC'}
-                        onMouseLeave={e => e.currentTarget.style.background = '#fff'}>
-                        <div style={{ width: 10, height: 10, borderRadius: '50%', background: c.dot, flexShrink: 0 }} />
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: 13, fontWeight: 600, color: '#1A1A2E', marginBottom: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item._label}</div>
-                          {item._sub && <div style={{ fontSize: 12, color: '#6B7280' }}>{item._sub}</div>}
-                        </div>
-                        <span style={{ fontSize: 11, padding: '3px 10px', borderRadius: 20, background: c.bg, color: c.color, fontWeight: 600, flexShrink: 0, whiteSpace: 'nowrap' }}>
-                          {item._kind === 'schedule' ? 'Class' : item._kind === 'assessment' ? 'Assessment' : 'Task'}
-                        </span>
-                        <span style={{ fontSize: 11, color: '#9CA3AF' }}>→</span>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-              <div style={{ marginTop: 12, padding: '8px 12px', background: '#F8FAFC', borderRadius: 8, fontSize: 12, color: '#6B7280', display: 'flex', gap: 16, flexWrap: 'wrap' }}>
-                <span>🗓 {hubItems.filter(i=>i._kind==='schedule').length} classes</span>
-                <span>📝 {hubItems.filter(i=>i._kind==='assessment').length} assessments</span>
-                <span>✅ {hubItems.filter(i=>i._kind==='task').length} tasks</span>
-              </div>
-            </>
-          );
-        })()}
-      </div>
+        );
+      })()}
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
         {/* My Batches */}
@@ -418,6 +597,19 @@ export default function StaffDashboard() {
                   <div style={{ fontSize: 11, color: '#9CA3AF', marginTop: 1 }}>
                     {task.dueDate && `Due: ${task.dueDate}`}
                     {task.priority === 'high' && <span style={{ color: '#EF4444', marginLeft: 6, fontWeight: 600 }}>● High</span>}
+                    {(() => {
+                      if (!task.dueDate) return null;
+                      const due = new Date(task.dueDate);
+                      if (isNaN(due)) return null;
+                      due.setHours(23, 59, 59, 999);
+                      const now = Date.now();
+                      const pill = (bg, ink, label) => (
+                        <span style={{ marginLeft: 6, padding: '1px 7px', borderRadius: 999, fontSize: 10, fontWeight: 600, background: bg, color: ink }}>{label}</span>
+                      );
+                      if (due.getTime() < now) return pill('var(--red-soft)', 'var(--red-ink)', 'Overdue');
+                      if (due.getTime() - now <= 48 * 3600 * 1000) return pill('var(--amber-soft)', 'var(--amber-ink)', 'Due soon');
+                      return null;
+                    })()}
                   </div>
                 </div>
                 <button
