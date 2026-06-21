@@ -45,7 +45,7 @@ export default function Sidebar({ navItems = [] }) {
 
   return (
     <aside style={{
-      width: 224,
+      width: 230,
       background: 'var(--surface)',
       borderRight: '1px solid var(--border)',
       display: 'flex', flexDirection: 'column',
@@ -56,10 +56,15 @@ export default function Sidebar({ navItems = [] }) {
       {/* Logo */}
       <div style={{ padding: '18px 18px 16px', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <img src="/logo.svg" alt="ISC" style={{ width: 36, height: 36, borderRadius: 10, flexShrink: 0 }} />
+          <div style={{
+            width: 36, height: 36, borderRadius: 10, flexShrink: 0,
+            background: 'linear-gradient(135deg, #E81620 0%, #8E0A10 100%)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            color: '#fff', fontWeight: 800, fontSize: 13, fontFamily: 'var(--font-display)',
+          }}>ISC</div>
           <div>
-            <div style={{ fontWeight: 700, fontSize: 13.5, color: 'var(--text)', lineHeight: 1.2, fontFamily: 'var(--font-display)' }}>Int'l Skills Club</div>
-            <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Management System</div>
+            <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--text)', lineHeight: 1.2, fontFamily: 'var(--font-display)' }}>International Skills Club</div>
+            <div style={{ fontSize: 10.5, color: 'var(--text-muted)' }}>Management System</div>
           </div>
         </div>
       </div>
@@ -105,6 +110,13 @@ export default function Sidebar({ navItems = [] }) {
                     <Icon size={17} />
                   </span>
                   <span style={{ flex: 1 }}>{item.label}</span>
+                  {item.badge !== undefined && (
+                    <span style={{
+                      background: 'var(--brand)', color: '#fff',
+                      borderRadius: 10, fontSize: 10, fontWeight: 700,
+                      padding: '1px 6px', minWidth: 18, textAlign: 'center',
+                    }}>{item.badge}</span>
+                  )}
                 </>
               )}
             </NavLink>

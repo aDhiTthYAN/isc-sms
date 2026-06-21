@@ -107,101 +107,139 @@ export default function StudentsPage() {
 
   return (
     <div>
-      <div className="page-header">
-        <h2>
-          All Students
-          <span style={{ fontSize: 14, color: 'var(--muted)', fontWeight: 400, marginLeft: 8 }}>
-            ({totalCount.toLocaleString()} total)
-          </span>
-        </h2>
+      {/* Page Header */}
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 6, flexWrap: 'wrap', gap: 12 }}>
+        <div>
+          <h1 style={{ fontSize: 22, fontWeight: 700, fontFamily: 'var(--font-display)', color: 'var(--text)', margin: 0 }}>All Students</h1>
+          <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: '4px 0 0' }}>Track and manage every enrolled student across all batches.</p>
+        </div>
         {isCEOorAdmin && (
           <div style={{ display: 'flex', gap: 8 }}>
-            <button className="btn btn-ghost" onClick={() => navigate('/bulk-import')}>
-              <Upload size={15} /> Bulk Import
+            <button className="btn btn-secondary btn-sm" onClick={() => navigate('/bulk-import')} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <Upload size={14} /> Bulk Import
             </button>
-            <button className="btn btn-primary" onClick={() => setShowModal(true)}>
+            <button className="btn btn-primary" onClick={() => setShowModal(true)} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <Plus size={15} /> Add Student
             </button>
           </div>
         )}
       </div>
 
-      {/* Scale info */}
+      {/* Search + batch filter row */}
+      <div style={{ display: 'flex', gap: 10, marginBottom: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+        <div className="search-bar" style={{ flex: 1, minWidth: 220 }}>
+          <Search size={15} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+          <input placeholder="Search name, phone, ClassPlus ID, email..."
+            value={search} onChange={e => setSearch(e.target.value)} />
+          {searching && <span style={{ fontSize: 11, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>Searching...</span>}
+        </div>
+        <select className="form-input" style={{ width: 180 }} value={batchFilter} onChange={e => { setBatchFilter(e.target.value); setSearch(''); }}>
+          <option value="">All batches</option>
+          {batches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+        </select>
+        <span style={{ fontSize: 13, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{totalCount.toLocaleString()} students</span>
+      </div>
+
+      {/* Status filter pills */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
+        {[
+          { key: '', label: 'All', count: totalCount },
+          { key: 'active', label: 'Active', count: students.filter(s => s.status === 'active').length },
+          { key: 'moderate', label: 'Moderate', count: students.filter(s => s.status === 'moderate').length },
+          { key: 'at-risk', label: 'At-Risk', count: students.filter(s => s.status === 'at-risk').length },
+          { key: 'dropped', label: 'Dropped', count: students.filter(s => s.status === 'dropped').length },
+        ].map(pill => (
+          <button key={pill.key}
+            onClick={() => { setStatusFilter(pill.key); setSearch(''); }}
+            style={{
+              padding: '5px 14px', borderRadius: 20, border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 500,
+              background: statusFilter === pill.key ? 'var(--brand)' : 'var(--surface)',
+              color: statusFilter === pill.key ? '#fff' : 'var(--text-sub)',
+              border: statusFilter === pill.key ? 'none' : '1px solid var(--border)',
+              transition: 'all 0.15s',
+              display: 'flex', alignItems: 'center', gap: 6,
+            }}>
+            {statusFilter === pill.key && <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#fff', display: 'inline-block' }} />}
+            {pill.label} {pill.count}
+          </button>
+        ))}
+      </div>
+
       {totalCount > 500 && (
         <div style={{ padding: '8px 14px', background: '#F0FDF4', borderRadius: 8, fontSize: 12, color: '#065F46', marginBottom: 14, display: 'flex', gap: 8, alignItems: 'center' }}>
           <Users size={13} /> Showing 50 students at a time. Use search or filters to find specific students instantly.
         </div>
       )}
 
-      {/* Filters */}
-      <div style={{ display: 'flex', gap: 10, marginBottom: 14, flexWrap: 'wrap' }}>
-        <div className="search-bar" style={{ flex: 1, minWidth: 220 }}>
-          <Search size={15} style={{ color: 'var(--muted)', flexShrink: 0 }} />
-          <input placeholder="Search name, phone, ClassPlus ID, email..."
-            value={search} onChange={e => setSearch(e.target.value)} />
-          {searching && <span style={{ fontSize: 11, color: 'var(--muted)', whiteSpace: 'nowrap' }}>Searching...</span>}
-        </div>
-        <select className="form-input" style={{ width: 180 }} value={batchFilter} onChange={e => { setBatchFilter(e.target.value); setSearch(''); }}>
-          <option value="">All Batches</option>
-          {batches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
-        </select>
-        <select className="form-input" style={{ width: 150 }} value={statusFilter} onChange={e => { setStatusFilter(e.target.value); setSearch(''); }}>
-          <option value="">All Status</option>
-          {STATUSES.map(s => <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>)}
-        </select>
-      </div>
-
       <div className="table-container">
         <table>
           <thead>
-            <tr><th>Student</th><th>Course / Batch</th><th>Phone</th><th>Staff</th><th>Joined</th><th>Status</th><th></th></tr>
+            <tr>
+              <th>STUDENT</th>
+              <th>BATCH</th>
+              <th>CLASSPLUS ID</th>
+              <th>PROGRESS</th>
+              <th>STATUS</th>
+              <th></th>
+            </tr>
           </thead>
           <tbody>
             {loading && students.length === 0 && (
-              <tr><td colSpan={7} style={{ textAlign: 'center', padding: 40 }}>
+              <tr><td colSpan={6} style={{ textAlign: 'center', padding: 40 }}>
                 <div className="spinner" style={{ margin: '0 auto' }} />
               </td></tr>
             )}
             {!loading && students.length === 0 && (
-              <tr><td colSpan={7} style={{ textAlign: 'center', color: 'var(--muted)', padding: 40 }}>
+              <tr><td colSpan={6} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 40 }}>
                 No students found. {isCEOorAdmin && 'Add your first student or use Bulk Import.'}
               </td></tr>
             )}
-            {students.map(s => (
-              <tr key={s.id}>
-                <td>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
-                    <Avatar name={s.name} size="sm" />
-                    <div>
-                      <div style={{ fontWeight: 500 }}>{s.name}</div>
-                      <div style={{ fontSize: 11, color: 'var(--muted)' }}>
-                        {s.location}{s.classplusId ? ` · ${s.classplusId}` : ''}
+            {students.map(s => {
+              const statusColor = { active: '#10B981', moderate: '#F59E0B', 'at-risk': '#EF4444', dropped: '#6B7280' }[s.status] || '#6B7280';
+              const progressPct = s.status === 'active' ? 80 : s.status === 'moderate' ? 50 : s.status === 'at-risk' ? 25 : 10;
+              return (
+                <tr key={s.id}>
+                  <td>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <Avatar name={s.name} size="sm" />
+                      <div>
+                        <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--text)' }}>{s.name}</div>
+                        <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{s.email || s.phone || '—'}</div>
                       </div>
                     </div>
-                  </div>
-                </td>
-                <td>
-                  <div style={{ fontSize: 13 }}>{s.course || '—'}</div>
-                  <div style={{ fontSize: 11, color: 'var(--muted)' }}>{batchName(s.batchId)}</div>
-                </td>
-                <td style={{ fontSize: 13 }}>{s.phone || '—'}</td>
-                <td style={{ fontSize: 13 }}>{s.staffAssigned || '—'}</td>
-                <td style={{ fontSize: 12, color: 'var(--muted)' }}>{s.joiningDate || '—'}</td>
-                <td><StatusBadge status={s.status} /></td>
-                <td>
-                  <div style={{ display: 'flex', gap: 5 }}>
-                    <button className="btn btn-ghost btn-sm btn-icon" onClick={() => navigate(`/students/${s.id}`)}>
-                      <Eye size={13} />
-                    </button>
-                    {isCEOorAdmin && (
-                      <button className="btn btn-ghost btn-sm btn-icon" style={{ color: '#EF4444' }} onClick={() => setDeleting(s.id)}>
-                        <Trash2 size={13} />
+                  </td>
+                  <td>
+                    {batchName(s.batchId) !== '—' ? (
+                      <span style={{ background: 'var(--canvas)', border: '1px solid var(--border)', borderRadius: 6, padding: '2px 8px', fontSize: 12, color: 'var(--text-sub)', fontWeight: 500 }}>
+                        {batchName(s.batchId)}
+                      </span>
+                    ) : '—'}
+                  </td>
+                  <td style={{ fontSize: 13, color: 'var(--text-sub)' }}>{s.classplusId || '—'}</td>
+                  <td style={{ minWidth: 120 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <div style={{ flex: 1, height: 6, background: 'var(--border)', borderRadius: 3, overflow: 'hidden' }}>
+                        <div style={{ height: '100%', width: `${progressPct}%`, background: statusColor, borderRadius: 3 }} />
+                      </div>
+                      <span style={{ fontSize: 11, fontWeight: 600, color: statusColor, minWidth: 30 }}>{progressPct}%</span>
+                    </div>
+                  </td>
+                  <td><StatusBadge status={s.status} /></td>
+                  <td>
+                    <div style={{ display: 'flex', gap: 5 }}>
+                      <button className="btn btn-ghost btn-sm btn-icon" onClick={() => navigate(`/students/${s.id}`)}>
+                        <Eye size={13} />
                       </button>
-                    )}
-                  </div>
-                </td>
-              </tr>
-            ))}
+                      {isCEOorAdmin && (
+                        <button className="btn btn-ghost btn-sm btn-icon" style={{ color: '#EF4444' }} onClick={() => setDeleting(s.id)}>
+                          <Trash2 size={13} />
+                        </button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
         {/* Pagination */}
@@ -213,7 +251,7 @@ export default function StudentsPage() {
           </div>
         )}
         {!search && students.length > 0 && (
-          <div style={{ padding: '8px 16px', borderTop: '1px solid var(--border)', fontSize: 12, color: 'var(--muted)', textAlign: 'center' }}>
+          <div style={{ padding: '8px 16px', borderTop: '1px solid var(--border)', fontSize: 12, color: 'var(--text-muted)', textAlign: 'center' }}>
             Showing {students.length} of {totalCount.toLocaleString()} students
           </div>
         )}

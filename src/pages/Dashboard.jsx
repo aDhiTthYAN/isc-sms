@@ -344,28 +344,44 @@ export default function Dashboard() {
 
   return (
     <div>
-      {/* Header with Sidebar Buttons */}
-      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginBottom: 16 }}>
-        <button
-          onClick={() => { setSidebarTab('notif'); setShowSidebar(true); }}
-          style={{ position: 'relative', background: '#fff', border: '1px solid #E5E7EB', borderRadius: 10, padding: '7px 14px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 500, color: '#374151' }}
-        >
-          <Bell size={16} />
-          Notifications
-          {unreadNotifs > 0 && (
-            <span style={{ position: 'absolute', top: -5, right: -5, background: '#E53935', color: '#fff', borderRadius: '50%', width: 18, height: 18, fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{unreadNotifs}</span>
-          )}
-        </button>
-        <button
-          onClick={() => { setSidebarTab('requests'); setShowSidebar(true); }}
-          style={{ position: 'relative', background: '#fff', border: '1px solid #E5E7EB', borderRadius: 10, padding: '7px 14px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 500, color: '#374151' }}
-        >
-          <Inbox size={16} />
-          Requests
-          {pendingRequests.length > 0 && (
-            <span style={{ position: 'absolute', top: -5, right: -5, background: '#F59E0B', color: '#fff', borderRadius: '50%', width: 18, height: 18, fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{pendingRequests.length}</span>
-          )}
-        </button>
+      {/* Welcome Header */}
+      <div style={{ marginBottom: 24 }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+          <div>
+            <h1 style={{ fontSize: 24, fontWeight: 700, fontFamily: 'var(--font-display)', color: 'var(--text)', marginBottom: 4, margin: 0 }}>
+              Welcome back, {(profile?.name || 'there').split(' ')[0]} 👋
+            </h1>
+            <p style={{ fontSize: 14, color: 'var(--text-muted)', margin: '4px 0 0' }}>
+              Here's what's happening across International Skills Club today.
+            </p>
+          </div>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+            <div style={{ display: 'flex', gap: 4, background: 'var(--canvas)', borderRadius: 10, padding: 4, border: '1px solid var(--border)' }}>
+              <button style={{ padding: '5px 14px', borderRadius: 7, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 600, background: '#fff', color: 'var(--text)', boxShadow: '0 1px 2px rgba(0,0,0,0.08)' }}>This week</button>
+              <button style={{ padding: '5px 14px', borderRadius: 7, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 500, background: 'transparent', color: 'var(--text-muted)' }}>This month</button>
+            </div>
+            <button
+              onClick={() => { setSidebarTab('notif'); setShowSidebar(true); }}
+              style={{ position: 'relative', background: '#fff', border: '1px solid var(--border)', borderRadius: 9, padding: '7px 14px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 500, color: 'var(--text-sub)' }}
+            >
+              <Bell size={15} />
+              Notifications
+              {unreadNotifs > 0 && (
+                <span style={{ position: 'absolute', top: -5, right: -5, background: 'var(--brand)', color: '#fff', borderRadius: '50%', width: 17, height: 17, fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{unreadNotifs}</span>
+              )}
+            </button>
+            <button
+              onClick={() => { setSidebarTab('requests'); setShowSidebar(true); }}
+              style={{ position: 'relative', background: '#fff', border: '1px solid var(--border)', borderRadius: 9, padding: '7px 14px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 500, color: 'var(--text-sub)' }}
+            >
+              <Inbox size={15} />
+              Requests
+              {pendingRequests.length > 0 && (
+                <span style={{ position: 'absolute', top: -5, right: -5, background: '#F59E0B', color: '#fff', borderRadius: '50%', width: 17, height: 17, fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{pendingRequests.length}</span>
+              )}
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* CEO Sidebar */}
@@ -456,13 +472,39 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* KPI Cards — staff see a simpler 3-card strip */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14, marginBottom: 24 }}>
-        {(profile?.role !== 'ceo' && profile?.role !== 'admin'
-          ? kpis.filter(k => ['Active Batches','Pending Tasks','Recent Activity'].includes(k.label))
-          : kpis
-        ).map(k => <KPICard key={k.label} {...k} />)}
-      </div>
+      {/* KPI Stat Cards */}
+      {(profile?.role === 'ceo' || profile?.role === 'admin') ? (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14, marginBottom: 24 }}>
+          {/* Card 1: Total Students - hero red gradient */}
+          <div style={{ background: 'linear-gradient(135deg, #E81620 0%, #8E0A10 100%)', borderRadius: 14, padding: '22px 22px', color: '#fff', boxShadow: '0 4px 14px rgba(232,22,32,0.25)', cursor: 'pointer' }} onClick={() => navigate('/students')}>
+            <div style={{ fontSize: 11, fontWeight: 600, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 10 }}>Total Students</div>
+            <div style={{ fontSize: 36, fontWeight: 800, fontFamily: 'var(--font-display)', lineHeight: 1, marginBottom: 6 }}>{totalStudents}</div>
+            <div style={{ fontSize: 12, opacity: 0.75 }}>All enrolled</div>
+          </div>
+          {/* Card 2: Active Batches */}
+          <div style={{ background: '#fff', borderRadius: 14, padding: '22px 22px', border: '1px solid var(--border)', boxShadow: '0 1px 4px rgba(0,0,0,0.06)', cursor: 'pointer' }} onClick={() => navigate('/batches')}>
+            <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 10 }}>Active Batches</div>
+            <div style={{ fontSize: 36, fontWeight: 800, fontFamily: 'var(--font-display)', lineHeight: 1, color: 'var(--text)', marginBottom: 6 }}>{activeBatches.length}</div>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{batches.filter(b=>b.status==='upcoming').length} starting soon</div>
+          </div>
+          {/* Card 3: At-Risk Students */}
+          <div style={{ background: '#fff', borderRadius: 14, padding: '22px 22px', border: '1px solid var(--border)', boxShadow: '0 1px 4px rgba(0,0,0,0.06)', cursor: 'pointer' }} onClick={() => navigate('/students')}>
+            <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 10 }}>At-Risk Students</div>
+            <div style={{ fontSize: 36, fontWeight: 800, fontFamily: 'var(--font-display)', lineHeight: 1, color: '#EF4444', marginBottom: 6 }}>{atRiskCount}</div>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Needs attention</div>
+          </div>
+          {/* Card 4: Pending Tasks */}
+          <div style={{ background: '#fff', borderRadius: 14, padding: '22px 22px', border: '1px solid var(--border)', boxShadow: '0 1px 4px rgba(0,0,0,0.06)', cursor: 'pointer' }} onClick={() => navigate('/tasks')}>
+            <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 10 }}>Pending Tasks</div>
+            <div style={{ fontSize: 36, fontWeight: 800, fontFamily: 'var(--font-display)', lineHeight: 1, color: 'var(--text)', marginBottom: 6 }}>{pendingTasks.length}</div>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Across the team</div>
+          </div>
+        </div>
+      ) : (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14, marginBottom: 24 }}>
+          {kpis.filter(k => ['Active Batches','Pending Tasks','Recent Activity'].includes(k.label)).map(k => <KPICard key={k.label} {...k} />)}
+        </div>
+      )}
 
       {/* Batch Activity Hub — shown here for STAFF (right after KPIs), at bottom for CEO */}
       {(profile?.role !== 'ceo' && profile?.role !== 'admin') && <BatchActivityHub batches={batches} schedBatch={schedBatch} setSchedBatch={setSchedBatch} schedFilter={schedFilter} setSchedFilter={setSchedFilter} schedItems={schedItems} schedLoading={schedLoading} navigate={navigate} Calendar={Calendar} />}

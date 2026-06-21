@@ -130,15 +130,25 @@ export default function FollowUps() {
 
   return (
     <div>
-      <div className="page-header">
-        <h2>Follow-Up Tracker
-          <span style={{ fontSize: 14, color: 'var(--muted)', fontWeight: 400, marginLeft: 8 }}>
-            ({pendingCount} pending)
-          </span>
-        </h2>
+      {/* Page Header */}
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 6, flexWrap: 'wrap', gap: 12 }}>
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <h1 style={{ fontSize: 22, fontWeight: 700, fontFamily: 'var(--font-display)', color: 'var(--text)', margin: 0 }}>Follow-Up Tracker</h1>
+            {pendingCount > 0 && (
+              <span style={{ display: 'flex', alignItems: 'center', gap: 5, background: '#FEF3C7', color: '#92400E', borderRadius: 20, padding: '3px 10px', fontSize: 12, fontWeight: 600 }}>
+                <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#F59E0B', display: 'inline-block' }} />
+                {pendingCount} pending
+              </span>
+            )}
+          </div>
+          <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: '4px 0 0' }}>
+            Stay on top of every student touchpoint — assign, track, and close the loop.
+          </p>
+        </div>
         {isCEOorAdmin && (
-          <button className="btn btn-primary" onClick={() => setShowModal(true)}>
-            <Plus size={16} /> Assign Follow-Up
+          <button className="btn btn-primary" onClick={() => setShowModal(true)} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <Plus size={15} /> Assign Follow-Up
           </button>
         )}
       </div>
@@ -150,19 +160,31 @@ export default function FollowUps() {
         </div>
       )}
 
-      <div style={{ display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
+      {/* Search + filter tabs */}
+      <div style={{ display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>
         <div className="search-bar" style={{ flex: 1, minWidth: 200 }}>
-          <Search size={15} style={{ color: 'var(--muted)', flexShrink: 0 }} />
+          <Search size={15} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
           <input placeholder="Search student, staff, note..." value={search} onChange={e => setSearch(e.target.value)} />
         </div>
-        <div className="tab-bar">
+        {/* Filter pills */}
+        <div style={{ display: 'flex', gap: 6 }}>
           {[
-            { key: 'all',       label: 'All' },
-            { key: 'pending',   label: `Pending (${pendingCount})` },
-            { key: 'urgent',    label: `Urgent (${urgentCount})` },
-            { key: 'completed', label: 'Completed' },
+            { key: 'all', label: 'All' },
+            { key: 'pending', label: `Pending ${pendingCount > 0 ? pendingCount : ''}` },
+            { key: 'urgent', label: `Urgent ${urgentCount > 0 ? urgentCount : ''}` },
+            { key: 'completed', label: 'Done' },
           ].map(t => (
-            <div key={t.key} className={`tab ${filter === t.key ? 'active' : ''}`} onClick={() => setFilter(t.key)}>{t.label}</div>
+            <button key={t.key}
+              onClick={() => setFilter(t.key)}
+              style={{
+                padding: '6px 14px', borderRadius: 20, border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 500,
+                background: filter === t.key ? 'var(--brand)' : 'var(--surface)',
+                color: filter === t.key ? '#fff' : 'var(--text-sub)',
+                border: filter === t.key ? 'none' : '1px solid var(--border)',
+                transition: 'all 0.15s',
+              }}>
+              {t.label}
+            </button>
           ))}
         </div>
       </div>
@@ -171,18 +193,18 @@ export default function FollowUps() {
         <table>
           <thead>
             <tr>
-              <th>Student</th>
-              {isCEOorAdmin && <th>Assigned To</th>}
-              <th>Note</th>
-              <th>Priority</th>
-              <th>Date</th>
-              <th>Status</th>
+              <th>STUDENT</th>
+              {isCEOorAdmin && <th>ASSIGNED TO</th>}
+              <th>NOTE</th>
+              <th>PRIORITY</th>
+              <th>DATE</th>
+              <th>STATUS</th>
               <th></th>
             </tr>
           </thead>
           <tbody>
             {filtered.length === 0 && (
-              <tr><td colSpan={7} style={{ textAlign: 'center', color: 'var(--muted)', padding: 40 }}>No follow-ups found.</td></tr>
+              <tr><td colSpan={7} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 40 }}>No follow-ups found.</td></tr>
             )}
             {filtered.map(f => (
               <tr key={f.id}>
@@ -190,19 +212,19 @@ export default function FollowUps() {
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <Avatar name={f.studentName || '?'} size="sm" />
                     <div>
-                      <div style={{ fontWeight: 500, fontSize: 13 }}>{f.studentName}</div>
-                      <div style={{ fontSize: 11, color: 'var(--muted)' }}>by {f.assignedBy}</div>
+                      <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--text)' }}>{f.studentName}</div>
+                      <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>by {f.assignedBy}</div>
                     </div>
                   </div>
                 </td>
-                {isCEOorAdmin && <td style={{ fontSize: 13 }}>{f.assignedTo || '—'}</td>}
-                <td style={{ fontSize: 13, maxWidth: 220 }}>{f.note}</td>
+                {isCEOorAdmin && <td style={{ fontSize: 13, color: 'var(--text-sub)' }}>{f.assignedTo || '—'}</td>}
+                <td style={{ fontSize: 13, maxWidth: 220, color: 'var(--text-sub)' }}>{f.note}</td>
                 <td>
-                  {f.priority === 'urgent' ? <span className="badge badge-red">🔴 Urgent</span>
-                   : f.priority === 'high' ? <span className="badge badge-amber">🟡 High</span>
+                  {f.priority === 'urgent' ? <span className="badge badge-red">Urgent</span>
+                   : f.priority === 'high' ? <span className="badge badge-amber">High</span>
                    : <span className="badge badge-gray">Normal</span>}
                 </td>
-                <td style={{ fontSize: 11, color: 'var(--muted)' }}>{formatDate(f.createdAt)}</td>
+                <td style={{ fontSize: 11, color: 'var(--text-muted)' }}>{formatDate(f.createdAt)}</td>
                 <td>
                   {f.completed
                     ? <span className="badge badge-green"><CheckCircle size={11} style={{ marginRight: 3 }} />Done</span>

@@ -446,6 +446,7 @@ export default function Batches() {
   const [studentSearch, setStudentSearch] = useState('');
   const [studentStatusFilter, setStudentStatusFilter] = useState('');
   const [studentPage, setStudentPage] = useState(0);
+  const [batchFilter, setBatchFilter] = useState('all');
 
   const [editFlow, setEditFlow]         = useState([]);
   const [editFields, setEditFields]     = useState([]);
@@ -2800,13 +2801,24 @@ export default function Batches() {
   // ══════════════════════════════════════════════════════════════
   // BATCH LIST VIEW
   // ══════════════════════════════════════════════════════════════
-  const grouped = { active:[], upcoming:[], completed:[] };
-  batches.forEach(b => { (grouped[b.status]||grouped.completed).push(b); });
+  const activeBatches    = batches.filter(b => b.status === 'active');
+  const upcomingBatches  = batches.filter(b => b.status === 'upcoming');
+  const completedBatches = batches.filter(b => b.status !== 'active' && b.status !== 'upcoming');
+
+  const filteredBatches = batchFilter === 'all'       ? batches
+                        : batchFilter === 'active'    ? activeBatches
+                        : batchFilter === 'upcoming'  ? upcomingBatches
+                        : completedBatches;
 
   return (
     <div>
-      <div className="page-header">
-        <h2>Batch Management</h2>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 20, flexWrap: 'wrap', gap: 12 }}>
+        <div>
+          <h1 style={{ fontSize: 22, fontWeight: 700, fontFamily: 'var(--font-display)', color: 'var(--text)', margin: 0 }}>Batch Management</h1>
+          <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: '4px 0 0' }}>
+            Organize courses, cohorts and schedules across all programs.
+          </p>
+        </div>
         {isCEOorAdmin && (
           <button className="btn btn-primary" onClick={() => setShowCreate(true)}>
             <Plus size={16}/> Create Batch
@@ -2814,8 +2826,25 @@ export default function Batches() {
         )}
       </div>
 
-      <div style={{ padding:'10px 14px', background:'#F0FDF4', borderRadius:8, fontSize:12, color:'#065F46', marginBottom:20 }}>
-        <strong>Flow:</strong> Create batch → configure course flow &amp; student fields → assign subjects to faculties → add students → track onboarding analytics
+      <div style={{ display: 'flex', gap: 8, marginBottom: 20, flexWrap: 'wrap' }}>
+        {[
+          { key: 'all',       label: `All batches ${batches.length}` },
+          { key: 'active',    label: `Active ${activeBatches.length}` },
+          { key: 'upcoming',  label: `Upcoming ${upcomingBatches.length}` },
+          { key: 'completed', label: `Completed ${completedBatches.length}` },
+        ].map(pill => (
+          <button key={pill.key}
+            onClick={() => setBatchFilter(pill.key)}
+            style={{
+              padding: '6px 16px', borderRadius: 20, cursor: 'pointer', fontSize: 13, fontWeight: 500,
+              background: batchFilter === pill.key ? 'var(--brand)' : 'var(--surface)',
+              color: batchFilter === pill.key ? '#fff' : 'var(--text-sub)',
+              border: batchFilter === pill.key ? 'none' : '1px solid var(--border)',
+              transition: 'all 0.15s',
+            }}>
+            {pill.label}
+          </button>
+        ))}
       </div>
 
       {batches.length === 0 && (
@@ -2825,54 +2854,83 @@ export default function Batches() {
         </div>
       )}
 
-      {['active','upcoming','completed'].map(group => {
-        if (!grouped[group].length) return null;
-        return (
-          <div key={group} style={{ marginBottom:24 }}>
-            <h3 style={{ fontSize:12, fontWeight:700, color:'#6B7280', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:12 }}>
-              {group} ({grouped[group].length})
-            </h3>
-            <div className="grid-3">
-              {grouped[group].map(b => (
-                <div
-                  key={b.id}
-                  className="card"
-                  style={{ cursor:'pointer', transition:'box-shadow 0.15s, transform 0.15s' }}
-                  onClick={() => openBatch(b)}
-                  onMouseEnter={e => { e.currentTarget.style.boxShadow='0 8px 24px rgba(0,0,0,0.1)'; e.currentTarget.style.transform='translateY(-2px)'; }}
-                  onMouseLeave={e => { e.currentTarget.style.boxShadow=''; e.currentTarget.style.transform=''; }}
-                >
-                  <div style={{ display:'flex', justifyContent:'space-between', marginBottom:8 }}>
-                    <div>
-                      <div style={{ fontWeight:700, fontSize:14 }}>{b.name}</div>
-                      <div style={{ fontSize:12, color:'#6B7280' }}>{b.course}{b.courseDurationMonths?` · ${b.courseDurationMonths}mo`:''}</div>
-                    </div>
-                    <div style={{ display:'flex', flexDirection:'column', gap:4, alignItems:'flex-end' }}>
-                      <span className={`badge ${b.status==='active'?'badge-green':b.status==='upcoming'?'badge-blue':'badge-gray'}`}>{b.status}</span>
-                      {b.endDate && new Date(b.endDate) < new Date() && (
-                        <span style={{ fontSize:10, padding:'1px 7px', borderRadius:10, background:'#E5E7EB', color:'#6B7280', fontWeight:600 }}>Expired</span>
-                      )}
-                    </div>
-                  </div>
-                  <div style={{ fontSize:13, marginBottom:8 }}>
-                    <span style={{ color:'#6B7280' }}>Students: </span>
-                    <strong style={{ color:'#0F3460', fontSize:16 }}>{batchCounts[b.id]||0}</strong>
-                    {b.mentorName && <><span style={{ color:'#6B7280', marginLeft:10 }}>Mentor: </span>{b.mentorName}</>}
-                  </div>
-                  {b.status==='active' && (
-                    <div style={{ height:4, background:'#E5E7EB', borderRadius:2, overflow:'hidden', marginTop:4 }}>
-                      <div style={{ height:'100%', width:`${progress(b)}%`, background:'#E53935', transition:'width 0.3s' }}/>
-                    </div>
-                  )}
-                  <div style={{ marginTop:10, paddingTop:8, borderTop:'1px solid #F3F4F6', fontSize:12, color:'#E53935', display:'flex', alignItems:'center', gap:4 }}>
-                    {b.courseFlow?.length || DEFAULT_COURSE_FLOW.length} flow steps · {b.studentFields?.length || DEFAULT_STUDENT_FIELDS.length} fields <ChevronRight size={12}/>
-                  </div>
+      <div className="grid-3">
+        {filteredBatches.map(b => {
+          const studentCount = batchCounts[b.id] || 0;
+          const onboardPct   = b._onboardPct || 0;
+          b = { ...b, _studentCount: studentCount, _onboardPct: onboardPct };
+          return (
+            <div key={b.id}
+              style={{
+                background: '#fff', borderRadius: 14, border: '1px solid var(--border)',
+                padding: '18px 20px', cursor: 'pointer',
+                boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
+                transition: 'box-shadow 0.2s, transform 0.15s',
+                display: 'flex', flexDirection: 'column', gap: 12,
+              }}
+              onClick={() => openBatch(b)}
+              onMouseEnter={e => { e.currentTarget.style.boxShadow = '0 4px 16px rgba(0,0,0,0.12)'; e.currentTarget.style.transform = 'translateY(-2px)'; }}
+              onMouseLeave={e => { e.currentTarget.style.boxShadow = '0 1px 4px rgba(0,0,0,0.06)'; e.currentTarget.style.transform = 'none'; }}
+            >
+              {/* Top row: course chip + status badge */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ background: 'var(--canvas)', border: '1px solid var(--border)', borderRadius: 6, padding: '2px 10px', fontSize: 11, fontWeight: 600, color: 'var(--text-sub)' }}>
+                  {b.course || 'Course'}
+                </span>
+                <span style={{
+                  fontSize: 11, padding: '3px 10px', borderRadius: 20, fontWeight: 600,
+                  background: b.status === 'active' ? '#D1FAE5' : b.status === 'upcoming' ? '#DBEAFE' : '#F3F4F6',
+                  color: b.status === 'active' ? '#065F46' : b.status === 'upcoming' ? '#1E40AF' : '#6B7280',
+                }}>{b.status || 'active'}</span>
+              </div>
+
+              {/* Batch name */}
+              <div>
+                <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', fontFamily: 'var(--font-display)', marginBottom: 4 }}>
+                  {b.name}
                 </div>
-              ))}
+                {b.mentorName && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--text-muted)' }}>
+                    <div style={{ width: 20, height: 20, borderRadius: '50%', background: 'var(--grad-brand)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 700, color: '#fff' }}>
+                      {(b.mentorName || 'M')[0].toUpperCase()}
+                    </div>
+                    Mentor · {b.mentorName}
+                  </div>
+                )}
+              </div>
+
+              {/* Stats row */}
+              <div style={{ display: 'flex', gap: 16 }}>
+                <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                  <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--text)' }}>{b._studentCount || 0}</span> students
+                </div>
+                <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                  <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--text)' }}>{b._onboardPct || 0}%</span> onboarded
+                </div>
+              </div>
+
+              {/* Progress bar */}
+              {(() => {
+                const pct = b._onboardPct || 0;
+                const barColor = pct >= 80 ? '#10B981' : pct >= 50 ? '#F59E0B' : '#E81620';
+                return (
+                  <div style={{ height: 5, background: 'var(--border)', borderRadius: 3, overflow: 'hidden' }}>
+                    <div style={{ height: '100%', width: `${pct}%`, background: barColor, borderRadius: 3, transition: 'width 0.4s' }} />
+                  </div>
+                );
+              })()}
+
+              {/* Footer: schedule + open link */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: 4, borderTop: '1px solid var(--border)' }}>
+                <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                  {b.scheduleDay ? `${b.scheduleDay} · ${b.scheduleTime || ''}` : 'Schedule TBD'}
+                </span>
+                <span style={{ fontSize: 12, color: 'var(--brand)', fontWeight: 600 }}>Open →</span>
+              </div>
             </div>
-          </div>
-        );
-      })}
+          );
+        })}
+      </div>
 
       {/* Create Batch Modal */}
       {showCreate && (
