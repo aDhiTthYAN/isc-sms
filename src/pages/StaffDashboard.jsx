@@ -535,9 +535,9 @@ export default function StaffDashboard() {
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                     {pageList.map((item, i) => {
                       const c = kindColor[item._kind] || kindColor.task;
-                      const nav = item._kind === 'schedule' ? '/batches' : item._kind === 'assessment' ? '/assessments' : '/tasks';
+                      const tab = item._kind === 'schedule' ? 'schedule' : item._kind === 'assessment' ? 'assessments' : 'tasks';
                       return (
-                        <div key={item.id || i} onClick={() => navigate(nav, { state: { batchId: hubBatch } })}
+                        <div key={item.id || i} onClick={() => navigate('/batches', { state: { batchId: hubBatch, tab } })}
                           style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', borderRadius: 10, border: '1px solid #E5E7EB', cursor: 'pointer', background: '#fff', transition: 'background 0.12s' }}
                           onMouseEnter={e => e.currentTarget.style.background = '#F8FAFC'}
                           onMouseLeave={e => e.currentTarget.style.background = '#fff'}>

@@ -489,11 +489,15 @@ export default function Batches() {
 
   useEffect(() => {
     loadBatches().then(() => {
-      // Auto-open batch if navigated here from hub with state.batchId
       if (location.state?.batchId) {
         getBatches().then(allBatches => {
           const target = allBatches.find(b => b.id === location.state.batchId);
-          if (target) loadBatchDetail(target).then(() => setSelectedBatch(target));
+          if (target) {
+            loadBatchDetail(target).then(() => {
+              setSelectedBatch(target);
+              if (location.state?.tab) setActiveTab(location.state.tab);
+            });
+          }
         }).catch(() => {});
       }
     });
