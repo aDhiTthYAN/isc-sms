@@ -129,6 +129,9 @@ export default function StudentProfile() {
   const handleMarkFlow = async (step, done) => {
     if (done) {
       setFlowNoteModal(step);
+      // Pre-fill existing note if re-opening a completed step
+      const existing = flowStep(step.key);
+      setFlowNote(existing?.note || '');
     } else {
       await updateCourseFlowStep(id, step.key, { done: false, date: '', note: '' });
       setToast({ message: `"${step.label}" unmarked`, type: 'info' });
@@ -517,16 +520,28 @@ export default function StudentProfile() {
                           {step.label}
                         </div>
                         {fs?.done && (
-                          <div style={{ fontSize:11, color:'#9CA3AF', marginTop:2 }}>
-                            ✅ Done {fs.date && `on ${fs.date}`}{(fs.value || fs.note) && ` — ${fs.value || fs.note}`}
+                          <div style={{ fontSize:11, color:'#6B7280', marginTop:2 }}>
+                            ✅ Done{fs.date && ` on ${fs.date}`}
+                            {(fs.value || fs.note) && (
+                              <span style={{ display:'block', marginTop:3, color:'#374151', fontStyle:'italic' }}>
+                                📝 {fs.value || fs.note}
+                              </span>
+                            )}
                           </div>
                         )}
                       </div>
-                      {!fs?.done && (
-                        <button className="btn btn-ghost btn-sm" style={{ fontSize:11 }} onClick={() => handleMarkFlow(step, true)}>
-                          Mark Done
-                        </button>
-                      )}
+                      <div style={{ display:'flex', flexDirection:'column', gap:4, flexShrink:0 }}>
+                        {!fs?.done && (
+                          <button className="btn btn-ghost btn-sm" style={{ fontSize:11 }} onClick={() => handleMarkFlow(step, true)}>
+                            Mark Done
+                          </button>
+                        )}
+                        {fs?.done && (
+                          <button className="btn btn-ghost btn-sm" style={{ fontSize:11 }} onClick={() => handleMarkFlow(step, true)}>
+                            Edit Note
+                          </button>
+                        )}
+                      </div>
                     </div>
                   );
                 })}

@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import {
   getBatches, addBatch, updateBatch,
   getBatchStudents, addStudent, bulkAddStudents, getBatchStudentCount, updateStudent,
@@ -347,6 +347,7 @@ function OnboardingStepPanel({ step, onClose, onMarkComplete, onRevoke }) {
 export default function Batches() {
   const { profile } = useAuth();
   const navigate    = useNavigate();
+  const location    = useLocation();
   const isCEOorAdmin = profile?.role === 'ceo' || profile?.role === 'admin';
 
   const [batches, setBatches]           = useState([]);
@@ -486,7 +487,17 @@ export default function Batches() {
     }
   };
 
-  useEffect(() => { loadBatches(); }, []);
+  useEffect(() => {
+    loadBatches().then(() => {
+      // Auto-open batch if navigated here from hub with state.batchId
+      if (location.state?.batchId) {
+        getBatches().then(allBatches => {
+          const target = allBatches.find(b => b.id === location.state.batchId);
+          if (target) loadBatchDetail(target).then(() => setSelectedBatch(target));
+        }).catch(() => {});
+      }
+    });
+  }, []);
 
   const openBatch = async (batch) => {
     setSelectedBatch(batch);
@@ -1050,7 +1061,7 @@ export default function Batches() {
         {/* Header */}
         <div className="page-header">
           <div style={{ display:'flex', alignItems:'center', gap:12 }}>
-            <button className="btn btn-ghost btn-sm btn-icon" onClick={() => { setSelectedBatch(null); setConfirmDialog(null); }}><ArrowLeft size={16}/></button>
+            <button className="btn btn-ghost btn-sm btn-icon" onClick={() => { if (location.state?.batchId) { navigate(-1); } else { setSelectedBatch(null); } setConfirmDialog(null); }}><ArrowLeft size={16}/></button>
             <div>
               <div style={{ display:'flex', alignItems:'center', gap:8 }}>
                 <h2 style={{ fontSize: 20, fontWeight: 700 }}>{selectedBatch.name}</h2>

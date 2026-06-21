@@ -49,53 +49,104 @@ function KPICard({ label, value, sub, color, bg, icon: Icon, link }) {
   );
 }
 
-function BatchActivityHub({ batches, schedBatch, setSchedBatch, schedFilter, setSchedFilter, schedItems, schedLoading, navigate, Calendar }) {
+function BatchActivityHub({ batches, schedBatch, setSchedBatch, schedFilter, setSchedFilter,
+  schedItems, schedLoading, navigate, Calendar,
+  schedTimeFilter, setSchedTimeFilter, schedCourse, setSchedCourse, schedTypeFilter, setSchedTypeFilter }) {
+  const [search, setSearch] = useState('');
+
   const kindColor = {
     schedule:   { bg: '#DBEAFE', color: '#1E40AF', dot: '#3B82F6' },
     assessment: { bg: '#D1FAE5', color: '#065F46', dot: '#10B981' },
     task:       { bg: '#FEF3C7', color: '#92400E', dot: '#F59E0B' },
   };
-  const filtered = schedFilter === 'all' ? schedItems : schedItems.filter(i => i._kind === schedFilter);
+
+  const courseOptions = [...new Set(schedItems.map(i => i._course).filter(Boolean))];
+  const typeOptions   = [...new Set(schedItems.filter(i => schedFilter === 'all' || i._kind === schedFilter).map(i => i._type).filter(Boolean))];
+
+  let list = schedItems;
+  if (schedFilter !== 'all')        list = list.filter(i => i._kind === schedFilter);
+  if (schedTimeFilter === 'active') list = list.filter(i => i._timeStatus === 'active');
+  else if (schedTimeFilter === 'upcoming') list = list.filter(i => i._timeStatus === 'upcoming');
+  else if (schedTimeFilter === 'past')     list = list.filter(i => i._timeStatus === 'past' || i._timeStatus === 'completed');
+  if (schedCourse)     list = list.filter(i => i._course === schedCourse);
+  if (schedTypeFilter) list = list.filter(i => i._type === schedTypeFilter);
+  if (search.trim())   list = list.filter(i => i._label.toLowerCase().includes(search.toLowerCase()) || (i._sub||'').toLowerCase().includes(search.toLowerCase()));
+
+  const clearAll = () => { setSchedFilter('all'); setSchedTimeFilter('active'); setSchedCourse(''); setSchedTypeFilter(''); setSearch(''); };
+  const dirty = schedFilter !== 'all' || schedTimeFilter !== 'active' || schedCourse || schedTypeFilter || search;
 
   return (
     <div style={{ background: '#fff', borderRadius: 14, border: '1px solid #E5E7EB', padding: '20px 22px', boxShadow: '0 1px 3px rgba(0,0,0,0.08), 0 4px 12px rgba(0,0,0,0.04)', marginBottom: 20 }}>
-      {/* Header row */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, flexWrap: 'wrap', gap: 10 }}>
+      {/* Header + batch chips */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14, flexWrap: 'wrap', gap: 10 }}>
         <h3 style={{ fontSize: 15, fontWeight: 700, color: '#1A1A2E' }}>📅 Batch Activity Hub</h3>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-          {/* Batch tabs — one chip per batch */}
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-            {batches.map(b => (
-              <button key={b.id} onClick={() => setSchedBatch(b.id)}
-                style={{ padding: '5px 14px', borderRadius: 20, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 600,
-                  background: schedBatch === b.id ? '#0F3460' : '#F3F4F6',
-                  color: schedBatch === b.id ? '#fff' : '#374151', transition: 'all 0.15s' }}>
-                {b.name}
-              </button>
-            ))}
-          </div>
-          {/* Filter pills */}
-          {schedBatch && (
-            <div style={{ display: 'flex', gap: 4 }}>
-              {[
-                { key: 'all',        label: 'All'           },
-                { key: 'schedule',   label: '🗓 Classes'    },
-                { key: 'assessment', label: '📝 Assessments'},
-                { key: 'task',       label: '✅ Tasks'      },
-              ].map(f => (
-                <button key={f.key} onClick={() => setSchedFilter(f.key)}
-                  style={{ padding: '5px 11px', borderRadius: 20, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 600,
-                    background: schedFilter === f.key ? '#E53935' : '#F3F4F6',
-                    color: schedFilter === f.key ? '#fff' : '#374151' }}>
-                  {f.label}
-                </button>
-              ))}
-            </div>
-          )}
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+          {batches.map(b => (
+            <button key={b.id} onClick={() => { setSchedBatch(b.id); clearAll(); }}
+              style={{ padding: '5px 14px', borderRadius: 20, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 600,
+                background: schedBatch === b.id ? '#0F3460' : '#F3F4F6',
+                color: schedBatch === b.id ? '#fff' : '#374151', transition: 'all 0.15s' }}>
+              {b.name}
+            </button>
+          ))}
         </div>
       </div>
 
-      {/* Empty state */}
+      {/* Filter bar */}
+      {schedBatch && (
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: 12, padding: '10px 12px', background: '#F8FAFC', borderRadius: 10, border: '1px solid #E5E7EB' }}>
+          {/* Category pills */}
+          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+            {[{key:'all',label:'All'},{key:'schedule',label:'🗓 Classes'},{key:'assessment',label:'📝 Assessments'},{key:'task',label:'✅ Tasks'}].map(f => (
+              <button key={f.key} onClick={() => { setSchedFilter(f.key); setSchedTypeFilter(''); }}
+                style={{ padding: '4px 12px', borderRadius: 20, border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 600,
+                  background: schedFilter === f.key ? '#0F3460' : '#E5E7EB', color: schedFilter === f.key ? '#fff' : '#374151' }}>
+                {f.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Time filter */}
+          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', borderLeft: '1px solid #E5E7EB', paddingLeft: 8 }}>
+            {[{key:'active',label:'⚡ Active'},{key:'upcoming',label:'📅 Upcoming'},{key:'past',label:'🕐 Past'},{key:'all',label:'All Time'}].map(f => (
+              <button key={f.key} onClick={() => setSchedTimeFilter(f.key)}
+                style={{ padding: '4px 10px', borderRadius: 20, border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 600,
+                  background: schedTimeFilter === f.key ? '#E53935' : '#E5E7EB', color: schedTimeFilter === f.key ? '#fff' : '#374151' }}>
+                {f.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Course dropdown */}
+          {courseOptions.length > 0 && (
+            <select value={schedCourse} onChange={e => setSchedCourse(e.target.value)}
+              style={{ padding: '4px 10px', borderRadius: 8, border: '1px solid #E5E7EB', fontSize: 12, background: '#fff', color: '#374151' }}>
+              <option value="">All Courses</option>
+              {courseOptions.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+          )}
+
+          {/* Type dropdown */}
+          {typeOptions.length > 0 && (
+            <select value={schedTypeFilter} onChange={e => setSchedTypeFilter(e.target.value)}
+              style={{ padding: '4px 10px', borderRadius: 8, border: '1px solid #E5E7EB', fontSize: 12, background: '#fff', color: '#374151' }}>
+              <option value="">All {schedFilter === 'schedule' ? 'Types' : 'Subjects'}</option>
+              {typeOptions.map(t => <option key={t} value={t}>{t}</option>)}
+            </select>
+          )}
+
+          <input placeholder="Search…" value={search} onChange={e => setSearch(e.target.value)}
+            style={{ padding: '4px 10px', borderRadius: 8, border: '1px solid #E5E7EB', fontSize: 12, background: '#fff', minWidth: 120, flex: 1 }} />
+
+          {dirty && (
+            <button onClick={clearAll}
+              style={{ padding: '4px 10px', borderRadius: 8, border: '1px solid #E5E7EB', fontSize: 11, background: '#fff', cursor: 'pointer', color: '#E53935', fontWeight: 600 }}>
+              Clear
+            </button>
+          )}
+        </div>
+      )}
+
       {!schedBatch && (
         <div style={{ textAlign: 'center', color: '#9CA3AF', padding: '36px 0', fontSize: 13 }}>
           <Calendar size={28} style={{ color: '#D1D5DB', display: 'block', margin: '0 auto 8px' }} />
@@ -103,20 +154,25 @@ function BatchActivityHub({ batches, schedBatch, setSchedBatch, schedFilter, set
         </div>
       )}
 
-      {schedBatch && schedLoading && (
-        <div style={{ textAlign: 'center', color: '#9CA3AF', padding: '24px 0', fontSize: 13 }}>Loading…</div>
-      )}
+      {schedBatch && schedLoading && <div style={{ textAlign: 'center', color: '#9CA3AF', padding: '24px 0', fontSize: 13 }}>Loading…</div>}
 
       {schedBatch && !schedLoading && (
         <>
-          {filtered.length === 0 ? (
-            <div style={{ textAlign: 'center', color: '#9CA3AF', padding: '24px 0', fontSize: 13 }}>No items in this category.</div>
+          <div style={{ marginBottom: 10, fontSize: 12, color: '#6B7280', display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+            <span style={{ fontWeight: 600, color: '#1A1A2E' }}>{list.length} item{list.length !== 1 ? 's' : ''}</span>
+            <span>🗓 {schedItems.filter(i=>i._kind==='schedule').length} classes</span>
+            <span>📝 {schedItems.filter(i=>i._kind==='assessment').length} assessments</span>
+            <span>✅ {schedItems.filter(i=>i._kind==='task').length} tasks</span>
+          </div>
+          {list.length === 0 ? (
+            <div style={{ textAlign: 'center', color: '#9CA3AF', padding: '24px 0', fontSize: 13 }}>No items match your filters.</div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 420, overflowY: 'auto' }}>
-              {filtered.map((item, i) => {
+              {list.map((item, i) => {
                 const c = kindColor[item._kind] || kindColor.task;
+                const nav = item._kind === 'schedule' ? '/batches' : item._kind === 'assessment' ? '/assessments' : '/tasks';
                 return (
-                  <div key={item.id || i} onClick={() => navigate(item._nav)}
+                  <div key={item.id || i} onClick={() => navigate(nav, { state: { batchId: schedBatch } })}
                     style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', borderRadius: 10, border: '1px solid #E5E7EB', cursor: 'pointer', background: '#fff', transition: 'background 0.12s' }}
                     onMouseEnter={e => e.currentTarget.style.background = '#F8FAFC'}
                     onMouseLeave={e => e.currentTarget.style.background = '#fff'}>
@@ -125,6 +181,7 @@ function BatchActivityHub({ batches, schedBatch, setSchedBatch, schedFilter, set
                       <div style={{ fontSize: 13, fontWeight: 600, color: '#1A1A2E', marginBottom: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item._label}</div>
                       {item._sub && <div style={{ fontSize: 12, color: '#6B7280' }}>{item._sub}</div>}
                     </div>
+                    {item._course && <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 20, background: '#F3F4F6', color: '#374151', fontWeight: 500, flexShrink: 0 }}>{item._course}</span>}
                     <span style={{ fontSize: 11, padding: '3px 10px', borderRadius: 20, background: c.bg, color: c.color, fontWeight: 600, flexShrink: 0, whiteSpace: 'nowrap' }}>
                       {item._kind === 'schedule' ? 'Class' : item._kind === 'assessment' ? 'Assessment' : 'Task'}
                     </span>
@@ -134,11 +191,6 @@ function BatchActivityHub({ batches, schedBatch, setSchedBatch, schedFilter, set
               })}
             </div>
           )}
-          <div style={{ marginTop: 12, padding: '9px 14px', background: '#F8FAFC', borderRadius: 8, fontSize: 12, color: '#6B7280', display: 'flex', gap: 16, flexWrap: 'wrap' }}>
-            <span>🗓 {schedItems.filter(i=>i._kind==='schedule').length} classes</span>
-            <span>📝 {schedItems.filter(i=>i._kind==='assessment').length} assessments</span>
-            <span>✅ {schedItems.filter(i=>i._kind==='task').length} tasks</span>
-          </div>
         </>
       )}
     </div>
@@ -159,10 +211,13 @@ export default function Dashboard() {
   const [actPage, setActPage]           = useState(0);
   const ACT_PAGE = 10;
 
-  const [schedBatch, setSchedBatch]   = useState('');
-  const [schedItems, setSchedItems]   = useState([]);
-  const [schedLoading, setSchedLoading] = useState(false);
-  const [schedFilter, setSchedFilter] = useState('all'); // 'all' | 'schedule' | 'assessment' | 'task'
+  const [schedBatch,      setSchedBatch]      = useState('');
+  const [schedItems,      setSchedItems]      = useState([]);
+  const [schedLoading,    setSchedLoading]    = useState(false);
+  const [schedFilter,     setSchedFilter]     = useState('all');
+  const [schedTimeFilter, setSchedTimeFilter] = useState('active');
+  const [schedCourse,     setSchedCourse]     = useState('');
+  const [schedTypeFilter, setSchedTypeFilter] = useState('');
 
   // Sidebar state
   const [showSidebar, setShowSidebar]   = useState(false);
@@ -290,6 +345,7 @@ export default function Dashboard() {
   const loadBatchActivity = async (batchId) => {
     if (!batchId) return setSchedItems([]);
     setSchedLoading(true);
+    const today = new Date().toISOString().slice(0, 10);
     try {
       const [scheds, asmts, bTasks] = await Promise.all([
         getBatchSchedules(batchId).catch(() => []),
@@ -297,9 +353,30 @@ export default function Dashboard() {
         getBatchTasks(batchId).catch(() => []),
       ]);
       const items = [
-        ...scheds.map(s => ({ ...s, _kind: 'schedule', _label: s.title || 'Class', _sub: s.recurring ? `Every ${s.day} at ${s.time}` : `${s.scheduledDate} at ${s.time}`, _nav: '/batches' })),
-        ...asmts.map(a => ({ ...a, _kind: 'assessment', _label: a.title || 'Assessment', _sub: `${a.date || '—'} · ${a.totalMarks} marks`, _nav: '/assessments' })),
-        ...bTasks.map(t => ({ ...t, _kind: 'task', _label: t.title || 'Task', _sub: t.assignedTo || '', _nav: '/tasks' })),
+        ...scheds.map(s => {
+          const _timeStatus = s.recurring ? 'active' : !s.scheduledDate ? 'active'
+            : s.scheduledDate > today ? 'upcoming' : s.scheduledDate < today ? 'past' : 'active';
+          return { ...s, _kind: 'schedule', _timeStatus,
+            _label: s.title || 'Class',
+            _sub: s.recurring ? `Every ${s.day} at ${s.time}` : `${s.scheduledDate} at ${s.time}`,
+            _type: s.type || 'live-class', _course: s.course || '' };
+        }),
+        ...asmts.map(a => {
+          const _timeStatus = a.status === 'completed' ? 'completed'
+            : a.date > today ? 'upcoming' : a.date < today ? 'past' : 'active';
+          return { ...a, _kind: 'assessment', _timeStatus,
+            _label: a.title || 'Assessment',
+            _sub: `${a.date || '—'} · ${a.totalMarks} marks`,
+            _type: a.subject || '', _course: a.course || '' };
+        }),
+        ...bTasks.map(t => {
+          const _timeStatus = (t.status === 'completed' || t.status === 'submitted') ? 'completed'
+            : t.dueDate > today ? 'upcoming' : t.dueDate < today ? 'past' : 'active';
+          return { ...t, _kind: 'task', _timeStatus,
+            _label: t.title || 'Task',
+            _sub: t.subject || t.assignedTo || '',
+            _type: t.subject || '', _course: t.course || '' };
+        }),
       ];
       setSchedItems(items);
     } catch {}
@@ -507,7 +584,7 @@ export default function Dashboard() {
       )}
 
       {/* Batch Activity Hub — shown here for STAFF (right after KPIs), at bottom for CEO */}
-      {(profile?.role !== 'ceo' && profile?.role !== 'admin') && <BatchActivityHub batches={batches} schedBatch={schedBatch} setSchedBatch={setSchedBatch} schedFilter={schedFilter} setSchedFilter={setSchedFilter} schedItems={schedItems} schedLoading={schedLoading} navigate={navigate} Calendar={Calendar} />}
+      {(profile?.role !== 'ceo' && profile?.role !== 'admin') && <BatchActivityHub batches={batches} schedBatch={schedBatch} setSchedBatch={setSchedBatch} schedFilter={schedFilter} setSchedFilter={setSchedFilter} schedItems={schedItems} schedLoading={schedLoading} navigate={navigate} Calendar={Calendar} schedTimeFilter={schedTimeFilter} setSchedTimeFilter={setSchedTimeFilter} schedCourse={schedCourse} setSchedCourse={setSchedCourse} schedTypeFilter={schedTypeFilter} setSchedTypeFilter={setSchedTypeFilter} />}
 
       {/* Batches Overview Table — CEO/Admin only */}
       {(profile?.role === 'ceo' || profile?.role === 'admin') &&
@@ -701,7 +778,7 @@ export default function Dashboard() {
       )}
 
       {/* Batch Activity Hub — CEO/Admin sees it here at the bottom */}
-      {(profile?.role === 'ceo' || profile?.role === 'admin') && <BatchActivityHub batches={batches} schedBatch={schedBatch} setSchedBatch={setSchedBatch} schedFilter={schedFilter} setSchedFilter={setSchedFilter} schedItems={schedItems} schedLoading={schedLoading} navigate={navigate} Calendar={Calendar} />}
+      {(profile?.role === 'ceo' || profile?.role === 'admin') && <BatchActivityHub batches={batches} schedBatch={schedBatch} setSchedBatch={setSchedBatch} schedFilter={schedFilter} setSchedFilter={setSchedFilter} schedItems={schedItems} schedLoading={schedLoading} navigate={navigate} Calendar={Calendar} schedTimeFilter={schedTimeFilter} setSchedTimeFilter={setSchedTimeFilter} schedCourse={schedCourse} setSchedCourse={setSchedCourse} schedTypeFilter={schedTypeFilter} setSchedTypeFilter={setSchedTypeFilter} />}
     </div>
   );
 }

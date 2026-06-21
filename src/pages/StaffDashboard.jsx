@@ -37,12 +37,14 @@ export default function StaffDashboard() {
   const [reminding,       setReminding]       = useState({});
 
   // Batch Activity Hub
-  const [hubBatch,    setHubBatch]    = useState('');
-  const [hubItems,    setHubItems]    = useState([]);
-  const [hubLoading,  setHubLoading]  = useState(false);
-  const [hubFilter,   setHubFilter]   = useState('all');
-  const [hubSearch,   setHubSearch]   = useState('');
-  const [hubTypeFilter, setHubTypeFilter] = useState(''); // dropdown type within category
+  const [hubBatch,      setHubBatch]      = useState('');
+  const [hubItems,      setHubItems]      = useState([]);
+  const [hubLoading,    setHubLoading]    = useState(false);
+  const [hubFilter,     setHubFilter]     = useState('all');
+  const [hubSearch,     setHubSearch]     = useState('');
+  const [hubTypeFilter, setHubTypeFilter] = useState('');
+  const [hubCourse,     setHubCourse]     = useState('');
+  const [hubTimeFilter, setHubTimeFilter] = useState('active'); // 'active'|'upcoming'|'past'|'all'
   const HUB_PAGE = 20;
   const [hubPage, setHubPage] = useState(0);
 
@@ -182,33 +184,39 @@ export default function StaffDashboard() {
   useEffect(() => {
     if (!hubBatch) return setHubItems([]);
     setHubLoading(true);
+    const today = new Date().toISOString().slice(0, 10);
     Promise.all([
       getBatchSchedules(hubBatch).catch(() => []),
       getAssessments(hubBatch).catch(() => []),
       getBatchTasks(hubBatch).catch(() => []),
     ]).then(([scheds, asmts, bTasks]) => {
       setHubItems([
-        // Schedules — all are "active" (no completed state for schedules)
-        ...scheds.map(s => ({ ...s, _kind: 'schedule',
-          _label: s.title || 'Class',
-          _sub: s.recurring ? `Every ${s.day} at ${s.time}` : `${s.scheduledDate || ''} at ${s.time}`,
-          _type: s.type || 'live-class',
-          _course: s.course || '',
-        })),
-        // Assessments — exclude completed
-        ...asmts.filter(a => a.status !== 'completed').map(a => ({ ...a, _kind: 'assessment',
-          _label: a.title || 'Assessment',
-          _sub: `${a.date || '—'} · ${a.totalMarks || ''} marks`,
-          _type: a.subject || '',
-          _course: a.course || '',
-        })),
-        // Batch tasks — exclude completed/submitted
-        ...bTasks.filter(t => t.status !== 'completed' && t.status !== 'submitted').map(t => ({ ...t, _kind: 'task',
-          _label: t.title || 'Task',
-          _sub: `${t.subject || ''} · Due: ${t.dueDate || '—'}`,
-          _type: t.subject || '',
-          _course: t.course || '',
-        })),
+        ...scheds.map(s => {
+          const _timeStatus = s.recurring ? 'active'
+            : !s.scheduledDate ? 'active'
+            : s.scheduledDate > today ? 'upcoming'
+            : s.scheduledDate < today ? 'past' : 'active';
+          return { ...s, _kind: 'schedule', _timeStatus,
+            _label: s.title || 'Class',
+            _sub: s.recurring ? `Every ${s.day} at ${s.time}` : `${s.scheduledDate || ''} at ${s.time}`,
+            _type: s.type || 'live-class', _course: s.course || '' };
+        }),
+        ...asmts.map(a => {
+          const _timeStatus = a.status === 'completed' ? 'completed'
+            : a.date > today ? 'upcoming' : a.date < today ? 'past' : 'active';
+          return { ...a, _kind: 'assessment', _timeStatus,
+            _label: a.title || 'Assessment',
+            _sub: `${a.date || '—'} · ${a.totalMarks || ''} marks`,
+            _type: a.subject || '', _course: a.course || '' };
+        }),
+        ...bTasks.map(t => {
+          const _timeStatus = (t.status === 'completed' || t.status === 'submitted') ? 'completed'
+            : t.dueDate > today ? 'upcoming' : t.dueDate < today ? 'past' : 'active';
+          return { ...t, _kind: 'task', _timeStatus,
+            _label: t.title || 'Task',
+            _sub: `${t.subject || ''} · Due: ${t.dueDate || '—'}`,
+            _type: t.subject || '', _course: t.course || '' };
+        }),
       ]);
       setHubPage(0);
       setHubLoading(false);
@@ -396,13 +404,18 @@ export default function StaffDashboard() {
           assessment: { bg: '#D1FAE5', color: '#065F46', dot: '#10B981' },
           task:       { bg: '#FEF3C7', color: '#92400E', dot: '#F59E0B' },
         };
-        // Derive dropdown options from loaded items
-        const typeOptions = [...new Set(hubItems.filter(i => hubFilter === 'all' || i._kind === hubFilter).map(i => i._type).filter(Boolean))];
+        // Derive dropdown options
         const courseOptions = [...new Set(hubItems.map(i => i._course).filter(Boolean))];
+        const typeOptions = [...new Set(hubItems.filter(i => hubFilter === 'all' || i._kind === hubFilter).map(i => i._type).filter(Boolean))];
 
         // Apply all filters
         let list = hubItems;
         if (hubFilter !== 'all') list = list.filter(i => i._kind === hubFilter);
+        if (hubTimeFilter === 'active')   list = list.filter(i => i._timeStatus === 'active');
+        else if (hubTimeFilter === 'upcoming') list = list.filter(i => i._timeStatus === 'upcoming');
+        else if (hubTimeFilter === 'past')     list = list.filter(i => i._timeStatus === 'past' || i._timeStatus === 'completed');
+        // 'all' = no time filter
+        if (hubCourse)           list = list.filter(i => i._course === hubCourse);
         if (hubTypeFilter)       list = list.filter(i => i._type === hubTypeFilter);
         if (hubSearch.trim())    list = list.filter(i => i._label.toLowerCase().includes(hubSearch.toLowerCase()) || (i._sub||'').toLowerCase().includes(hubSearch.toLowerCase()));
 
@@ -446,11 +459,37 @@ export default function StaffDashboard() {
                   ))}
                 </div>
 
-                {/* Subject/type dropdown — only when meaningful */}
+                {/* Time filter pills */}
+                <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', borderLeft: '1px solid #E5E7EB', paddingLeft: 8 }}>
+                  {[
+                    { key: 'active',   label: '⚡ Active'   },
+                    { key: 'upcoming', label: '📅 Upcoming' },
+                    { key: 'past',     label: '🕐 Past'     },
+                    { key: 'all',      label: 'All Time'    },
+                  ].map(f => (
+                    <button key={f.key} onClick={() => { setHubTimeFilter(f.key); setHubPage(0); }}
+                      style={{ padding: '4px 10px', borderRadius: 20, border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 600,
+                        background: hubTimeFilter === f.key ? '#E53935' : '#E5E7EB',
+                        color:      hubTimeFilter === f.key ? '#fff'    : '#374151' }}>
+                      {f.label}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Course dropdown */}
+                {courseOptions.length > 0 && (
+                  <select value={hubCourse} onChange={e => { setHubCourse(e.target.value); setHubPage(0); }}
+                    style={{ padding: '4px 10px', borderRadius: 8, border: '1px solid #E5E7EB', fontSize: 12, background: '#fff', color: '#374151' }}>
+                    <option value="">All Courses</option>
+                    {courseOptions.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                )}
+
+                {/* Subject/type dropdown */}
                 {typeOptions.length > 0 && (
                   <select value={hubTypeFilter} onChange={e => { setHubTypeFilter(e.target.value); setHubPage(0); }}
                     style={{ padding: '4px 10px', borderRadius: 8, border: '1px solid #E5E7EB', fontSize: 12, background: '#fff', color: '#374151' }}>
-                    <option value="">All {hubFilter === 'schedule' ? 'types' : hubFilter === 'assessment' ? 'subjects' : 'subjects'}</option>
+                    <option value="">All {hubFilter === 'schedule' ? 'Types' : 'Subjects'}</option>
                     {typeOptions.map(t => <option key={t} value={t}>{t}</option>)}
                   </select>
                 )}
@@ -460,12 +499,12 @@ export default function StaffDashboard() {
                   placeholder="Search…"
                   value={hubSearch}
                   onChange={e => { setHubSearch(e.target.value); setHubPage(0); }}
-                  style={{ padding: '4px 10px', borderRadius: 8, border: '1px solid #E5E7EB', fontSize: 12, background: '#fff', minWidth: 140, flex: 1 }}
+                  style={{ padding: '4px 10px', borderRadius: 8, border: '1px solid #E5E7EB', fontSize: 12, background: '#fff', minWidth: 120, flex: 1 }}
                 />
 
                 {/* Clear */}
-                {(hubSearch || hubTypeFilter || hubFilter !== 'all') && (
-                  <button onClick={() => { setHubFilter('all'); setHubTypeFilter(''); setHubSearch(''); setHubPage(0); }}
+                {(hubSearch || hubTypeFilter || hubCourse || hubFilter !== 'all' || hubTimeFilter !== 'active') && (
+                  <button onClick={() => { setHubFilter('all'); setHubTypeFilter(''); setHubCourse(''); setHubSearch(''); setHubTimeFilter('active'); setHubPage(0); }}
                     style={{ padding: '4px 10px', borderRadius: 8, border: '1px solid #E5E7EB', fontSize: 11, background: '#fff', cursor: 'pointer', color: '#E53935', fontWeight: 600 }}>
                     Clear
                   </button>
@@ -498,7 +537,7 @@ export default function StaffDashboard() {
                       const c = kindColor[item._kind] || kindColor.task;
                       const nav = item._kind === 'schedule' ? '/batches' : item._kind === 'assessment' ? '/assessments' : '/tasks';
                       return (
-                        <div key={item.id || i} onClick={() => navigate(nav)}
+                        <div key={item.id || i} onClick={() => navigate(nav, { state: { batchId: hubBatch } })}
                           style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', borderRadius: 10, border: '1px solid #E5E7EB', cursor: 'pointer', background: '#fff', transition: 'background 0.12s' }}
                           onMouseEnter={e => e.currentTarget.style.background = '#F8FAFC'}
                           onMouseLeave={e => e.currentTarget.style.background = '#fff'}>
