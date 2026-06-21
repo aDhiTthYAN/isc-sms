@@ -3,13 +3,13 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
-  /* Brand red */
-  --brand:        #E81620;
-  --brand-600:    #CE111B;
-  --brand-700:    #A60D15;
-  --brand-100:    #FBDDDE;
-  --brand-50:     #FEF1F1;
-  --brand-ink:    #8E0A10;
+  /* Brand → Indigo (red reserved for danger/urgent only) */
+  --brand:        #4F46E5;
+  --brand-600:    #4338CA;
+  --brand-700:    #3730A3;
+  --brand-100:    #E0E0FB;
+  --brand-50:     #EEEDFE;
+  --brand-ink:    #3A30C4;
 
   --ink: #16171D;
 
@@ -29,10 +29,10 @@
   --n-900: #16171D;
 
   /* Surfaces */
-  --canvas:         #F5F6FA;
+  --canvas:         #F4F5FB;
   --surface:        #FFFFFF;
-  --surface-sunken: #F0F1F7;
-  --surface-hover:  #F7F8FC;
+  --surface-sunken: #EEEFF7;
+  --surface-hover:  #F6F6FC;
 
   /* Text */
   --text:        #1C1E27;
@@ -58,12 +58,14 @@
   --slate:   #6E7488;  --slate-soft:  #E9EBF2;  --slate-ink:  #41475A;
 
   /* Gradients */
-  --grad-brand:  linear-gradient(135deg, #FF4A45 0%, #E81620 55%, #B00710 100%);
+  --grad-brand:  linear-gradient(135deg, #8B83FF 0%, #4F46E5 55%, #3A30C4 100%);
   --grad-blue:   linear-gradient(135deg, #5B8DF8 0%, #3B6EF6 55%, #2148C9 100%);
   --grad-violet: linear-gradient(135deg, #A989FF 0%, #8B5CF6 55%, #6429D6 100%);
   --grad-green:  linear-gradient(135deg, #38C98E 0%, #16A974 55%, #0B7150 100%);
   --grad-amber:  linear-gradient(135deg, #FFC25C 0%, #F5A623 55%, #D9820A 100%);
-  --grad-night:  linear-gradient(150deg, #2A2E45 0%, #16171D 100%);
+  --grad-night:  linear-gradient(150deg, #2D2A55 0%, #1A1830 55%, #131124 100%);
+  --grad-indigo: linear-gradient(135deg, #8B83FF 0%, #4F46E5 50%, #3A30C4 100%);
+  --grad-mesh:   radial-gradient(120% 120% at 10% 0%, #6D63F0 0%, #4F46E5 38%, #3A2FB8 70%, #2A2280 100%);
 
   /* Legacy aliases (keep for backwards compat with existing pages) */
   --bg:        var(--canvas);
@@ -91,9 +93,9 @@
   --shadow-xs: 0 1px 2px rgba(22,23,29,0.06);
   --shadow-sm: 0 1px 2px rgba(22,23,29,0.05), 0 2px 6px rgba(22,23,29,0.05);
   --shadow-lg: 0 4px 8px rgba(22,23,29,0.05), 0 18px 40px rgba(22,23,29,0.14);
-  --ring:      0 0 0 3px rgba(232,22,32,0.22);
-  --shadow-brand:   0 4px 14px rgba(232,22,32,0.32);
-  --shadow-brand-h: 0 6px 20px rgba(232,22,32,0.42);
+  --ring:      0 0 0 3px rgba(79,70,229,.18);
+  --shadow-brand:   0 8px 22px -8px rgba(79,70,229,.55);
+  --shadow-brand-h: 0 10px 28px -6px rgba(79,70,229,.65);
 
   /* Motion */
   --ease:     cubic-bezier(0.4, 0, 0.2, 1);
