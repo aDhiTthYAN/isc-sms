@@ -20,7 +20,7 @@ import { sendAssignmentEmail } from '../firebase/emailService';
 import {
   Plus, Upload, UserPlus, ChevronRight, ArrowLeft,
   Download, CheckSquare, Users, Trash2, Settings,
-  AlertTriangle, CheckCircle, X, Search, Pencil
+  AlertTriangle, CheckCircle, X, Search, Pencil, Clock
 } from 'lucide-react';
 
 const COURSES = ['Python','Data Science','Web Development','Machine Learning','Digital Marketing','UI/UX Design','Cyber Security','ISC Level 1','ISC Level 2','AI Batch','Other'];
@@ -1018,10 +1018,10 @@ export default function Batches() {
   };
 
   const slotPillColor = (slot) => {
-    if (slot.status === 'completed')   return { bg:'#D1FAE5', col:'#065F46' };
-    if (slot.status === 'cancelled')   return { bg:'#FEE2E2', col:'#991B1B' };
-    if (slot.status === 'rescheduled') return { bg:'#FEF3C7', col:'#92400E' };
-    return { bg:'#DBEAFE', col:'#0F3460' };
+    if (slot.status === 'completed')   return { bg:'var(--green-soft)', col:'var(--green-ink)' };
+    if (slot.status === 'cancelled')   return { bg:'var(--red-soft)',   col:'var(--red-ink)' };
+    if (slot.status === 'rescheduled') return { bg:'var(--amber-soft)', col:'var(--amber-ink)' };
+    return { bg:'var(--teal-soft)', col:'var(--teal-ink)' };
   };
 
   if (loading) return <Loading/>;
@@ -1172,15 +1172,15 @@ export default function Batches() {
         {/* Batch info strip */}
         <div style={{ display:'grid', gridTemplateColumns:'repeat(5,1fr)', gap:10, marginBottom:16 }}>
           {[
-            { label:'Total Students',  value:count,                                                 color:'#0F3460', bg:'#DBEAFE' },
-            { label:'Active',          value:batchStudents.filter(s=>s.status==='active').length,   color:'#10B981', bg:'#D1FAE5' },
-            { label:'At Risk',         value:batchStudents.filter(s=>s.status==='at-risk').length,  color:'#EF4444', bg:'#FEE2E2' },
-            { label:'Onboarding Done', value:fullyOnboarded,                                         color:'#8B5CF6', bg:'#EDE9FE' },
-            { label:'Course Progress', value:`${pct}%`,                                              color:'#E53935', bg:'#FEE2E2' },
+            { label:'Total Students',  value:count,                                                              color:'var(--blue-ink)',    bg:'var(--blue-soft)' },
+            { label:'Active',          value:batchStudents.filter(s=>s.status==='active').length,                color:'var(--green-ink)',   bg:'var(--green-soft)' },
+            { label:'At Risk',         value:batchStudents.filter(s=>s.status==='at-risk').length,               color:'var(--red-ink)',     bg:'var(--red-soft)' },
+            { label:'Onboarding Done', value:fullyOnboarded,                                                     color:'var(--violet-ink)', bg:'var(--violet-soft)' },
+            { label:'Course Progress', value:`${pct}%`,                                                          color:'var(--brand)',       bg:'var(--brand-50)' },
           ].map(c => (
-            <div key={c.label} style={{ background:'#fff', borderRadius:10, border:'1px solid #E5E7EB', padding:'12px 16px', boxShadow:'0 1px 3px rgba(0,0,0,0.06)' }}>
-              <div style={{ fontSize:11, color:'#6B7280', marginBottom:4, fontWeight:500 }}>{c.label}</div>
-              <div style={{ fontSize:22, fontWeight:700, color:c.color }}>{c.value}</div>
+            <div key={c.label} style={{ background:'var(--surface)', borderRadius:12, border:'1px solid var(--border)', padding:'12px 16px', boxShadow:'var(--shadow-xs)' }}>
+              <div style={{ fontSize:11, color:'var(--text-muted)', marginBottom:4, fontWeight:500 }}>{c.label}</div>
+              <div style={{ fontSize:22, fontWeight:700, color:c.color, fontFamily:'var(--font-display)' }}>{c.value}</div>
             </div>
           ))}
         </div>
@@ -1376,87 +1376,137 @@ export default function Batches() {
         })()}
 
         {/* ── ONBOARDING ANALYTICS TAB ── */}
-        {activeTab === 'onboarding' && (
-          <div>
-            {/* Summary Banner */}
-            <div style={{ background: 'linear-gradient(135deg, #1A1A2E 0%, #0F3460 100%)', borderRadius: 14, padding: '22px 28px', marginBottom: 20, display: 'flex', alignItems: 'center', gap: 24 }}>
-              {/* Progress Ring */}
-              <div style={{ flexShrink: 0 }}>
-                <svg width="90" height="90" viewBox="0 0 90 90">
-                  <circle cx="45" cy="45" r="38" fill="none" stroke="rgba(255,255,255,0.12)" strokeWidth="9"/>
-                  <circle cx="45" cy="45" r="38" fill="none" stroke={count > 0 && fullyOnboarded === count ? '#10B981' : '#E53935'}
-                    strokeWidth="9" strokeLinecap="round"
-                    strokeDasharray={`${2 * Math.PI * 38}`}
-                    strokeDashoffset={`${2 * Math.PI * 38 * (1 - (count > 0 ? fullyOnboarded / count : 0))}`}
-                    transform="rotate(-90 45 45)"
-                    style={{ transition: 'stroke-dashoffset 0.6s ease' }}
-                  />
-                  <text x="45" y="49" textAnchor="middle" fontSize="18" fontWeight="700" fill="#fff">
-                    {count > 0 ? Math.round(fullyOnboarded / count * 100) : 0}%
-                  </text>
-                </svg>
-              </div>
-              <div style={{ color: '#fff' }}>
-                <div style={{ fontSize: 22, fontWeight: 700, marginBottom: 4 }}>
-                  {fullyOnboarded} of {count} students completed full onboarding
-                </div>
-                <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)' }}>
-                  {count - fullyOnboarded} students still have pending steps · {batchFlow.length} total steps in this batch
-                </div>
-              </div>
-            </div>
+        {activeTab === 'onboarding' && (() => {
+          const onboardingSteps = flowAnalytics.filter(s => s.phase === 'onboarding');
+          const courseSteps = flowAnalytics.filter(s => s.phase === 'course');
+          const overallPct = flowAnalytics.length > 0
+            ? Math.round(flowAnalytics.reduce((sum, s) => sum + s.pct, 0) / flowAnalytics.length)
+            : 0;
+          const stillOnboarding = batchStudents.filter(s => !batchFlow.every(step => s.courseFlow?.[step.key]?.done)).length;
+          const avgSteps = batchStudents.length > 0
+            ? (flowAnalytics.reduce((sum, s) => sum + s.completed, 0) / batchStudents.length).toFixed(1)
+            : '0.0';
+          const barColor = (pct) => pct >= 66 ? 'var(--green)' : pct >= 33 ? 'var(--amber)' : pct > 0 ? 'var(--brand)' : 'var(--n-300)';
 
-            {/* Step-by-step table */}
-            <div style={{ background: '#fff', borderRadius: 14, border: '1px solid #E5E7EB', overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-                <thead>
-                  <tr style={{ background: '#F8FAFC' }}>
-                    {['#', 'Step Name', 'Phase', 'Completed', 'Not Completed', 'Progress', ''].map(h => (
-                      <th key={h} style={{ padding: '11px 14px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.05em', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {flowAnalytics.map((step, idx) => (
-                    <tr key={step.key} style={{ background: idx % 2 === 0 ? '#fff' : '#FAFBFC', transition: 'background 0.12s' }}
-                      onMouseEnter={e => e.currentTarget.style.background = '#F0F4FF'}
-                      onMouseLeave={e => e.currentTarget.style.background = idx % 2 === 0 ? '#fff' : '#FAFBFC'}
-                    >
-                      <td style={{ padding: '11px 14px', color: '#9CA3AF', fontSize: 12 }}>{idx + 1}</td>
-                      <td style={{ padding: '11px 14px', fontWeight: 600 }}>{step.label}</td>
-                      <td style={{ padding: '11px 14px' }}>
-                        <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 20, fontWeight: 600, background: step.phase === 'onboarding' ? '#DBEAFE' : '#EDE9FE', color: step.phase === 'onboarding' ? '#1E40AF' : '#6D28D9', textTransform: 'capitalize' }}>
-                          {step.phase}
-                        </span>
-                      </td>
-                      <td style={{ padding: '11px 14px' }}>
-                        <span style={{ fontWeight: 700, color: '#10B981' }}>{step.completed}</span>
-                        <span style={{ color: '#9CA3AF', fontSize: 11, marginLeft: 4 }}>({step.pct}%)</span>
-                      </td>
-                      <td style={{ padding: '11px 14px' }}>
-                        <span style={{ fontWeight: 600, color: step.notCompleted > 0 ? '#EF4444' : '#10B981' }}>{step.notCompleted}</span>
-                      </td>
-                      <td style={{ padding: '11px 14px', minWidth: 100 }}>
-                        <div style={{ height: 6, background: '#E5E7EB', borderRadius: 4, overflow: 'hidden' }}>
-                          <div style={{ height: '100%', width: `${step.pct}%`, background: step.pct === 100 ? '#10B981' : step.pct > 60 ? '#F59E0B' : '#E53935', transition: 'width 0.3s' }} />
-                        </div>
-                      </td>
-                      <td style={{ padding: '11px 14px' }}>
-                        <button
-                          className="btn btn-ghost btn-sm"
-                          style={{ fontSize: 11, whiteSpace: 'nowrap' }}
-                          onClick={() => setSelectedStep(step)}
-                        >
-                          View Students <ChevronRight size={11} />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+          const StepRow = ({ step, globalIdx }) => (
+            <div
+              onClick={() => setSelectedStep(step)}
+              style={{ display:'flex', alignItems:'center', gap:12, padding:'12px 20px', cursor:'pointer', transition:'background 0.12s', position:'relative', zIndex:1 }}
+              onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-hover)'}
+              onMouseLeave={e => e.currentTarget.style.background = ''}
+            >
+              <div style={{ flexShrink:0, width:30, height:30, borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center', fontSize:12, fontWeight:700,
+                background: step.completed > 0 ? 'var(--brand)' : 'var(--surface-sunken)',
+                color: step.completed > 0 ? '#fff' : 'var(--text-muted)',
+                border: `2px solid ${step.completed > 0 ? 'var(--brand)' : 'var(--border)'}`,
+              }}>
+                {globalIdx + 1}
+              </div>
+              <div style={{ flex:1, minWidth:0 }}>
+                <div style={{ fontSize:13.5, fontWeight:600, color:'var(--text)', marginBottom:5 }}>{step.label}</div>
+                <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                  <div style={{ flex:1, height:6, background:'var(--n-150)', borderRadius:3, maxWidth:320, overflow:'hidden' }}>
+                    <div style={{ height:'100%', width:`${step.pct}%`, background:barColor(step.pct), borderRadius:3, transition:'width 0.4s' }} />
+                  </div>
+                  <span style={{ fontSize:12, fontWeight:600, color:'var(--text-sub)', whiteSpace:'nowrap' }}>{step.pct}%</span>
+                </div>
+              </div>
+              <div style={{ display:'flex', alignItems:'center', gap:10, flexShrink:0 }}>
+                <span style={{ fontSize:13, fontWeight:600, color:'var(--text-sub)', whiteSpace:'nowrap' }}>{step.completed}/{step.total}</span>
+                {step.notCompleted > 0 && (
+                  <span style={{ fontSize:11, padding:'2px 8px', borderRadius:20, background:'var(--red-soft)', color:'var(--red-ink)', fontWeight:600, whiteSpace:'nowrap' }}>
+                    {step.notCompleted} pending
+                  </span>
+                )}
+                <span style={{ fontSize:12, color:'var(--brand)', fontWeight:600 }}>View ›</span>
+              </div>
             </div>
-          </div>
-        )}
+          );
+
+          const PhaseGroup = ({ label, steps }) => (
+            <div style={{ marginBottom:0 }}>
+              <div style={{ padding:'8px 20px', fontSize:11, fontWeight:700, color:'var(--text-muted)', letterSpacing:'0.06em', textTransform:'uppercase', background:'var(--n-50)', borderTop:'1px solid var(--border)' }}>
+                {label}
+              </div>
+              <div style={{ position:'relative' }}>
+                <div style={{ position:'absolute', left:34, top:0, bottom:0, width:2, background:'var(--border)', zIndex:0 }} />
+                {steps.map((step) => <StepRow key={step.key} step={step} globalIdx={flowAnalytics.indexOf(step)} />)}
+              </div>
+            </div>
+          );
+
+          return (
+            <div>
+              {/* Hero row */}
+              <div style={{ display:'grid', gridTemplateColumns:'1.4fr 1fr', gap:12, marginBottom:16 }}>
+                <div style={{ background:'var(--grad-mesh)', borderRadius:18, padding:'24px 28px', color:'#fff', position:'relative', overflow:'hidden' }}>
+                  <div style={{ position:'absolute', top:-60, right:-40, width:200, height:200, borderRadius:'50%', background:'rgba(255,255,255,0.06)', pointerEvents:'none' }} />
+                  <div style={{ fontSize:11, fontWeight:700, letterSpacing:'0.07em', color:'rgba(255,255,255,0.7)', textTransform:'uppercase', marginBottom:10 }}>
+                    OVERALL ONBOARDING
+                  </div>
+                  <div style={{ display:'flex', alignItems:'flex-end', gap:12, marginBottom:16 }}>
+                    <span style={{ fontSize:46, fontWeight:700, fontFamily:'var(--font-display)', lineHeight:1 }}>{overallPct}%</span>
+                    <span style={{ fontSize:14, color:'rgba(255,255,255,0.75)', paddingBottom:4 }}>
+                      {fullyOnboarded} of {count} fully onboarded
+                    </span>
+                  </div>
+                  <div style={{ display:'flex', gap:3, marginBottom:12 }}>
+                    {flowAnalytics.map((step) => (
+                      <div key={step.key} style={{ flex:1, height:8, borderRadius:4, background: step.completed > 0 ? 'rgba(255,255,255,0.92)' : 'rgba(255,255,255,0.22)' }} />
+                    ))}
+                  </div>
+                  <div style={{ fontSize:12, color:'rgba(255,255,255,0.65)' }}>
+                    {batchFlow.length} steps · {avgSteps} avg steps completed per student
+                  </div>
+                </div>
+                <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+                  <div style={{ flex:1, background:'var(--surface)', borderRadius:14, border:'1px solid var(--border)', padding:'18px 20px', boxShadow:'var(--shadow-xs)', display:'flex', alignItems:'center', gap:14 }}>
+                    <div style={{ width:40, height:40, borderRadius:12, background:'var(--green-soft)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+                      <CheckCircle size={20} style={{ color:'var(--green)' }} />
+                    </div>
+                    <div>
+                      <div style={{ fontSize:24, fontWeight:700, fontFamily:'var(--font-display)', color:'var(--text)' }}>{fullyOnboarded}/{count}</div>
+                      <div style={{ fontSize:12, color:'var(--text-muted)', marginTop:2 }}>Fully onboarded</div>
+                    </div>
+                  </div>
+                  <div style={{ flex:1, background:'var(--surface)', borderRadius:14, border:'1px solid var(--border)', padding:'18px 20px', boxShadow:'var(--shadow-xs)', display:'flex', alignItems:'center', gap:14 }}>
+                    <div style={{ width:40, height:40, borderRadius:12, background:'var(--amber-soft)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+                      <Clock size={20} style={{ color:'var(--amber)' }} />
+                    </div>
+                    <div>
+                      <div style={{ fontSize:24, fontWeight:700, fontFamily:'var(--font-display)', color:'var(--text)' }}>{stillOnboarding}</div>
+                      <div style={{ fontSize:12, color:'var(--text-muted)', marginTop:2 }}>Still in onboarding</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Funnel list */}
+              <div style={{ background:'var(--surface)', borderRadius:16, border:'1px solid var(--border)', overflow:'hidden', boxShadow:'var(--shadow-sm)' }}>
+                <div style={{ padding:'16px 20px', borderBottom:'1px solid var(--border)', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+                  <div style={{ fontWeight:700, fontSize:15, color:'var(--text)' }}>Onboarding funnel</div>
+                  <div style={{ display:'flex', gap:14, fontSize:12, color:'var(--text-muted)' }}>
+                    <span style={{ display:'flex', alignItems:'center', gap:5 }}>
+                      <span style={{ width:8, height:8, borderRadius:'50%', background:'var(--brand)', display:'inline-block' }} />
+                      Onboarding
+                    </span>
+                    <span style={{ display:'flex', alignItems:'center', gap:5 }}>
+                      <span style={{ width:8, height:8, borderRadius:'50%', background:'var(--teal)', display:'inline-block' }} />
+                      Course
+                    </span>
+                  </div>
+                </div>
+                {onboardingSteps.length > 0 && <PhaseGroup label="Onboarding Phase" steps={onboardingSteps} />}
+                {courseSteps.length > 0 && <PhaseGroup label="Course Phase" steps={courseSteps} />}
+                {flowAnalytics.length === 0 && (
+                  <div style={{ padding:48, textAlign:'center', color:'var(--text-muted)', fontSize:13 }}>
+                    No course flow steps configured. Click "Course Flow" to add steps.
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })()}
 
         {/* ── SCHEDULE TAB ── */}
         {activeTab === 'schedule' && (() => {
@@ -1509,12 +1559,12 @@ export default function Batches() {
               {/* Calendar toolbar */}
               <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:14, flexWrap:'wrap' }}>
                 {/* View toggle */}
-                <div style={{ display:'flex', background:'#F3F4F6', borderRadius:8, padding:2 }}>
+                <div style={{ display:'flex', background:'var(--n-100)', borderRadius:8, padding:2 }}>
                   {['week','month'].map(v => (
                     <button key={v} onClick={() => setCalendarView(v)}
                       style={{ padding:'5px 14px', borderRadius:6, border:'none', cursor:'pointer', fontSize:12, fontWeight:600,
-                        background: calendarView === v ? '#0F3460' : 'transparent',
-                        color: calendarView === v ? '#fff' : '#6B7280',
+                        background: calendarView === v ? 'var(--brand)' : 'transparent',
+                        color: calendarView === v ? '#fff' : 'var(--text-muted)',
                         transition:'all 0.15s' }}
                     >{v.charAt(0).toUpperCase()+v.slice(1)}</button>
                   ))}
@@ -1554,20 +1604,20 @@ export default function Batches() {
                     return (
                       <div key={idx} style={{
                         background: '#fff', borderRadius: 10,
-                        border: `2px solid ${isToday ? '#0F3460' : '#E5E7EB'}`,
+                        border: `2px solid ${isToday ? 'var(--brand)' : 'var(--border)'}`,
                         minHeight: 140, padding: '10px 8px',
-                        boxShadow: isToday ? '0 0 0 2px #0F346030' : '0 1px 3px rgba(0,0,0,0.05)',
+                        boxShadow: isToday ? '0 0 0 2px rgba(79,70,229,0.18)' : '0 1px 3px rgba(0,0,0,0.05)',
                       }}>
                         <div style={{ textAlign:'center', marginBottom:8 }}>
-                          <div style={{ fontSize:11, color: isToday ? '#0F3460' : '#9CA3AF', fontWeight:600 }}>{dayLabel}</div>
+                          <div style={{ fontSize:11, color: isToday ? 'var(--brand)' : 'var(--text-muted)', fontWeight:600 }}>{dayLabel}</div>
                           <div style={{
                             width:28, height:28, borderRadius:'50%', margin:'4px auto 0',
-                            background: isToday ? '#0F3460' : 'transparent',
-                            color: isToday ? '#fff' : '#1A1A2E',
+                            background: isToday ? 'var(--brand)' : 'transparent',
+                            color: isToday ? '#fff' : 'var(--text)',
                             display:'flex', alignItems:'center', justifyContent:'center',
                             fontWeight:700, fontSize:14,
                           }}>{dateNum}</div>
-                          {isToday && <div style={{ fontSize:9, color:'#0F3460', fontWeight:600 }}>{monthShort}</div>}
+                          {isToday && <div style={{ fontSize:9, color:'var(--brand)', fontWeight:600 }}>{monthShort}</div>}
                         </div>
                         <div>
                           {slots.map(slot => <SlotPill key={slot.id} slot={slot} compact />)}
@@ -1595,12 +1645,12 @@ export default function Batches() {
                         <div key={idx} style={{
                           background: inMonth ? '#fff' : '#F9FAFB',
                           borderRadius: 8, minHeight: 80, padding: '6px',
-                          border: `1px solid ${isToday ? '#0F3460' : '#E5E7EB'}`,
+                          border: `1px solid ${isToday ? 'var(--brand)' : 'var(--border)'}`,
                           opacity: inMonth ? 1 : 0.4,
                         }}>
                           <div style={{
                             width:22, height:22, borderRadius:'50%',
-                            background: isToday ? '#0F3460' : 'transparent',
+                            background: isToday ? 'var(--brand)' : 'transparent',
                             color: isToday ? '#fff' : inMonth ? '#1A1A2E' : '#9CA3AF',
                             display:'flex', alignItems:'center', justifyContent:'center',
                             fontWeight: isToday ? 700 : 500, fontSize:12, marginBottom:4,
@@ -1852,8 +1902,8 @@ export default function Batches() {
                         onClick={() => setTaskFilter(f)}
                         style={{
                           padding: '5px 12px', borderRadius: 20, fontSize: 12, fontWeight: 600, cursor: 'pointer', border: 'none',
-                          background: taskFilter === f ? '#1A1A2E' : '#F3F4F6',
-                          color: taskFilter === f ? '#fff' : '#6B7280',
+                          background: taskFilter === f ? 'var(--brand)' : 'var(--n-100)',
+                          color: taskFilter === f ? '#fff' : 'var(--text-muted)',
                           textTransform: 'capitalize',
                         }}
                       >{f === 'all' ? 'Show All' : f}</button>

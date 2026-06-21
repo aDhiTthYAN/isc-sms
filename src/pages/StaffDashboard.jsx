@@ -230,7 +230,7 @@ export default function StaffDashboard() {
   const atRisk          = students.filter(s => s.status === 'at-risk');
 
   const statCards = [
-    { label: 'My Students',     value: students.length,         color: '#0F3460', bg: '#DBEAFE', icon: Users,          link: '/students'  },
+    { label: 'My Students',     value: students.length,         color: 'var(--blue-ink)', bg: 'var(--blue-soft)', icon: Users,          link: '/students'  },
     { label: 'Pending Tasks',   value: pendingTasks.length,     color: '#F59E0B', bg: '#FEF3C7', icon: CheckSquare,    link: '/tasks'     },
     { label: 'Open Follow-Ups', value: pendingFollowups.length, color: '#10B981', bg: '#D1FAE5', icon: PhoneCall,      link: '/followups' },
     { label: 'At-Risk Students',value: atRisk.length,           color: '#EF4444', bg: '#FEE2E2', icon: AlertTriangle,  link: '/students'  },
@@ -238,9 +238,9 @@ export default function StaffDashboard() {
 
   const sHead = (title, to, label = 'View all') => (
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-      <h3 style={{ fontSize: 15, fontWeight: 700, color: '#1A1A2E' }}>{title}</h3>
+      <h3 style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>{title}</h3>
       {to && (
-        <Link to={to} style={{ fontSize: 12, color: '#E53935', display: 'flex', alignItems: 'center', gap: 3, fontWeight: 500 }}>
+        <Link to={to} style={{ fontSize: 12, color: 'var(--brand)', display: 'flex', alignItems: 'center', gap: 3, fontWeight: 500 }}>
           {label} <ChevronRight size={13} />
         </Link>
       )}
@@ -255,7 +255,7 @@ export default function StaffDashboard() {
       {/* Welcome */}
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom: 24 }}>
         <div>
-          <h2 style={{ fontSize: 24, fontWeight: 700, color: '#1A1A2E', marginBottom: 4 }}>
+          <h2 style={{ fontSize: 24, fontWeight: 700, color: 'var(--text)', marginBottom: 4 }}>
             Welcome back, {profile?.name?.split(' ')[0]}
           </h2>
           <div style={{ fontSize: 13, color: '#9CA3AF' }}>
@@ -266,15 +266,15 @@ export default function StaffDashboard() {
         <div style={{ display:'flex', gap:8 }}>
           <button onClick={() => { setShowSidebar(true); setSidebarTab('requests'); }}
             style={{ position:'relative', background:'#fff', border:'1px solid #E5E7EB', borderRadius:10, padding:'8px 12px', cursor:'pointer', display:'flex', alignItems:'center', gap:6, fontSize:13, fontWeight:600 }}>
-            <Inbox size={15} style={{ color:'#0F3460' }}/>
+            <Inbox size={15} style={{ color:'var(--brand)' }}/>
             My Requests
-            {pendingReqs > 0 && <span style={{ background:'#E53935', color:'#fff', fontSize:10, fontWeight:700, borderRadius:'50%', width:18, height:18, display:'flex', alignItems:'center', justifyContent:'center' }}>{pendingReqs}</span>}
+            {pendingReqs > 0 && <span style={{ background:'var(--brand)', color:'#fff', fontSize:10, fontWeight:700, borderRadius:'50%', width:18, height:18, display:'flex', alignItems:'center', justifyContent:'center' }}>{pendingReqs}</span>}
           </button>
           <button onClick={() => { setShowSidebar(true); setSidebarTab('notif'); }}
             style={{ position:'relative', background:'#fff', border:'1px solid #E5E7EB', borderRadius:10, padding:'8px 12px', cursor:'pointer', display:'flex', alignItems:'center', gap:6, fontSize:13, fontWeight:600 }}>
-            <Bell size={15} style={{ color:'#0F3460' }}/>
+            <Bell size={15} style={{ color:'var(--brand)' }}/>
             Notifications
-            {unreadNotifs > 0 && <span style={{ background:'#E53935', color:'#fff', fontSize:10, fontWeight:700, borderRadius:'50%', width:18, height:18, display:'flex', alignItems:'center', justifyContent:'center' }}>{unreadNotifs}</span>}
+            {unreadNotifs > 0 && <span style={{ background:'var(--brand)', color:'#fff', fontSize:10, fontWeight:700, borderRadius:'50%', width:18, height:18, display:'flex', alignItems:'center', justifyContent:'center' }}>{unreadNotifs}</span>}
           </button>
         </div>
       </div>
@@ -289,7 +289,7 @@ export default function StaffDashboard() {
                 {[{ key:'notif', label:'Notifications' }, { key:'requests', label:'My Requests' }].map(t => (
                   <button key={t.key} onClick={() => setSidebarTab(t.key)}
                     style={{ padding:'5px 12px', borderRadius:6, border:'none', cursor:'pointer', fontSize:12, fontWeight:600,
-                      background: sidebarTab===t.key ? '#0F3460' : 'transparent',
+                      background: sidebarTab===t.key ? 'var(--brand)' : 'transparent',
                       color: sidebarTab===t.key ? '#fff' : '#6B7280' }}>
                     {t.label}
                   </button>
@@ -305,7 +305,7 @@ export default function StaffDashboard() {
                     <div key={n.id} onClick={() => markNotificationRead(n.id).then(() => setNotifications(prev => prev.map(x => x.id===n.id ? { ...x, read:true } : x)))}
                       style={{ padding:'10px 12px', borderRadius:10, marginBottom:8, cursor:'pointer',
                         background: n.read ? '#FAFBFC' : '#EFF6FF', border:`1px solid ${n.read ? '#E5E7EB' : '#BFDBFE'}` }}>
-                      <div style={{ fontSize:13, fontWeight:n.read ? 400 : 700, color:'#1A1A2E', marginBottom:2 }}>{n.title}</div>
+                      <div style={{ fontSize:13, fontWeight:n.read ? 400 : 700, color:'var(--text)', marginBottom:2 }}>{n.title}</div>
                       <div style={{ fontSize:12, color:'#6B7280' }}>{n.body}</div>
                     </div>
                   ))}
@@ -426,12 +426,12 @@ export default function StaffDashboard() {
           <div style={{ ...CARD, marginBottom: 20 }}>
             {/* Title + batch chips row */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
-              <h3 style={{ fontSize: 15, fontWeight: 700, color: '#1A1A2E' }}>📅 Batch Activity Hub <span style={{ fontSize: 12, color: '#9CA3AF', fontWeight: 400 }}>(active only)</span></h3>
+              <h3 style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>📅 Batch Activity Hub <span style={{ fontSize: 12, color: '#9CA3AF', fontWeight: 400 }}>(active only)</span></h3>
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                 {myBatches.map(b => (
                   <button key={b.id} onClick={() => { setHubBatch(b.id); setHubFilter('all'); setHubTypeFilter(''); setHubSearch(''); setHubPage(0); }}
                     style={{ padding: '5px 14px', borderRadius: 20, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 600, transition: 'all 0.15s',
-                      background: hubBatch === b.id ? '#0F3460' : '#F3F4F6',
+                      background: hubBatch === b.id ? 'var(--brand)' : '#F3F4F6',
                       color:      hubBatch === b.id ? '#fff'    : '#374151' }}>
                     {b.name}
                   </button>
@@ -452,7 +452,7 @@ export default function StaffDashboard() {
                   ].map(f => (
                     <button key={f.key} onClick={() => { setHubFilter(f.key); setHubTypeFilter(''); setHubPage(0); }}
                       style={{ padding: '4px 12px', borderRadius: 20, border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 600,
-                        background: hubFilter === f.key ? '#0F3460' : '#E5E7EB',
+                        background: hubFilter === f.key ? 'var(--brand)' : '#E5E7EB',
                         color:      hubFilter === f.key ? '#fff'    : '#374151' }}>
                       {f.label}
                     </button>
@@ -505,7 +505,7 @@ export default function StaffDashboard() {
                 {/* Clear */}
                 {(hubSearch || hubTypeFilter || hubCourse || hubFilter !== 'all' || hubTimeFilter !== 'active') && (
                   <button onClick={() => { setHubFilter('all'); setHubTypeFilter(''); setHubCourse(''); setHubSearch(''); setHubTimeFilter('active'); setHubPage(0); }}
-                    style={{ padding: '4px 10px', borderRadius: 8, border: '1px solid #E5E7EB', fontSize: 11, background: '#fff', cursor: 'pointer', color: '#E53935', fontWeight: 600 }}>
+                    style={{ padding: '4px 10px', borderRadius: 8, border: '1px solid #E5E7EB', fontSize: 11, background: '#fff', cursor: 'pointer', color: 'var(--brand)', fontWeight: 600 }}>
                     Clear
                   </button>
                 )}
@@ -523,7 +523,7 @@ export default function StaffDashboard() {
               <>
                 {/* Count row */}
                 <div style={{ display: 'flex', gap: 16, marginBottom: 10, fontSize: 12, color: '#6B7280', flexWrap: 'wrap' }}>
-                  <span style={{ fontWeight: 600, color: '#1A1A2E' }}>{list.length} item{list.length !== 1 ? 's' : ''}</span>
+                  <span style={{ fontWeight: 600, color: 'var(--text)' }}>{list.length} item{list.length !== 1 ? 's' : ''}</span>
                   <span>🗓 {hubItems.filter(i=>i._kind==='schedule').length} classes</span>
                   <span>📝 {hubItems.filter(i=>i._kind==='assessment').length} assessments</span>
                   <span>✅ {hubItems.filter(i=>i._kind==='task').length} assignments</span>
@@ -543,7 +543,7 @@ export default function StaffDashboard() {
                           onMouseLeave={e => e.currentTarget.style.background = '#fff'}>
                           <div style={{ width: 9, height: 9, borderRadius: '50%', background: c.dot, flexShrink: 0 }} />
                           <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ fontSize: 13, fontWeight: 600, color: '#1A1A2E', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item._label}</div>
+                            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item._label}</div>
                             {item._sub && <div style={{ fontSize: 11, color: '#6B7280', marginTop: 1 }}>{item._sub}</div>}
                           </div>
                           {item._type && (
@@ -685,7 +685,7 @@ export default function StaffDashboard() {
                   onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
                   onClick={() => navigate(`/students/${s.id}`)}
                 >
-                  <div style={{ width: 30, height: 30, borderRadius: '50%', background: '#FEE2E2', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: '#E53935', flexShrink: 0 }}>
+                  <div style={{ width: 30, height: 30, borderRadius: '50%', background: '#FEE2E2', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: 'var(--brand)', flexShrink: 0 }}>
                     {(s.name || '?').charAt(0).toUpperCase()}
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
@@ -696,7 +696,7 @@ export default function StaffDashboard() {
                 </div>
               ))}
               {atRisk.length > 5 && (
-                <Link to="/students" style={{ fontSize: 12, color: '#E53935', textAlign: 'center', padding: '6px 0', fontWeight: 500 }}>
+                <Link to="/students" style={{ fontSize: 12, color: 'var(--brand)', textAlign: 'center', padding: '6px 0', fontWeight: 500 }}>
                   +{atRisk.length - 5} more →
                 </Link>
               )}

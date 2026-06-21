@@ -329,7 +329,7 @@ export default function StudentProfile() {
                   return (
                     <div key={row.label}>
                       <div style={{ color:'#9CA3AF', fontSize:10, fontWeight:600, textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:3 }}>{row.label}</div>
-                      <div style={{ display:'flex', alignItems:'center', gap:5, color:'#1A1A2E' }}>
+                      <div style={{ display:'flex', alignItems:'center', gap:5, color:'var(--text)' }}>
                         <Icon size={12} style={{ color:'#9CA3AF' }}/> {row.val}
                       </div>
                     </div>
@@ -516,7 +516,7 @@ export default function StudentProfile() {
                         }
                       </button>
                       <div style={{ flex:1 }}>
-                        <div style={{ fontSize:13, fontWeight: fs?.done?500:400, color: fs?.done?'#1A1A2E':'#6B7280', textDecoration: fs?.done?'none':'none' }}>
+                        <div style={{ fontSize:13, fontWeight: fs?.done?500:400, color: fs?.done?'var(--text)':'#6B7280', textDecoration: fs?.done?'none':'none' }}>
                           {step.label}
                         </div>
                         {fs?.done && (

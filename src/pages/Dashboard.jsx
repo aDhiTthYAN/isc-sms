@@ -84,8 +84,8 @@ function BatchActivityHub({ batches, schedBatch, setSchedBatch, schedFilter, set
           {batches.map(b => (
             <button key={b.id} onClick={() => { setSchedBatch(b.id); clearAll(); }}
               style={{ padding: '5px 14px', borderRadius: 20, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 600,
-                background: schedBatch === b.id ? '#0F3460' : '#F3F4F6',
-                color: schedBatch === b.id ? '#fff' : '#374151', transition: 'all 0.15s' }}>
+                background: schedBatch === b.id ? 'var(--brand)' : 'var(--n-100)',
+                color: schedBatch === b.id ? '#fff' : 'var(--text-sub)', transition: 'all 0.15s' }}>
               {b.name}
             </button>
           ))}
@@ -100,7 +100,7 @@ function BatchActivityHub({ batches, schedBatch, setSchedBatch, schedFilter, set
             {[{key:'all',label:'All'},{key:'schedule',label:'🗓 Classes'},{key:'assessment',label:'📝 Assessments'},{key:'task',label:'✅ Tasks'}].map(f => (
               <button key={f.key} onClick={() => { setSchedFilter(f.key); setSchedTypeFilter(''); }}
                 style={{ padding: '4px 12px', borderRadius: 20, border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 600,
-                  background: schedFilter === f.key ? '#0F3460' : '#E5E7EB', color: schedFilter === f.key ? '#fff' : '#374151' }}>
+                  background: schedFilter === f.key ? 'var(--brand)' : 'var(--n-150)', color: schedFilter === f.key ? '#fff' : 'var(--text-sub)' }}>
                 {f.label}
               </button>
             ))}
@@ -111,7 +111,7 @@ function BatchActivityHub({ batches, schedBatch, setSchedBatch, schedFilter, set
             {[{key:'active',label:'⚡ Active'},{key:'upcoming',label:'📅 Upcoming'},{key:'past',label:'🕐 Past'},{key:'all',label:'All Time'}].map(f => (
               <button key={f.key} onClick={() => setSchedTimeFilter(f.key)}
                 style={{ padding: '4px 10px', borderRadius: 20, border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 600,
-                  background: schedTimeFilter === f.key ? '#E53935' : '#E5E7EB', color: schedTimeFilter === f.key ? '#fff' : '#374151' }}>
+                  background: schedTimeFilter === f.key ? 'var(--brand)' : 'var(--n-150)', color: schedTimeFilter === f.key ? '#fff' : 'var(--text-sub)' }}>
                 {f.label}
               </button>
             ))}
@@ -399,7 +399,7 @@ export default function Dashboard() {
 
   const kpis = [
     { label: 'Total Students',     value: totalStudents,      sub: 'All enrolled',          color: '#E53935', bg: '#FEE2E2', icon: Users,          link: '/students' },
-    { label: 'Active Batches',     value: activeBatches.length, sub: `${batches.filter(b=>b.status==='upcoming').length} upcoming`, color: '#0F3460', bg: '#DBEAFE', icon: School, link: '/batches' },
+    { label: 'Active Batches',     value: activeBatches.length, sub: `${batches.filter(b=>b.status==='upcoming').length} upcoming`, color: 'var(--blue-ink)', bg: 'var(--blue-soft)', icon: School, link: '/batches' },
     { label: 'At-Risk Students',   value: atRiskCount,        sub: 'Needs attention',       color: '#EF4444', bg: '#FEE2E2', icon: AlertTriangle,  link: '/students' },
     { label: 'Pending Tasks',      value: pendingTasks.length, sub: 'Open tasks',           color: '#F59E0B', bg: '#FEF3C7', icon: CheckSquare,    link: '/tasks'    },
     { label: 'Total Batches',      value: batches.length,     sub: 'Across all programs',   color: '#10B981', bg: '#D1FAE5', icon: TrendingUp,     link: '/batches'  },
@@ -473,11 +473,11 @@ export default function Dashboard() {
               <div style={{ display: 'flex', gap: 8 }}>
                 <button
                   onClick={() => setSidebarTab('requests')}
-                  style={{ padding: '5px 14px', borderRadius: 8, border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: 13, background: sidebarTab === 'requests' ? '#0F3460' : '#F3F4F6', color: sidebarTab === 'requests' ? '#fff' : '#374151' }}
+                  style={{ padding: '5px 14px', borderRadius: 8, border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: 13, background: sidebarTab === 'requests' ? 'var(--brand)' : 'var(--n-100)', color: sidebarTab === 'requests' ? '#fff' : 'var(--text-sub)' }}
                 >Requests {pendingRequests.length > 0 ? `(${pendingRequests.length})` : ''}</button>
                 <button
                   onClick={() => setSidebarTab('notif')}
-                  style={{ padding: '5px 14px', borderRadius: 8, border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: 13, background: sidebarTab === 'notif' ? '#0F3460' : '#F3F4F6', color: sidebarTab === 'notif' ? '#fff' : '#374151' }}
+                  style={{ padding: '5px 14px', borderRadius: 8, border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: 13, background: sidebarTab === 'notif' ? 'var(--brand)' : 'var(--n-100)', color: sidebarTab === 'notif' ? '#fff' : 'var(--text-sub)' }}
                 >Notifications {unreadNotifs > 0 ? `(${unreadNotifs})` : ''}</button>
               </div>
               <button onClick={() => setShowSidebar(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}>
@@ -517,7 +517,7 @@ export default function Dashboard() {
                   ))}
                   <button
                     onClick={() => { setShowSidebar(false); navigate('/requests'); }}
-                    style={{ marginTop: 8, padding: '9px', borderRadius: 8, border: '1px solid #E5E7EB', background: '#fff', color: '#0F3460', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}
+                    style={{ marginTop: 8, padding: '9px', borderRadius: 8, border: '1px solid #E5E7EB', background: '#fff', color: 'var(--brand)', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}
                   >View All Requests →</button>
                 </div>
               )}
@@ -552,8 +552,8 @@ export default function Dashboard() {
       {/* KPI Stat Cards */}
       {(profile?.role === 'ceo' || profile?.role === 'admin') ? (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14, marginBottom: 24 }}>
-          {/* Card 1: Total Students - hero red gradient */}
-          <div style={{ background: 'linear-gradient(135deg, #E81620 0%, #8E0A10 100%)', borderRadius: 14, padding: '22px 22px', color: '#fff', boxShadow: '0 4px 14px rgba(232,22,32,0.25)', cursor: 'pointer' }} onClick={() => navigate('/students')}>
+          {/* Card 1: Total Students - hero indigo gradient */}
+          <div style={{ background: 'var(--grad-brand)', borderRadius: 14, padding: '22px 22px', color: '#fff', boxShadow: 'var(--shadow-brand)', cursor: 'pointer' }} onClick={() => navigate('/students')}>
             <div style={{ fontSize: 11, fontWeight: 600, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 10 }}>Total Students</div>
             <div style={{ fontSize: 36, fontWeight: 800, fontFamily: 'var(--font-display)', lineHeight: 1, marginBottom: 6 }}>{totalStudents}</div>
             <div style={{ fontSize: 12, opacity: 0.75 }}>All enrolled</div>
@@ -615,7 +615,7 @@ export default function Dashboard() {
                     onClick={() => navigate('/batches')}
                   >
                     <td style={{ padding: '11px 12px', fontWeight: 600, color: '#1A1A2E' }}>{batch.name}</td>
-                    <td style={{ padding: '11px 12px' }}><span style={{ fontWeight: 700, fontSize: 15, color: '#0F3460' }}>{count}</span></td>
+                    <td style={{ padding: '11px 12px' }}><span style={{ fontWeight: 700, fontSize: 15, color: 'var(--brand)' }}>{count}</span></td>
                     <td style={{ padding: '11px 12px' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                         <div style={{ flex: 1, height: 6, background: '#E5E7EB', borderRadius: 4, overflow: 'hidden', minWidth: 60 }}>
