@@ -27,8 +27,8 @@ const DEFAULT_batchCourseFlow = [
 ];
 
 const PHASE_LABELS = {
-  onboarding: { label: '🚀 Onboarding Phase', color: '#3B82F6', bg: '#DBEAFE' },
-  course:     { label: '📚 Course Phase',      color: '#10B981', bg: '#D1FAE5' },
+  onboarding: { label: 'Onboarding Phase', color: '#3B82F6', bg: '#DBEAFE' },
+  course:     { label: 'Course Phase',      color: '#10B981', bg: '#D1FAE5' },
 };
 
 const ALL_SUBJECTS = [
@@ -346,7 +346,7 @@ export default function StudentProfile() {
                   fontSize:13,
                 }}>
                   <div style={{ fontWeight:600, marginBottom:3, color: sub.expired?'#991B1B':sub.expiringSoon?'#92400E':'#065F46' }}>
-                    📅 Subscription {sub.expired?'EXPIRED':sub.expiringSoon?'Expiring Soon':'Active'}
+                    Subscription {sub.expired?'EXPIRED':sub.expiringSoon?'Expiring Soon':'Active'}
                   </div>
                   <div style={{ fontSize:12, color:'#6B7280' }}>
                     {student.courseDurationMonths}mo course · Joined {student.joinDate} · Expires {sub.exp.toLocaleDateString('en-IN')} · {sub.expired?`Expired ${Math.abs(sub.days)} days ago`:`${sub.days} days left`}
@@ -356,7 +356,7 @@ export default function StudentProfile() {
 
               {student.notes && (
                 <div style={{ marginTop:12, padding:'10px 14px', background:'#FFFBEB', borderRadius:8, fontSize:13, color:'#92400E' }}>
-                  📝 {student.notes}
+                  {student.notes}
                 </div>
               )}
             </div>
@@ -374,13 +374,13 @@ export default function StudentProfile() {
               {(!student.weakSubjects || student.weakSubjects.length === 0) ? (
                 <div style={{ fontSize:13, color:'#9CA3AF' }}>
                   No weak subjects marked.
-                  <span style={{ color:'#E53935', cursor:'pointer', marginLeft:6 }} onClick={() => setWeakModal(true)}>Add now →</span>
+                  <span style={{ color:'#E53935', cursor:'pointer', marginLeft:6 }} onClick={() => setWeakModal(true)}>Add now </span>
                 </div>
               ) : (
                 <div style={{ display:'flex', flexWrap:'wrap', gap:8 }}>
                   {student.weakSubjects.map(s => (
                     <span key={s} style={{ padding:'5px 12px', borderRadius:20, background:'#FEE2E2', color:'#991B1B', fontSize:12, fontWeight:600 }}>
-                      ⚠️ {s}
+                      {s}
                     </span>
                   ))}
                 </div>
@@ -401,11 +401,10 @@ export default function StudentProfile() {
               </div>
               <div style={{ fontSize:12, color:'#6B7280' }}>
                 {batchCourseFlow.filter(s => !flowStep(s.key)?.done).slice(0,3).map(s => (
-                  <div key={s.key} style={{ marginBottom:3 }}>⏳ {s.label}</div>
+                  <div key={s.key} style={{ marginBottom:3 }}>{s.label}</div>
                 ))}
                 <span style={{ color:'#E53935', cursor:'pointer' }} onClick={() => setActiveTab('courseflow')}>
-                  View all steps →
-                </span>
+                  View all steps                 </span>
               </div>
             </div>
 
@@ -446,7 +445,7 @@ export default function StudentProfile() {
               ))}
               {followups.length === 0 && <div style={{ fontSize:13, color:'#9CA3AF' }}>No follow-ups yet.</div>}
               <span style={{ fontSize:12, color:'#E53935', cursor:'pointer', marginTop:6, display:'block' }} onClick={() => setActiveTab('followups')}>
-                {followups.length > 3 && `View all ${followups.length} →`}
+                {followups.length > 3 && `View all ${followups.length} `}
               </span>
             </div>
           </div>
@@ -457,7 +456,7 @@ export default function StudentProfile() {
       {activeTab === 'courseflow' && (
         <div>
           <div style={{ padding:'10px 14px', background:'#EFF6FF', borderRadius:8, fontSize:12, color:'#1E40AF', marginBottom:16 }}>
-            Track each step of the student's journey from admission to course completion. Click ✓ to mark a step done, add a note for context.
+            Track each step of the student's journey from admission to course completion. Click to mark a step done, add a note for context.
           </div>
 
           {/* Progress summary */}
@@ -521,10 +520,10 @@ export default function StudentProfile() {
                         </div>
                         {fs?.done && (
                           <div style={{ fontSize:11, color:'#6B7280', marginTop:2 }}>
-                            ✅ Done{fs.date && ` on ${fs.date}`}
+                            Done{fs.date && ` on ${fs.date}`}
                             {(fs.value || fs.note) && (
                               <span style={{ display:'block', marginTop:3, color:'#374151', fontStyle:'italic' }}>
-                                📝 {fs.value || fs.note}
+                                {fs.value || fs.note}
                               </span>
                             )}
                           </div>
@@ -665,7 +664,7 @@ export default function StudentProfile() {
             {student.weakSubjects?.length > 0 ? (
               <div style={{ display:'flex', flexWrap:'wrap', gap:8, marginBottom:14 }}>
                 {student.weakSubjects.map(s => (
-                  <span key={s} style={{ padding:'6px 14px', borderRadius:20, background:'#FEE2E2', color:'#991B1B', fontSize:13, fontWeight:600 }}>⚠️ {s}</span>
+                  <span key={s} style={{ padding:'6px 14px', borderRadius:20, background:'#FEE2E2', color:'#991B1B', fontSize:13, fontWeight:600 }}>{s}</span>
                 ))}
               </div>
             ) : (
@@ -783,7 +782,7 @@ export default function StudentProfile() {
                 border:     `1px solid ${weakSubjects.includes(sub)?'#FECACA':'var(--border)'}`,
                 transition:'all .15s',
               }}>
-                {weakSubjects.includes(sub)?'⚠️ ':''}{sub}
+                {weakSubjects.includes(sub)?'':''}{sub}
               </div>
             ))}
           </div>
@@ -807,7 +806,7 @@ export default function StudentProfile() {
           <div style={{ display:'flex', gap:10, justifyContent:'flex-end' }}>
             <button className="btn btn-ghost" onClick={() => { setFlowNoteModal(null); setFlowNote(''); }}>Cancel</button>
             <button className="btn btn-primary" onClick={handleSaveFlowNote} disabled={savingFlow}>
-              {savingFlow?'Saving...':'Mark Complete ✓'}
+              {savingFlow?'Saving...':'Mark Complete '}
             </button>
           </div>
         </Modal>

@@ -3,12 +3,12 @@ import { getTasks, addTask, updateTask, addNotification, getStaffProfiles } from
 import { sendTaskEmail } from '../firebase/emailService';
 import { Modal, Toast, Loading, FormRow } from '../components/ui';
 import { useAuth } from '../context/AuthContext';
-import { Plus, CheckCircle2, Circle, Loader2, Mail } from 'lucide-react';
+import { Plus, CheckCircle2, Circle, Loader2, Mail, Search } from 'lucide-react';
 
 const COLUMNS = [
-  { key: 'pending',     label: 'Pending',     color: '#9CA3AF', icon: Circle },
-  { key: 'in-progress', label: 'In Progress', color: '#F59E0B', icon: Loader2 },
-  { key: 'completed',   label: 'Completed',   color: '#10B981', icon: CheckCircle2 },
+  { key: 'pending',     label: 'Pending',     dotColor: '#9CA3AF', badgeClass: 'badge-gray' },
+  { key: 'in-progress', label: 'In Progress', dotColor: 'var(--amber)', badgeClass: 'badge-amber' },
+  { key: 'completed',   label: 'Completed',   dotColor: 'var(--green)', badgeClass: 'badge-green' },
 ];
 
 export default function Tasks() {
@@ -20,17 +20,11 @@ export default function Tasks() {
   const [toast, setToast]         = useState(null);
   const [saving, setSaving]       = useState(false);
   const [form, setForm] = useState({
-    title: '', staffIds: [], dueDate: '', priority: 'normal', notes: ''
+    title: '', staffId: '', dueDate: '', priority: 'normal', notes: ''
   });
-
-  const toggleStaff = (id) => {
-    setForm(prev => ({
-      ...prev,
-      staffIds: prev.staffIds.includes(id)
-        ? prev.staffIds.filter(x => x !== id)
-        : [...prev.staffIds, id],
-    }));
-  };
+  const [search, setSearch]                 = useState('');
+  const [prioFilter, setPrioFilter]         = useState('');
+  const [assigneeFilter, setAssigneeFilter] = useState('');
 
   const isCEOorAdmin = profile?.role === 'ceo' || profile?.role === 'admin';
 
@@ -52,49 +46,49 @@ export default function Tasks() {
     e.preventDefault();
     setSaving(true);
     try {
-      const selectedStaff = staff.filter(s => form.staffIds.includes(s.id));
-      if (selectedStaff.length === 0) {
-        setToast({ message: 'Please select at least one staff member.', type: 'error' });
+      // Find the selected staff member — email is pulled automatically from Firestore
+      const selectedStaff = staff.find(s => s.id === form.staffId);
+      if (!selectedStaff) {
+        setToast({ message: 'Please select a staff member.', type: 'error' });
         setSaving(false);
         return;
       }
 
-      const notifMessage = `New task assigned by ${profile?.name}: "${form.title}"${form.dueDate ? ` — due ${form.dueDate}` : ''}${form.notes ? ` | ${form.notes}` : ''}`;
+      const taskData = {
+        title:          form.title,
+        assignedTo:     selectedStaff.name,
+        assignedToEmail:selectedStaff.email,  // auto from Firestore, no manual entry
+        dueDate:        form.dueDate,
+        priority:       form.priority,
+        notes:          form.notes,
+        assignedBy:     profile?.name,
+        assignedByEmail:user?.email,
+      };
 
-      await Promise.all(selectedStaff.map(async (s) => {
-        await addTask({
-          title:           form.title,
-          assignedTo:      s.name,
-          assignedToEmail: s.email,
-          dueDate:         form.dueDate,
-          priority:        form.priority,
-          notes:           form.notes,
-          assignedBy:      profile?.name,
-          assignedByEmail: user?.email,
-        });
+      await addTask(taskData);
 
-        addNotification({
-          toEmail:  s.email,
-          toName:   s.name,
-          fromName: profile?.name,
-          type:     'task',
-          message:  notifMessage,
-        }).catch(() => {});
+      // In-app notification — appears in staff's bell icon instantly
+      await addNotification({
+        toEmail:  selectedStaff.email,
+        toName:   selectedStaff.name,
+        fromName: profile?.name,
+        type:     'task',
+        message:  `New task: "${form.title}"${form.dueDate ? ` — due ${form.dueDate}` : ''}`,
+      });
 
-        sendTaskEmail({
-          toEmail:    s.email,
-          toName:     s.name,
-          taskTitle:  form.title,
-          dueDate:    form.dueDate,
-          priority:   form.priority,
-          assignedBy: profile?.name,
-        }).catch(() => {});
-      }));
+      // Email notification — goes to staff's registered email automatically
+      await sendTaskEmail({
+        toEmail:    selectedStaff.email,
+        toName:     selectedStaff.name,
+        taskTitle:  form.title,
+        dueDate:    form.dueDate,
+        priority:   form.priority,
+        assignedBy: profile?.name,
+      });
 
-      const names = selectedStaff.map(s => s.name).join(', ');
-      setToast({ message: `Task assigned to ${names}!`, type: 'success' });
+      setToast({ message: `Task assigned to ${selectedStaff.name}! Email sent to ${selectedStaff.email}`, type: 'success' });
       setShowModal(false);
-      setForm({ title: '', staffIds: [], dueDate: '', priority: 'normal', notes: '' });
+      setForm({ title: '', staffId: '', dueDate: '', priority: 'normal', notes: '' });
       load();
     } catch (err) {
       setToast({ message: 'Failed to assign task: ' + err.message, type: 'error' });
@@ -110,13 +104,35 @@ export default function Tasks() {
 
   if (loading) return <Loading />;
 
+  const allFiltered = tasks.filter(t => {
+    const q = search.toLowerCase();
+    if (q && !t.title?.toLowerCase().includes(q) && !t.assignedTo?.toLowerCase().includes(q)) return false;
+    if (prioFilter && t.priority !== prioFilter) return false;
+    if (assigneeFilter && t.assignedTo !== assigneeFilter) return false;
+    return true;
+  });
   const grouped = { pending: [], 'in-progress': [], completed: [] };
-  tasks.forEach(t => { (grouped[t.status] || grouped.pending).push(t); });
+  allFiltered.forEach(t => { (grouped[t.status] || grouped.pending).push(t); });
+
+  const staffNames = [...new Set(tasks.map(t => t.assignedTo).filter(Boolean))];
+
+  const rawCounts = {
+    total:      tasks.length,
+    pending:    tasks.filter(t => !t.status || t.status === 'pending').length,
+    inProgress: tasks.filter(t => t.status === 'in-progress').length,
+    completed:  tasks.filter(t => t.status === 'completed').length,
+  };
 
   return (
     <div>
+      {/* Page Header */}
       <div className="page-header">
-        <h2>Staff Tasks</h2>
+        <div>
+          <h2 style={{ margin: 0 }}>Staff Tasks</h2>
+          <p style={{ margin: '2px 0 0', fontSize: 13, color: 'var(--text-muted)' }}>
+            Manage and track team assignments across all projects.
+          </p>
+        </div>
         {isCEOorAdmin && (
           <button className="btn btn-primary" onClick={() => setShowModal(true)}>
             <Plus size={16} /> Assign Task
@@ -124,53 +140,176 @@ export default function Tasks() {
         )}
       </div>
 
+      {/* KPI Strip — CEO/admin only */}
       {isCEOorAdmin && (
-        <div style={{ padding: '10px 14px', background: '#EFF6FF', borderRadius: 8, fontSize: 12, color: '#1E40AF', marginBottom: 16, display: 'flex', gap: 8, alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: 12, marginBottom: 20, flexWrap: 'wrap' }}>
+          {[
+            { label: 'Total Tasks', value: rawCounts.total,      bg: 'var(--brand)',      color: '#fff' },
+            { label: 'Pending',     value: rawCounts.pending,    bg: 'var(--amber-soft)', color: 'var(--amber-ink)' },
+            { label: 'In Progress', value: rawCounts.inProgress, bg: 'var(--blue-soft)',  color: 'var(--blue-ink)'  },
+            { label: 'Completed',   value: rawCounts.completed,  bg: 'var(--green-soft)', color: 'var(--green-ink)' },
+          ].map(tile => (
+            <div key={tile.label} style={{
+              flex: '1 1 140px', background: tile.bg, color: tile.color,
+              borderRadius: 12, padding: '14px 18px', minWidth: 120,
+            }}>
+              <div style={{ fontSize: 26, fontWeight: 700, lineHeight: 1 }}>{tile.value}</div>
+              <div style={{ fontSize: 12, marginTop: 4 }}>{tile.label}</div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Info Banner — CEO/admin only */}
+      {isCEOorAdmin && (
+        <div style={{
+          padding: '10px 14px', background: 'var(--blue-soft)', borderRadius: 10,
+          fontSize: 12, color: 'var(--blue-ink)', marginBottom: 16,
+          display: 'flex', gap: 8, alignItems: 'center',
+        }}>
           <Mail size={14} />
           Staff receive an email + in-app notification instantly when you assign a task. Email is pulled automatically from their account.
         </div>
       )}
 
+      {/* Filter / Search Bar */}
+      <div style={{ display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>
+        <div className="search-bar" style={{ flex: 1, minWidth: 200 }}>
+          <Search size={16} style={{ color: 'var(--text-muted)' }} />
+          <input
+            placeholder="Search tasks..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+          />
+        </div>
+        <select
+          className="form-input"
+          style={{ width: 160 }}
+          value={prioFilter}
+          onChange={e => setPrioFilter(e.target.value)}
+        >
+          <option value="">All Priorities</option>
+          <option value="urgent">Urgent</option>
+          <option value="high">High</option>
+          <option value="normal">Normal</option>
+        </select>
+        <select
+          className="form-input"
+          style={{ width: 180 }}
+          value={assigneeFilter}
+          onChange={e => setAssigneeFilter(e.target.value)}
+        >
+          <option value="">All Staff</option>
+          {staffNames.map(name => (
+            <option key={name} value={name}>{name}</option>
+          ))}
+        </select>
+      </div>
+
+      {/* Kanban Board */}
       <div className="grid-3" style={{ alignItems: 'start' }}>
         {COLUMNS.map(col => {
-          const Icon = col.icon;
           const colTasks = grouped[col.key] || [];
           return (
-            <div key={col.key} style={{ background: 'var(--bg)', borderRadius: 12, border: '1px solid var(--border)', overflow: 'hidden' }}>
-              <div style={{ padding: '12px 16px', background: 'var(--white)', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 8 }}>
-                <Icon size={15} style={{ color: col.color }} />
-                <span style={{ fontWeight: 600, fontSize: 14 }}>{col.label}</span>
-                <span className={`badge ${col.key === 'completed' ? 'badge-green' : col.key === 'in-progress' ? 'badge-amber' : 'badge-gray'}`} style={{ marginLeft: 'auto' }}>
-                  {colTasks.length}
+            <div key={col.key} style={{
+              background: 'var(--surface)',
+              borderRadius: 14,
+              border: '1px solid var(--border)',
+              overflow: 'hidden',
+            }}>
+              {/* Column Header */}
+              <div style={{
+                padding: '12px 16px',
+                borderBottom: '1px solid var(--border)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+              }}>
+                <span style={{
+                  width: 8, height: 8, borderRadius: '50%',
+                  background: col.dotColor, flexShrink: 0,
+                }} />
+                <span style={{ fontWeight: 600, fontSize: 14, color: 'var(--text)', flex: 1 }}>
+                  {col.label}
                 </span>
+                <span className={`badge ${col.badgeClass}`}>{colTasks.length}</span>
               </div>
-              <div style={{ padding: 8, display: 'flex', flexDirection: 'column', gap: 8, minHeight: 120 }}>
+
+              {/* Column Body */}
+              <div style={{
+                padding: 8,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 8,
+                minHeight: 200,
+                maxHeight: 600,
+                overflowY: 'auto',
+              }}>
                 {colTasks.length === 0 && (
-                  <div style={{ textAlign: 'center', color: 'var(--muted)', fontSize: 13, padding: '20px 0' }}>No tasks</div>
+                  <div style={{
+                    textAlign: 'center', color: 'var(--text-muted)',
+                    fontSize: 13, padding: '32px 0',
+                  }}>
+                    No tasks
+                  </div>
                 )}
                 {colTasks.map(task => (
-                  <div key={task.id} style={{ background: 'var(--white)', borderRadius: 10, padding: '12px 14px', border: '1px solid var(--border)' }}>
+                  <div
+                    key={task.id}
+                    style={{
+                      background: 'var(--surface)',
+                      borderRadius: 10,
+                      border: '1px solid var(--border)',
+                      padding: '12px 14px',
+                      cursor: 'pointer',
+                      transition: 'background 0.15s',
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-hover)'}
+                    onMouseLeave={e => e.currentTarget.style.background = 'var(--surface)'}
+                  >
+                    {/* Top row: title + priority badge */}
                     <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 6 }}>
-                      <span style={{ fontWeight: 500, fontSize: 13, flex: 1, lineHeight: 1.4 }}>{task.title}</span>
+                      <span style={{ fontWeight: 600, fontSize: 13, flex: 1, color: 'var(--text)', lineHeight: 1.4 }}>
+                        {task.title}
+                      </span>
                       {task.priority === 'urgent' && <span className="badge badge-red">Urgent</span>}
                       {task.priority === 'high'   && <span className="badge badge-amber">High</span>}
                     </div>
-                    <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 8 }}>
-                      👤 {task.assignedTo}
-                      {task.dueDate && <span style={{ marginLeft: 8 }}>📅 {task.dueDate}</span>}
+
+                    {/* Meta row */}
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: task.notes ? 6 : 8 }}>
+                      {task.assignedTo}
+                      {task.dueDate && <span style={{ marginLeft: 8 }}>{task.dueDate}</span>}
                     </div>
-                    {task.notes && <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 8, fontStyle: 'italic' }}>{task.notes}</div>}
+
+                    {/* Notes */}
+                    {task.notes && (
+                      <div style={{ fontSize: 11, color: 'var(--text-muted)', fontStyle: 'italic', marginBottom: 8 }}>
+                        {task.notes}
+                      </div>
+                    )}
+
+                    {/* Action buttons */}
                     <div style={{ display: 'flex', gap: 6 }}>
                       {col.key !== 'pending' && (
-                        <button className="btn btn-ghost btn-sm" style={{ fontSize: 11 }}
-                          onClick={() => moveTask(task.id, col.key === 'in-progress' ? 'pending' : 'in-progress')}>
-                          ← Back
+                        <button
+                          className="btn btn-ghost btn-sm"
+                          style={{ fontSize: 11 }}
+                          onClick={() => moveTask(task.id, col.key === 'in-progress' ? 'pending' : 'in-progress')}
+                        >
+                          Back
                         </button>
                       )}
                       {col.key !== 'completed' && (
-                        <button style={{ fontSize: 11, padding: '4px 8px', background: '#D1FAE5', color: '#065F46', border: 'none', borderRadius: 6, cursor: 'pointer' }}
-                          onClick={() => moveTask(task.id, col.key === 'pending' ? 'in-progress' : 'completed')}>
-                          {col.key === 'pending' ? 'Start →' : 'Complete ✓'}
+                        <button
+                          style={{
+                            fontSize: 11, padding: '4px 10px',
+                            background: '#D1FAE5', color: '#065F46',
+                            border: 'none', borderRadius: 6, cursor: 'pointer',
+                          }}
+                          onClick={() => moveTask(task.id, col.key === 'pending' ? 'in-progress' : 'completed')}
+                        >
+                          {col.key === 'pending' ? 'Start ' : 'Complete '}
                         </button>
                       )}
                     </div>
@@ -182,11 +321,12 @@ export default function Tasks() {
         })}
       </div>
 
+      {/* Modal: Assign Task */}
       {showModal && (
         <Modal title="Assign Task to Staff" onClose={() => setShowModal(false)}>
           <form onSubmit={handleAdd} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             <div style={{ padding: '10px 12px', background: '#F0FDF4', borderRadius: 8, fontSize: 12, color: '#065F46' }}>
-              ✅ Staff email is pulled automatically from their account — you just select their name.
+              Staff email is pulled automatically from their account — you just select their name.
             </div>
             <div className="form-group">
               <label className="form-label">Task Title *</label>
@@ -194,19 +334,19 @@ export default function Tasks() {
                 value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} />
             </div>
             <div className="form-group">
-              <label className="form-label">Assign To * <span style={{ fontWeight: 400, color: '#6B7280' }}>(select one or more)</span></label>
-              <div style={{ border: '1px solid var(--border)', borderRadius: 8, padding: '8px 10px', maxHeight: 160, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <label className="form-label">Assign To *</label>
+              <select className="form-input" required value={form.staffId}
+                onChange={e => setForm({ ...form, staffId: e.target.value })}>
+                <option value="">Select staff member</option>
                 {staff.map(s => (
-                  <label key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13 }}>
-                    <input type="checkbox" checked={form.staffIds.includes(s.id)} onChange={() => toggleStaff(s.id)} />
-                    <span style={{ flex: 1 }}>{s.name}</span>
-                    <span style={{ fontSize: 11, color: '#9CA3AF' }}>{s.role}</span>
-                  </label>
+                  <option key={s.id} value={s.id}>
+                    {s.name} — {s.role}
+                  </option>
                 ))}
-              </div>
-              {form.staffIds.length > 0 && (
+              </select>
+              {form.staffId && (
                 <div style={{ fontSize: 11, color: '#6B7280', marginTop: 4 }}>
-                  📧 Notifying {form.staffIds.length} staff member{form.staffIds.length > 1 ? 's' : ''}
+                  Email notification will go to: <strong>{staff.find(s => s.id === form.staffId)?.email}</strong>
                 </div>
               )}
             </div>

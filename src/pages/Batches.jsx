@@ -50,8 +50,8 @@ const DEFAULT_COURSE_FLOW = [
 ];
 
 // Fields match the Google Form CSV columns in order:
-// Timestamp(→joinDate), Name of Father, Name of Mother, Email, Address,
-// Phone number, Whatsapp Number, Occupation, Kids Name(→name), Gender, Age, Class, School Name
+// Timestamp(joinDate), Name of Father, Name of Mother, Email, Address,
+// Phone number, Whatsapp Number, Occupation, Kids Name(name), Gender, Age, Class, School Name
 const DEFAULT_STUDENT_FIELDS = [
   { key: 'fatherName',    label: 'Name of Father',            required: false, type: 'text'  },
   { key: 'motherName',    label: 'Name of Mother',            required: false, type: 'text'  },
@@ -166,7 +166,7 @@ function downloadTemplate(batchName, fields) {
 function OnboardingStepPanel({ step, onClose, onMarkComplete, onRevoke }) {
   const [tab, setTab]                         = useState('not');
   const [search, setSearch]                   = useState('');
-  const [fieldValues, setFieldValues]         = useState({}); // studentId → captured value
+  const [fieldValues, setFieldValues]         = useState({}); // studentId captured value
   const [marking, setMarking]                 = useState({});
   const [localCompleted, setLocalCompleted]   = useState([]);
   const [localNotCompleted, setLocalNotCompleted] = useState([]);
@@ -296,7 +296,7 @@ function OnboardingStepPanel({ step, onClose, onMarkComplete, onRevoke }) {
                         style={{ fontSize:11, padding:'4px 10px', borderRadius:6, border:'none', cursor: canMark ? 'pointer' : 'default', fontWeight:600,
                           background: marking[s.id] ? '#E5E7EB' : '#D1FAE5', color: marking[s.id] ? '#9CA3AF' : '#065F46',
                           opacity: canMark ? 1 : 0.5 }}>
-                        {marking[s.id] ? 'Saving…' : ft === 'dropdown' ? `✓ Mark Complete + Save ${step.fieldLabel||'Value'}` : '✓ Mark Complete'}
+                        {marking[s.id] ? 'Saving…' : ft === 'dropdown' ? `Mark Complete + Save ${step.fieldLabel||'Value'}` : 'Mark Complete'}
                       </button>
                     )}
                     {isDropped && <div style={{ fontSize:11, color:'#9CA3AF', fontStyle:'italic' }}>Cannot mark — student is dropped</div>}
@@ -417,7 +417,7 @@ export default function Batches() {
   const [batchAssessments, setBatchAssessments]     = useState([]);
   const [showCreateAssessment, setShowCreateAssessment] = useState(false);
   const [assessmentForm, setAssessmentForm]         = useState({ title:'', date:'', totalMarks:'', conductingStaff:[] });
-  const [assessmentResults, setAssessmentResults]   = useState({}); // assessmentId → results[]
+  const [assessmentResults, setAssessmentResults]   = useState({}); // assessmentId results[]
   const [showViewResults, setShowViewResults]       = useState(null); // assessment object
   const [showImportMarks, setShowImportMarks]       = useState(null); // assessment object
   const [marksPreview, setMarksPreview]             = useState(null);
@@ -1101,7 +1101,7 @@ export default function Batches() {
               <div style={{ fontSize:13, color:'#6B7280' }}>
                 {selectedBatch.course}
                 {selectedBatch.courseDurationMonths ? ` · ${selectedBatch.courseDurationMonths} months` : ''}
-                {selectedBatch.startDate ? ` · ${new Date(selectedBatch.startDate).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'})} →` : ''}
+                {selectedBatch.startDate ? ` · ${new Date(selectedBatch.startDate).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'})} ` : ''}
                 {selectedBatch.endDate   ? ` ${new Date(selectedBatch.endDate).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'})}` : ''}
                 {' · '}{count} students
                 {selectedBatch.mentorName ? ` · Mentor: ${selectedBatch.mentorName}` : ''}
@@ -1150,7 +1150,7 @@ export default function Batches() {
             )}
             {activeTab === 'schedule' && (
               <>
-                <button className="btn btn-ghost btn-sm" onClick={() => setShowShareSchedule(true)}>🔗 Share</button>
+                <button className="btn btn-ghost btn-sm" onClick={() => setShowShareSchedule(true)}>Share</button>
                 {!isExpired && <button className="btn btn-primary" onClick={() => setShowSchedule(true)}><Plus size={14}/> Add Class</button>}
               </>
             )}
@@ -1336,15 +1336,15 @@ export default function Batches() {
                               style={{ fontSize:11, padding:'2px 6px', borderRadius:8, border:'1px solid #E5E7EB', fontWeight:600, cursor:'pointer',
                                 background: s.status==='active'?'#D1FAE5':s.status==='at-risk'?'#FEE2E2':s.status==='dropped'?'#F3F4F6':'#FEF3C7',
                                 color: s.status==='active'?'#065F46':s.status==='at-risk'?'#991B1B':s.status==='dropped'?'#6B7280':'#92400E' }}>
-                              <option value="active">🟢 Active</option>
-                              <option value="moderate">🟡 Moderate</option>
-                              <option value="at-risk">🔴 At Risk</option>
-                              <option value="dropped">⚫ Dropped</option>
+                              <option value="active">Active</option>
+                              <option value="moderate">Moderate</option>
+                              <option value="at-risk">At Risk</option>
+                              <option value="dropped">Dropped</option>
                             </select>
                           </td>
                           <td>
                             <span style={{ fontSize:11, padding:'2px 8px', borderRadius:10, fontWeight:600, background:onboardDone?'#D1FAE5':'#FEF3C7', color:onboardDone?'#065F46':'#92400E' }}>
-                              {flowDone}/{batchFlow.length} {onboardDone ? '✅' : '⏳'}
+                              {flowDone}/{batchFlow.length} {onboardDone ? '' : ''}
                             </span>
                           </td>
                           <td style={{ display:'flex', gap:4, alignItems:'center' }}>
@@ -1363,12 +1363,12 @@ export default function Batches() {
 
               {pages > 1 && (
                 <div style={{ display:'flex', justifyContent:'center', gap:6, marginTop:14 }}>
-                  <button className="btn btn-ghost btn-sm" disabled={studentPage===0} onClick={() => setStudentPage(p => p-1)}>← Prev</button>
+                  <button className="btn btn-ghost btn-sm" disabled={studentPage===0} onClick={() => setStudentPage(p => p-1)}>Prev</button>
                   {Array.from({length:Math.min(pages, 7)}, (_,i) => (
                     <button key={i} className={`btn btn-sm ${studentPage===i?'btn-primary':'btn-ghost'}`} onClick={() => setStudentPage(i)}>{i+1}</button>
                   ))}
                   {pages > 7 && <span style={{ alignSelf:'center', fontSize:12, color:'#9CA3AF' }}>...{pages} total</span>}
-                  <button className="btn btn-ghost btn-sm" disabled={studentPage===pages-1} onClick={() => setStudentPage(p => p+1)}>Next →</button>
+                  <button className="btn btn-ghost btn-sm" disabled={studentPage===pages-1} onClick={() => setStudentPage(p => p+1)}>Next </button>
                 </div>
               )}
             </div>
@@ -1539,7 +1539,7 @@ export default function Batches() {
                 }}
                 title={slot.title}
               >
-                {isOverdue && '⚠ '}{slot.time && `${slot.time} `}{slot.title}
+                {isOverdue && ''}{slot.time && `${slot.time} `}{slot.title}
               </div>
             );
           };
@@ -1575,7 +1575,7 @@ export default function Batches() {
                   if (calendarView === 'week') d.setDate(d.getDate()-7);
                   else d.setMonth(d.getMonth()-1);
                   setCalendarDate(d);
-                }}>←</button>
+                }}></button>
                 <span style={{ fontSize:13, fontWeight:600, minWidth:180, textAlign:'center' }}>
                   {calendarView === 'week' ? weekLabel : monthLabel}
                 </span>
@@ -1584,11 +1584,11 @@ export default function Batches() {
                   if (calendarView === 'week') d.setDate(d.getDate()+7);
                   else d.setMonth(d.getMonth()+1);
                   setCalendarDate(d);
-                }}>→</button>
+                }}></button>
                 <button className="btn btn-ghost btn-sm" onClick={() => setCalendarDate(new Date())}>Today</button>
                 <div style={{ flex:1 }}/>
                 <button className="btn btn-ghost btn-sm" onClick={() => setShowShareSchedule(true)}>
-                  🔗 Share Schedule
+                  Share Schedule
                 </button>
               </div>
 
@@ -1688,7 +1688,7 @@ export default function Batches() {
                         <div><strong>Day:</strong> {slot.scheduledDate ? slot.scheduledDate : slot.day} {slot.scheduledDate ? '(one-time)' : '(recurring)'}</div>
                         <div><strong>Time:</strong> {slot.time} · {slot.duration} min</div>
                         {slot.facultyName && <div><strong>Faculty:</strong> {slot.facultyName}</div>}
-                        {slot.meetLink && <div><strong>Link:</strong> <a href={slot.meetLink} target="_blank" rel="noreferrer" style={{ color:'#E53935' }}>Join →</a></div>}
+                        {slot.meetLink && <div><strong>Link:</strong> <a href={slot.meetLink} target="_blank" rel="noreferrer" style={{ color:'#E53935' }}>Join </a></div>}
                         {slot.notes && <div style={{ color:'#6B7280', marginTop:4 }}>{slot.notes}</div>}
                       </div>
 
@@ -1724,7 +1724,7 @@ export default function Batches() {
 
                       <div style={{ display:'flex', gap:8, justifyContent:'space-between', marginTop:4 }}>
                         <button className="btn btn-ghost btn-sm" onClick={() => { setCalendarSlotDetail(null); setShowAttendance(slot); }}>
-                          {attendanceSaved[slot.id] ? 'Attendance ✓' : 'Upload Attendance'}
+                          {attendanceSaved[slot.id] ? 'Attendance ' : 'Upload Attendance'}
                         </button>
                         <button className="btn btn-sm" style={{ background:'#FEE2E2', color:'#EF4444', border:'none' }}
                           onClick={() => setConfirmDialog({ message: 'Delete this class slot?', onConfirm: async () => {
@@ -1806,7 +1806,7 @@ export default function Batches() {
                           autoFocus
                         />
                         <button className="btn btn-primary btn-sm" onClick={handleSaveTaskEdit}>Save</button>
-                        <button className="btn btn-ghost btn-sm" onClick={() => setEditingTask(null)}>✕</button>
+                        <button className="btn btn-ghost btn-sm" onClick={() => setEditingTask(null)}></button>
                       </div>
                     ) : (
                       <div
@@ -1843,7 +1843,7 @@ export default function Batches() {
                             {pctDone===100?'All done':`${submitted}/${total}`}
                           </span>
                         </div>
-                        {isOverdue && <div style={{ fontSize:10, color:isSelected?'#FCA5A5':'var(--red)', marginTop:4, fontWeight:600 }}>⚠ Overdue</div>}
+                        {isOverdue && <div style={{ fontSize:10, color:isSelected?'#FCA5A5':'var(--red)', marginTop:4, fontWeight:600 }}>Overdue</div>}
                       </div>
                     )}
                   </div>
@@ -1872,7 +1872,7 @@ export default function Batches() {
                     {/* All done banner */}
                     {(currentTask.submittedBy?.length || 0) >= batchStudents.length && batchStudents.length > 0 && (
                       <div style={{ marginTop: 12, padding: '10px 16px', background: '#D1FAE5', borderRadius: 10, display: 'flex', alignItems: 'center', gap: 10 }}>
-                        <span style={{ fontSize: 20 }}>🎉</span>
+                        <span style={{ fontSize: 20 }}></span>
                         <div>
                           <div style={{ fontWeight: 700, color: '#065F46', fontSize: 14 }}>All students completed this assignment!</div>
                           <div style={{ fontSize: 12, color: '#047857' }}>Every student in this batch has submitted.</div>
@@ -2065,7 +2065,7 @@ export default function Batches() {
           <div>
             {batchAssessments.length === 0 && (
               <div style={{ background:'#fff', borderRadius:14, border:'1px solid #E5E7EB', padding:48, textAlign:'center', color:'#9CA3AF' }}>
-                <div style={{ fontSize:32, marginBottom:8 }}>📋</div>
+                <div style={{ fontSize:32, marginBottom:8 }}></div>
                 <div style={{ fontSize:15, fontWeight:600, marginBottom:4 }}>No assessments yet</div>
                 <div style={{ fontSize:13, marginBottom:16 }}>Create an exam or test for this batch</div>
                 <button className="btn btn-primary" onClick={() => setShowCreateAssessment(true)}><Plus size={14}/> Add Assessment</button>
@@ -2079,7 +2079,7 @@ export default function Batches() {
                     <div style={{ flex:1 }}>
                       <div style={{ fontSize:15, fontWeight:700, color:'#1A1A2E', marginBottom:4 }}>{asmt.title}</div>
                       <div style={{ display:'flex', gap:10, flexWrap:'wrap', alignItems:'center' }}>
-                        {asmt.date && <span style={{ fontSize:12, color:'#6B7280' }}>📅 {asmt.date}</span>}
+                        {asmt.date && <span style={{ fontSize:12, color:'#6B7280' }}>{asmt.date}</span>}
                         <span style={{ fontSize:12, color:'#6B7280' }}>Total Marks: <strong>{asmt.totalMarks}</strong></span>
                         {staffNames && <span style={{ fontSize:12, color:'#6B7280' }}>Staff: {staffNames}</span>}
                         <span style={{ fontSize:11, padding:'2px 8px', borderRadius:10, background:'#EDE9FE', color:'#6D28D9', fontWeight:600 }}>Exam</span>
@@ -2233,7 +2233,7 @@ export default function Batches() {
         {showImportMarks && (
           <Modal title={`Import Marks — ${showImportMarks.title}`} onClose={() => { setShowImportMarks(null); setMarksPreview(null); }} wide>
             <div style={{ padding:'10px 14px', background:'#DBEAFE', borderRadius:8, fontSize:12, color:'#1E40AF', marginBottom:14, lineHeight:1.6 }}>
-              ℹ️ Upload a CSV with columns: <strong>name</strong> (student name), <strong>phone</strong> (number), <strong>marks</strong> (marks scored).<br/>
+              ℹUpload a CSV with columns: <strong>name</strong> (student name), <strong>phone</strong> (number), <strong>marks</strong> (marks scored).<br/>
               Pass mark is 40% of total marks ({Math.round((showImportMarks.totalMarks||100)*0.4)} out of {showImportMarks.totalMarks}).
             </div>
             <input ref={marksFileRef} type="file" accept=".csv" style={{ display:'none' }}
@@ -2376,7 +2376,7 @@ export default function Batches() {
         {showBulk && (
           <Modal title={`Bulk Import into ${selectedBatch.name}`} onClose={() => { setShowBulk(false); setCsvPreview(null); }} wide>
             <div style={{ padding:'10px 14px', background:'#FEF3C7', borderRadius:8, fontSize:12, color:'#92400E', marginBottom:14, lineHeight:1.6 }}>
-              ⚠️ <strong>Important:</strong> The CSV column order must match the app field order exactly, OR use the downloaded template.<br/>
+              <strong>Important:</strong> The CSV column order must match the app field order exactly, OR use the downloaded template.<br/>
               Column names are matched by name (case-insensitive), but the order should match to avoid mismatches.<br/>
               If your CSV has a <strong>Timestamp</strong> column, the date will be auto-captured as the joining date.<br/>
               Expected columns: <strong>{batchFields.map(f=>f.label).join(', ')}</strong>
@@ -2609,7 +2609,7 @@ export default function Batches() {
                     )}
                   </div>
                   {scheduleForm.facultyName && (
-                    <div style={{ fontSize:11, color:'#10B981', marginTop:4 }}>✓ Selected: <strong>{scheduleForm.facultyName}</strong></div>
+                    <div style={{ fontSize:11, color:'#10B981', marginTop:4 }}>Selected: <strong>{scheduleForm.facultyName}</strong></div>
                   )}
                 </div>
                 <div className="form-group"><label className="form-label">Meet / Zoom Link</label><input className="form-input" type="url" placeholder="https://..." value={scheduleForm.meetLink} onChange={e=>setScheduleForm({...scheduleForm,meetLink:e.target.value})}/></div>
@@ -2731,7 +2731,7 @@ export default function Batches() {
                           <td style={{ padding:'7px 10px', color:'#6B7280' }}>{r.phone || '—'}</td>
                           <td style={{ padding:'7px 10px' }}>
                             <span style={{ fontWeight:600, fontSize:11, color: r.present ? '#10B981' : '#EF4444' }}>
-                              {r.present ? '✅ Present' : '❌ Absent'}
+                              {r.present ? 'Present' : 'Absent'}
                             </span>
                           </td>
                           <td style={{ padding:'7px 10px' }}>
@@ -2990,7 +2990,7 @@ export default function Batches() {
                 <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
                   {b.scheduleDay ? `${b.scheduleDay} · ${b.scheduleTime || ''}` : 'Schedule TBD'}
                 </span>
-                <span style={{ fontSize: 12, color: 'var(--brand)', fontWeight: 600 }}>Open →</span>
+                <span style={{ fontSize: 12, color: 'var(--brand)', fontWeight: 600 }}>Open </span>
               </div>
             </div>
           );

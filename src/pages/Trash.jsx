@@ -1,7 +1,12 @@
 import { useEffect, useState } from 'react';
 import { getTrashItems, restoreFromTrash, permanentDelete } from '../firebase/services';
 import { Loading, Toast } from '../components/ui';
-import { Trash2, RotateCcw } from 'lucide-react';
+import { Trash2, RotateCcw, AlertCircle, User, School } from 'lucide-react';
+
+const TAB_META = {
+  student: { label:'Student', tileBg:'var(--blue-soft)',   tileInk:'var(--blue-ink)',   Icon: User },
+  batch:   { label:'Batch',   tileBg:'var(--indigo-soft)', tileInk:'var(--indigo-ink)', Icon: School },
+};
 
 export default function Trash() {
   const [tab, setTab]         = useState('student');
@@ -66,30 +71,31 @@ export default function Trash() {
     return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
   };
 
+  const meta = TAB_META[tab] || TAB_META.student;
+  const TabIcon = meta.Icon;
+
   return (
     <div>
-      <div className="page-header">
-        <h2><Trash2 size={20} style={{ marginRight: 8, verticalAlign: 'middle' }} />Trash</h2>
+      <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', gap:16, flexWrap:'wrap', marginBottom:16 }}>
+        <div>
+          <h2 style={{ fontSize:24, fontWeight:700 }}>Trash</h2>
+          <div style={{ fontSize:13, color:'var(--text-muted)', marginTop:3 }}>Deleted items are kept for 30 days, then removed permanently.</div>
+        </div>
         {items.length > 0 && (
-          <button
-            className="btn btn-sm"
-            style={{ background: '#EF4444', color: '#fff', border: 'none' }}
-            disabled={busy}
-            onClick={handleDeleteAll}
-          >
-            <Trash2 size={13} /> Delete All ({items.length})
+          <button className="btn btn-danger btn-sm" style={{ height:38 }} disabled={busy} onClick={handleDeleteAll}>
+            <Trash2 size={15} /> Empty Trash
           </button>
         )}
       </div>
 
-      <div className="tab-bar" style={{ marginBottom: 16 }}>
-        {[
-          { key: 'student', label: 'Students' },
-          { key: 'batch',   label: 'Batches'  },
-        ].map(t => (
-          <div key={t.key} className={`tab ${tab === t.key ? 'active' : ''}`} onClick={() => setTab(t.key)}>
-            {t.label}
-          </div>
+      <div style={{ display:'flex', alignItems:'center', gap:10, background:'var(--amber-soft)', borderRadius:10, padding:'11px 16px', marginBottom:18, maxWidth:760 }}>
+        <AlertCircle size={16} style={{ color:'var(--amber-ink)', flexShrink:0 }} />
+        <span style={{ fontSize:12.5, color:'var(--amber-ink)' }}>Restoring a batch also restores all of its students and their progress.</span>
+      </div>
+
+      <div className="segmented" style={{ marginBottom:18 }}>
+        {[{ key:'student', label:'Students' }, { key:'batch', label:'Batches' }].map(t => (
+          <button key={t.key} className={tab === t.key ? 'active' : ''} onClick={() => setTab(t.key)}>{t.label}</button>
         ))}
       </div>
 
@@ -98,38 +104,36 @@ export default function Trash() {
           <table>
             <thead>
               <tr>
-                <th>Name</th>
-                {tab === 'student' && <th>Batch</th>}
-                <th>Deleted Date</th>
-                <th>Actions</th>
+                <th>Item</th>
+                <th style={{ width:120 }}>Type</th>
+                {tab === 'student' && <th style={{ width:160 }}>Batch</th>}
+                <th style={{ width:140 }}>Deleted</th>
+                <th style={{ width:230 }}></th>
               </tr>
             </thead>
             <tbody>
               {items.length === 0 && (
-                <tr><td colSpan={4} style={{ textAlign: 'center', color: '#9CA3AF', padding: 40 }}>Trash is empty.</td></tr>
+                <tr><td colSpan={5} style={{ textAlign:'center', color:'var(--text-muted)', padding:56, fontSize:13.5 }}>Trash is empty.</td></tr>
               )}
               {items.map(item => (
                 <tr key={item.id}>
-                  <td style={{ fontWeight: 600 }}>{item.data?.name || item.data?.batchName || '—'}</td>
-                  {tab === 'student' && <td style={{ color: '#6B7280' }}>{item.data?.batchName || '—'}</td>}
-                  <td style={{ color: '#6B7280' }}>{formatDate(item.deletedAt)}</td>
                   <td>
-                    <div style={{ display: 'flex', gap: 8 }}>
-                      <button
-                        className="btn btn-sm btn-ghost"
-                        disabled={busy}
-                        onClick={() => handleRestore(item)}
-                      >
-                        <RotateCcw size={13} /> Restore
+                    <div style={{ display:'flex', alignItems:'center', gap:11 }}>
+                      <div style={{ width:34, height:34, borderRadius:10, background:meta.tileBg, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+                        <TabIcon size={16} style={{ color:meta.tileInk }} />
+                      </div>
+                      <div style={{ fontSize:13.5, fontWeight:600 }}>{item.data?.name || item.data?.batchName || '—'}</div>
+                    </div>
+                  </td>
+                  <td><span className="chip">{meta.label}</span></td>
+                  {tab === 'student' && <td style={{ fontSize:12.5, color:'var(--text-sub)' }}>{item.data?.batchName || '—'}</td>}
+                  <td style={{ fontSize:12.5, color:'var(--text-muted)' }}>{formatDate(item.deletedAt)}</td>
+                  <td>
+                    <div style={{ display:'flex', gap:8, justifyContent:'flex-end' }}>
+                      <button className="btn btn-secondary btn-sm" disabled={busy} onClick={() => handleRestore(item)}>
+                        <RotateCcw size={14} /> Restore
                       </button>
-                      <button
-                        className="btn btn-sm"
-                        style={{ background: '#EF4444', color: '#fff', border: 'none' }}
-                        disabled={busy}
-                        onClick={() => handlePermDelete(item)}
-                      >
-                        Delete Permanently
-                      </button>
+                      <button className="btn btn-danger btn-sm" disabled={busy} onClick={() => handlePermDelete(item)}>Delete</button>
                     </div>
                   </td>
                 </tr>

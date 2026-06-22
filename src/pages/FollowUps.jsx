@@ -20,18 +20,9 @@ export default function FollowUps() {
   const [saving, setSaving]         = useState(false);
   const [form, setForm] = useState({
     studentId: '', studentName: '',
-    staffIds: [],
+    staffId: '',
     note: '', nextAction: '', priority: 'normal'
   });
-
-  const toggleStaff = (id) => {
-    setForm(prev => ({
-      ...prev,
-      staffIds: prev.staffIds.includes(id)
-        ? prev.staffIds.filter(x => x !== id)
-        : [...prev.staffIds, id],
-    }));
-  };
 
   const isCEOorAdmin = profile?.role === 'ceo' || profile?.role === 'admin';
 
@@ -59,50 +50,48 @@ export default function FollowUps() {
     e.preventDefault();
     setSaving(true);
     try {
-      const selectedStaff = staff.filter(s => form.staffIds.includes(s.id));
-      if (selectedStaff.length === 0) {
-        setToast({ message: 'Please select at least one staff member.', type: 'error' });
+      // Email pulled automatically from selected staff's Firestore record
+      const selectedStaff = staff.find(s => s.id === form.staffId);
+      if (!selectedStaff) {
+        setToast({ message: 'Please select a staff member.', type: 'error' });
         setSaving(false);
         return;
       }
 
-      const fullMessage = `Follow-up assigned by ${profile?.name}: "${form.studentName}" — ${form.note}`;
+      await addFollowUp({
+        studentId:       form.studentId,
+        studentName:     form.studentName,
+        assignedTo:      selectedStaff.name,
+        assignedToEmail: selectedStaff.email, // auto from Firestore
+        note:            form.note,
+        nextAction:      form.nextAction,
+        priority:        form.priority,
+        assignedBy:      profile?.name,
+        assignedByEmail: user?.email,
+      });
 
-      await Promise.all(selectedStaff.map(async (s) => {
-        await addFollowUp({
-          studentId:       form.studentId,
-          studentName:     form.studentName,
-          assignedTo:      s.name,
-          assignedToEmail: s.email,
-          note:            form.note,
-          nextAction:      form.nextAction,
-          priority:        form.priority,
-          assignedBy:      profile?.name,
-          assignedByEmail: user?.email,
-        });
+      // In-app notification bell
+      await addNotification({
+        toEmail:  selectedStaff.email,
+        toName:   selectedStaff.name,
+        fromName: profile?.name,
+        type:     'followup',
+        message:  `Follow-up assigned: "${form.studentName}" — ${form.note.slice(0, 60)}`,
+      });
 
-        addNotification({
-          toEmail:  s.email,
-          toName:   s.name,
-          fromName: profile?.name,
-          type:     'followup',
-          message:  fullMessage,
-        }).catch(() => {});
+      // Email to staff's registered email — no manual entry needed
+      await sendFollowUpEmail({
+        toEmail:     selectedStaff.email,
+        toName:      selectedStaff.name,
+        studentName: form.studentName,
+        note:        form.note,
+        priority:    form.priority,
+        assignedBy:  profile?.name,
+      });
 
-        sendFollowUpEmail({
-          toEmail:     s.email,
-          toName:      s.name,
-          studentName: form.studentName,
-          note:        form.note,
-          priority:    form.priority,
-          assignedBy:  profile?.name,
-        }).catch(() => {});
-      }));
-
-      const names = selectedStaff.map(s => s.name).join(', ');
-      setToast({ message: `Follow-up assigned to ${names}!`, type: 'success' });
+      setToast({ message: `Follow-up assigned to ${selectedStaff.name}! Notified via email.`, type: 'success' });
       setShowModal(false);
-      setForm({ studentId: '', studentName: '', staffIds: [], note: '', nextAction: '', priority: 'normal' });
+      setForm({ studentId: '', studentName: '', staffId: '', note: '', nextAction: '', priority: 'normal' });
       load();
     } catch (err) {
       setToast({ message: 'Failed: ' + err.message, type: 'error' });
@@ -130,25 +119,15 @@ export default function FollowUps() {
 
   return (
     <div>
-      {/* Page Header */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 6, flexWrap: 'wrap', gap: 12 }}>
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <h1 style={{ fontSize: 22, fontWeight: 700, fontFamily: 'var(--font-display)', color: 'var(--text)', margin: 0 }}>Follow-Up Tracker</h1>
-            {pendingCount > 0 && (
-              <span style={{ display: 'flex', alignItems: 'center', gap: 5, background: '#FEF3C7', color: '#92400E', borderRadius: 20, padding: '3px 10px', fontSize: 12, fontWeight: 600 }}>
-                <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#F59E0B', display: 'inline-block' }} />
-                {pendingCount} pending
-              </span>
-            )}
-          </div>
-          <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: '4px 0 0' }}>
-            Stay on top of every student touchpoint — assign, track, and close the loop.
-          </p>
-        </div>
+      <div className="page-header">
+        <h2>Follow-Up Tracker
+          <span style={{ fontSize: 14, color: 'var(--muted)', fontWeight: 400, marginLeft: 8 }}>
+            ({pendingCount} pending)
+          </span>
+        </h2>
         {isCEOorAdmin && (
-          <button className="btn btn-primary" onClick={() => setShowModal(true)} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <Plus size={15} /> Assign Follow-Up
+          <button className="btn btn-primary" onClick={() => setShowModal(true)}>
+            <Plus size={16} /> Assign Follow-Up
           </button>
         )}
       </div>
@@ -160,51 +139,54 @@ export default function FollowUps() {
         </div>
       )}
 
-      {/* Search + filter tabs */}
-      <div style={{ display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>
+      {/* Search row */}
+      <div style={{ display: 'flex', gap: 10, marginBottom: 12, flexWrap: 'wrap', alignItems: 'center' }}>
         <div className="search-bar" style={{ flex: 1, minWidth: 200 }}>
           <Search size={15} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
           <input placeholder="Search student, staff, note..." value={search} onChange={e => setSearch(e.target.value)} />
         </div>
-        {/* Filter pills */}
-        <div style={{ display: 'flex', gap: 6 }}>
-          {[
-            { key: 'all', label: 'All' },
-            { key: 'pending', label: `Pending ${pendingCount > 0 ? pendingCount : ''}` },
-            { key: 'urgent', label: `Urgent ${urgentCount > 0 ? urgentCount : ''}` },
-            { key: 'completed', label: 'Done' },
-          ].map(t => (
-            <button key={t.key}
-              onClick={() => setFilter(t.key)}
-              style={{
-                padding: '6px 14px', borderRadius: 20, border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 500,
-                background: filter === t.key ? 'var(--brand)' : 'var(--surface)',
-                color: filter === t.key ? '#fff' : 'var(--text-sub)',
-                border: filter === t.key ? 'none' : '1px solid var(--border)',
-                transition: 'all 0.15s',
-              }}>
-              {t.label}
+      </div>
+
+      {/* Status filter chips */}
+      <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginBottom:14 }}>
+        {[
+          { key:'all',       label:'All',       dot:'var(--n-400)' },
+          { key:'pending',   label:'Pending',   dot:'var(--amber)' },
+          { key:'urgent',    label:'Urgent',    dot:'var(--red)' },
+          { key:'completed', label:'Completed', dot:'var(--green)' },
+        ].map(chip => {
+          const count = chip.key === 'all' ? followups.length
+            : chip.key === 'pending'   ? followups.filter(f => !f.completed).length
+            : chip.key === 'urgent'    ? followups.filter(f => f.priority === 'urgent' && !f.completed).length
+            : followups.filter(f => f.completed).length;
+          const isActive = filter === chip.key;
+          return (
+            <button key={chip.key} onClick={() => setFilter(chip.key)}
+              style={{ display:'flex', alignItems:'center', gap:6, padding:'6px 14px', borderRadius:'var(--radius-pill)', border:`1px solid ${isActive?'var(--brand)':'var(--border)'}`, background:isActive?'var(--brand-50)':'var(--surface)', cursor:'pointer', fontSize:12, fontWeight:600, color:isActive?'var(--brand-ink)':'var(--text-sub)', transition:'all 0.12s' }}>
+              <span style={{ width:7, height:7, borderRadius:'50%', background:chip.dot, flexShrink:0 }} />
+              {chip.label}
+              <span style={{ fontSize:11, color:isActive?'var(--brand)':'var(--text-muted)', fontWeight:500 }}>{count}</span>
             </button>
-          ))}
-        </div>
+          );
+        })}
       </div>
 
       <div className="table-container">
         <table>
           <thead>
             <tr>
-              <th>STUDENT</th>
-              {isCEOorAdmin && <th>ASSIGNED TO</th>}
-              <th>NOTE</th>
-              <th>PRIORITY</th>
-              <th>DATE</th>
-              <th>STATUS</th>
+              <th>Student</th>
+              {isCEOorAdmin && <th>Assigned To</th>}
+              <th>Note</th>
+              <th>Priority</th>
+              <th>Date</th>
+              <th>Status</th>
               <th></th>
             </tr>
           </thead>
           <tbody>
             {filtered.length === 0 && (
-              <tr><td colSpan={7} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 40 }}>No follow-ups found.</td></tr>
+              <tr><td colSpan={7} style={{ textAlign: 'center', color: 'var(--muted)', padding: 40 }}>No follow-ups found.</td></tr>
             )}
             {filtered.map(f => (
               <tr key={f.id}>
@@ -212,19 +194,19 @@ export default function FollowUps() {
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <Avatar name={f.studentName || '?'} size="sm" />
                     <div>
-                      <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--text)' }}>{f.studentName}</div>
-                      <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>by {f.assignedBy}</div>
+                      <div style={{ fontWeight: 500, fontSize: 13 }}>{f.studentName}</div>
+                      <div style={{ fontSize: 11, color: 'var(--muted)' }}>by {f.assignedBy}</div>
                     </div>
                   </div>
                 </td>
-                {isCEOorAdmin && <td style={{ fontSize: 13, color: 'var(--text-sub)' }}>{f.assignedTo || '—'}</td>}
-                <td style={{ fontSize: 13, maxWidth: 220, color: 'var(--text-sub)' }}>{f.note}</td>
+                {isCEOorAdmin && <td style={{ fontSize: 13 }}>{f.assignedTo || '—'}</td>}
+                <td style={{ fontSize: 13, maxWidth: 220 }}>{f.note}</td>
                 <td>
                   {f.priority === 'urgent' ? <span className="badge badge-red">Urgent</span>
                    : f.priority === 'high' ? <span className="badge badge-amber">High</span>
                    : <span className="badge badge-gray">Normal</span>}
                 </td>
-                <td style={{ fontSize: 11, color: 'var(--text-muted)' }}>{formatDate(f.createdAt)}</td>
+                <td style={{ fontSize: 11, color: 'var(--muted)' }}>{formatDate(f.createdAt)}</td>
                 <td>
                   {f.completed
                     ? <span className="badge badge-green"><CheckCircle size={11} style={{ marginRight: 3 }} />Done</span>
@@ -246,7 +228,7 @@ export default function FollowUps() {
         <Modal title="Assign Follow-Up" onClose={() => setShowModal(false)}>
           <form onSubmit={handleAdd} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             <div style={{ padding: '8px 12px', background: '#F0FDF4', borderRadius: 8, fontSize: 12, color: '#065F46' }}>
-              ✅ Select a student and staff member — email is auto-fetched from their account.
+              Select a student and staff member — email is auto-fetched from their account.
             </div>
             <div className="form-group">
               <label className="form-label">Student *</label>
@@ -260,19 +242,15 @@ export default function FollowUps() {
               </select>
             </div>
             <div className="form-group">
-              <label className="form-label">Assign To * <span style={{ fontWeight: 400, color: '#6B7280' }}>(select one or more)</span></label>
-              <div style={{ border: '1px solid var(--border)', borderRadius: 8, padding: '8px 10px', maxHeight: 160, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {staff.map(s => (
-                  <label key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13 }}>
-                    <input type="checkbox" checked={form.staffIds.includes(s.id)} onChange={() => toggleStaff(s.id)} />
-                    <span style={{ flex: 1 }}>{s.name}</span>
-                    <span style={{ fontSize: 11, color: '#9CA3AF' }}>{s.role}</span>
-                  </label>
-                ))}
-              </div>
-              {form.staffIds.length > 0 && (
+              <label className="form-label">Assign To *</label>
+              <select className="form-input" required value={form.staffId}
+                onChange={e => setForm({ ...form, staffId: e.target.value })}>
+                <option value="">Select staff member</option>
+                {staff.map(s => <option key={s.id} value={s.id}>{s.name} — {s.role}</option>)}
+              </select>
+              {form.staffId && (
                 <div style={{ fontSize: 11, color: '#6B7280', marginTop: 4 }}>
-                  📧 Notifying {form.staffIds.length} staff member{form.staffIds.length > 1 ? 's' : ''}
+                  Will notify: <strong>{staff.find(s => s.id === form.staffId)?.email}</strong>
                 </div>
               )}
             </div>

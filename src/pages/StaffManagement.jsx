@@ -20,6 +20,10 @@ const ROLE_INFO = {
     label:'CEO', badgeCls:'badge-red', color:'#E53935',
     desc:'Full access — all modules, assign tasks, manage all staff and reports'
   },
+  admin: {
+    label:'Admin', badgeCls:'badge-purple', color:'#8B5CF6',
+    desc:'Manage students, batches, documents, concerns. Cannot manage staff.'
+  },
   staff: {
     label:'Staff', badgeCls:'badge-blue', color:'#3B82F6',
     desc:'View assigned students, log follow-ups, submit reports, complete tasks.'
@@ -109,11 +113,31 @@ export default function StaffManagement() {
   return (
     <div>
       <div className="page-header">
-        <h2>Staff Management</h2>
+        <div>
+          <h2 style={{ margin:0 }}>Staff Management</h2>
+          <p style={{ fontSize:13, color:'var(--text-muted)', margin:'4px 0 0' }}>Manage your teaching and administrative team.</p>
+        </div>
         <button className="btn btn-primary" onClick={() => setShowModal(true)}>
           <Plus size={16} /> Add Staff Member
         </button>
       </div>
+
+      {/* KPI stat tiles */}
+      {staffList.length > 0 && (
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:12, marginBottom:20 }}>
+          {[
+            { label:'Total Staff', value: staffList.length, color:'var(--brand)' },
+            { label:'Active', value: active.length, color:'var(--green)' },
+            { label:'CEO / Admin', value: staffList.filter(s=>s.role==='ceo'||s.role==='admin').length, color:'#7C3AED' },
+            { label:'Teaching Staff', value: staffList.filter(s=>s.role==='staff').length, color:'#2563EB' },
+          ].map(tile => (
+            <div key={tile.label} style={{ background:'var(--surface)', borderRadius:12, border:'1px solid var(--border)', padding:'14px 18px', boxShadow:'var(--shadow-xs)' }}>
+              <div style={{ fontSize:11, textTransform:'uppercase', letterSpacing:'0.06em', color:'var(--text-muted)', marginBottom:6 }}>{tile.label}</div>
+              <div style={{ fontSize:24, fontWeight:700, fontFamily:'var(--font-display)', color:tile.color }}>{tile.value}</div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Role explanation cards */}
       <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:12, marginBottom:20 }}>
@@ -143,11 +167,11 @@ export default function StaffManagement() {
             Staff accounts created directly from this dashboard
           </div>
           <div style={{ fontSize:12, color:'#374151', lineHeight:1.7 }}>
-            Enter staff name, email and role → click Add. The system automatically:
-            <br/>✅ Creates their login account
-            <br/>✅ Saves their profile with correct role
-            <br/>✅ Sends them a password setup email
-            <br/>Staff clicks the email link → sets their own password → logs in. Done.
+            Enter staff name, email and role click Add. The system automatically:
+            <br/>Creates their login account
+            <br/>Saves their profile with correct role
+            <br/>Sends them a password setup email
+            <br/>Staff clicks the email link sets their own password logs in. Done.
             <br/><strong>No Firebase Console needed ever again.</strong>
           </div>
         </div>
@@ -335,6 +359,7 @@ export default function StaffManagement() {
                 onChange={e => setForm({...form, role:e.target.value})}
               >
                 <option value="staff">Staff — Limited access</option>
+                <option value="admin">Admin — Moderate access</option>
                 <option value="ceo">CEO — Full access</option>
               </select>
               <div style={{ fontSize:11, color:'#6B7280', marginTop:4 }}>
@@ -372,17 +397,16 @@ export default function StaffManagement() {
                 </span>
               </div>
               <div style={{ fontSize:13, color:'#374151', lineHeight:1.8 }}>
-                ✅ Login account created in Firebase<br/>
-                ✅ Profile saved with <strong>{showSuccess.role}</strong> role<br/>
-                ✅ Password setup email sent to <strong>{showSuccess.email}</strong><br/>
+                Login account created in Firebase<br/>
+                Profile saved with <strong>{showSuccess.role}</strong> role<br/>
+                Password setup email sent to <strong>{showSuccess.email}</strong><br/>
                 <br/>
                 <strong>What happens next:</strong><br/>
-                The staff member opens their email → clicks "Reset Password" →
-                sets their own password → logs in to the app with their email.
+                The staff member opens their email clicks "Reset Password"                 sets their own password logs in to the app with their email.
                 <br/><br/>
                 <strong>If they don't receive the email:</strong><br/>
                 Ask them to check spam folder. Or go to Staff Management and
-                you can resend from Firebase Console → Authentication → their account → Reset password.
+                you can resend from Firebase Console Authentication their account Reset password.
               </div>
             </div>
             <button className="btn btn-primary" onClick={() => setShowSuccess(null)}>
@@ -415,7 +439,7 @@ export default function StaffManagement() {
                   border:     `1px solid ${editingSubjects.includes(sub) ? '#3B82F6' : 'var(--border)'}`,
                 }}
               >
-                {editingSubjects.includes(sub) ? '✓ ' : ''}{sub}
+                {editingSubjects.includes(sub) ? '' : ''}{sub}
               </div>
             ))}
           </div>

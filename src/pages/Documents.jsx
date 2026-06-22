@@ -5,14 +5,21 @@ import {
 } from 'firebase/storage';
 import { storage } from '../firebase/config';
 import { Modal, Toast, Loading, Confirm } from '../components/ui';
-import { Upload, File, Download, Trash2, Search, FileText, FileImage, Plus } from 'lucide-react';
+import { Upload, Download, Trash2, Search } from 'lucide-react';
 
 const DOC_TYPES = ['Admission Form', 'ID Proof', 'Certificate', 'Test Report', 'Assessment PDF', 'Internal Document', 'Other'];
 
-function fileIcon(name = '') {
-  const ext = name.split('.').pop().toLowerCase();
-  if (['jpg','jpeg','png','gif','webp'].includes(ext)) return <FileImage size={18} style={{ color: '#8B5CF6' }} />;
-  return <FileText size={18} style={{ color: '#E53935' }} />;
+const ACCENTS = ['#E81620','#F4683B','#F5A623','#16A974','#11B4C6','#3B6EF6','#6366F1','#8B5CF6','#EC4899','#6E7488'];
+function avatarColor(name = '') { let h = 0; for (const c of name) h = (h * 31 + c.charCodeAt(0)) >>> 0; return ACCENTS[h % ACCENTS.length]; }
+function initials(name = '') { const p = name.trim().split(/\s+/); return ((p[0]?.[0] || '') + (p[1]?.[0] || '')).toUpperCase() || '?'; }
+
+function fileExt(name = '') {
+  const ext = (name.split('.').pop() || '').toLowerCase();
+  if (['jpg','jpeg','png','gif','webp'].includes(ext)) return { ext:'IMG', cls:'badge-violet', tint:'var(--violet-soft)', ink:'var(--violet-ink)' };
+  if (['xls','xlsx'].includes(ext))                     return { ext:'XLS', cls:'badge-green',  tint:'var(--green-soft)',  ink:'var(--green-ink)' };
+  if (['csv'].includes(ext))                            return { ext:'CSV', cls:'badge-teal',   tint:'var(--teal-soft)',   ink:'var(--teal-ink)' };
+  if (['doc','docx'].includes(ext))                     return { ext:'DOC', cls:'badge-blue',   tint:'var(--blue-soft)',   ink:'var(--blue-ink)' };
+  return { ext:'PDF', cls:'badge-red', tint:'var(--red-soft)', ink:'var(--red-ink)' };
 }
 
 function formatBytes(bytes) {
@@ -107,59 +114,105 @@ export default function Documents() {
 
   if (loading) return <Loading />;
 
+  // Folder summary by document type (only types that have files)
+  const FOLDER_TINTS = [
+    { tint:'var(--blue-soft)',   ink:'var(--blue-ink)'   },
+    { tint:'var(--violet-soft)', ink:'var(--violet-ink)' },
+    { tint:'var(--green-soft)',  ink:'var(--green-ink)'  },
+    { tint:'var(--amber-soft)',  ink:'var(--amber-ink)'  },
+    { tint:'var(--teal-soft)',   ink:'var(--teal-ink)'   },
+    { tint:'var(--red-soft)',    ink:'var(--red-ink)'    },
+    { tint:'var(--slate-soft)',  ink:'var(--slate-ink)'  },
+  ];
+  const folders = DOC_TYPES
+    .map((t, i) => ({ name: t, count: docs.filter(d => d.docType === t).length, ...FOLDER_TINTS[i % FOLDER_TINTS.length] }))
+    .filter(f => f.count > 0)
+    .slice(0, 4);
+
   return (
     <div>
-      <div className="page-header">
-        <h2>Document Repository <span style={{ fontSize: 16, color: '#6B7280', fontWeight: 400 }}>({filtered.length})</span></h2>
-        <button className="btn btn-primary" onClick={() => setShowModal(true)}><Upload size={16} /> Upload Document</button>
+      <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', gap:16, flexWrap:'wrap', marginBottom:18 }}>
+        <div>
+          <h2 style={{ fontSize:24, fontWeight:700 }}>Documents</h2>
+          <div style={{ fontSize:13, color:'var(--text-muted)', marginTop:3 }}>Shared templates, student records, and operational files.</div>
+        </div>
+        <button className="btn btn-primary" onClick={() => setShowModal(true)}><Upload size={16} /> Upload</button>
       </div>
 
-      <div style={{ display: 'flex', gap: 10, marginBottom: 16 }}>
-        <div className="search-bar" style={{ flex: 1 }}>
-          <Search size={16} style={{ color: '#6B7280' }} />
-          <input placeholder="Search by student, document type, filename..." value={search} onChange={e => setSearch(e.target.value)} />
-        </div>
-        <select className="form-input" style={{ width: 200 }} value={studentFilter} onChange={e => setStudentFilter(e.target.value)}>
+      {folders.length > 0 && (
+        <>
+          <div style={{ fontSize:11, fontWeight:700, letterSpacing:'.1em', color:'var(--text-muted)', marginBottom:10 }}>FOLDERS</div>
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:14, marginBottom:24 }}>
+            {folders.map(f => (
+              <div key={f.name} className="card" style={{ padding:'16px 18px', display:'flex', alignItems:'center', gap:13 }}>
+                <div style={{ width:42, height:42, borderRadius:11, background:f.tint, color:f.ink, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+                  <Upload size={20} />
+                </div>
+                <div style={{ minWidth:0 }}>
+                  <div style={{ fontSize:14, fontWeight:600, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{f.name}</div>
+                  <div style={{ fontSize:11.5, color:'var(--text-muted)', marginTop:2 }}>{f.count} file{f.count > 1 ? 's' : ''}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+
+      <div style={{ display:'flex', alignItems:'center', gap:12, flexWrap:'wrap', marginBottom:14 }}>
+        <div style={{ fontSize:11, fontWeight:700, letterSpacing:'.1em', color:'var(--text-muted)' }}>RECENT FILES</div>
+        <div style={{ flex:1 }} />
+        <select className="form-input" style={{ width:180 }} value={studentFilter} onChange={e => setStudentFilter(e.target.value)}>
           <option value="">All Students</option>
           {students.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
         </select>
+        <div className="search-bar" style={{ width:280 }}>
+          <Search size={15} style={{ color:'var(--text-muted)' }} />
+          <input placeholder="Search files…" value={search} onChange={e => setSearch(e.target.value)} />
+        </div>
       </div>
 
       <div className="table-container">
         <table>
           <thead>
-            <tr><th>Document</th><th>Student</th><th>Type</th><th></th></tr>
+            <tr><th>Name</th><th style={{ width:120 }}>Type</th><th style={{ width:200 }}>Student</th><th style={{ width:60 }}></th></tr>
           </thead>
           <tbody>
             {filtered.length === 0 && (
-              <tr><td colSpan={4} style={{ textAlign: 'center', color: '#6B7280', padding: 40 }}>
+              <tr><td colSpan={4} style={{ textAlign:'center', color:'var(--text-muted)', padding:40 }}>
                 No documents uploaded yet.
               </td></tr>
             )}
-            {filtered.map((doc, i) => (
-              <tr key={i}>
-                <td>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    {fileIcon(doc.fileName)}
-                    <div>
-                      <div style={{ fontSize: 13, fontWeight: 500 }}>{doc.fileName}</div>
+            {filtered.map((doc, i) => {
+              const fx = fileExt(doc.fileName);
+              const sName = studentName(doc.studentId);
+              return (
+                <tr key={i}>
+                  <td>
+                    <div style={{ display:'flex', alignItems:'center', gap:11 }}>
+                      <div style={{ width:32, height:32, borderRadius:8, background:fx.tint, color:fx.ink, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, fontFamily:'var(--font-display)', fontWeight:700, fontSize:10 }}>{fx.ext}</div>
+                      <span style={{ fontSize:13, fontWeight:600 }}>{doc.fileName}</span>
                     </div>
-                  </div>
-                </td>
-                <td style={{ fontSize: 13, fontWeight: 500 }}>{studentName(doc.studentId)}</td>
-                <td><span className="badge badge-blue">{doc.docType}</span></td>
-                <td>
-                  <div style={{ display: 'flex', gap: 6 }}>
-                    <a href={doc.url} target="_blank" rel="noreferrer" className="btn btn-ghost btn-sm btn-icon" title="Download">
-                      <Download size={14} />
-                    </a>
-                    <button className="btn btn-ghost btn-sm btn-icon" style={{ color: '#EF4444' }} onClick={() => setDeleting(doc.fullPath)} title="Delete">
-                      <Trash2 size={14} />
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
+                  </td>
+                  <td><span className={`badge ${fx.cls}`} style={{ fontSize:10.5 }}>{doc.docType}</span></td>
+                  <td>
+                    <span style={{ display:'inline-flex', alignItems:'center', gap:8 }}>
+                      <span style={{ width:22, height:22, borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center', fontFamily:'var(--font-display)', fontWeight:700, fontSize:9, color:'#fff', background:avatarColor(sName) }}>{initials(sName)}</span>
+                      <span style={{ fontSize:12.5, color:'var(--text-sub)' }}>{sName}</span>
+                    </span>
+                  </td>
+                  <td>
+                    <div style={{ display:'flex', gap:6 }}>
+                      <a href={doc.url} target="_blank" rel="noreferrer" className="btn btn-ghost btn-sm btn-icon" title="Download">
+                        <Download size={14} />
+                      </a>
+                      <button className="btn btn-ghost btn-sm btn-icon" style={{ color:'var(--red)' }} onClick={() => setDeleting(doc.fullPath)} title="Delete">
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
@@ -189,17 +242,17 @@ export default function Documents() {
               <div
                 onClick={() => fileRef.current.click()}
                 style={{
-                  border: '2px dashed #E5E7EB', borderRadius: 10, padding: '20px',
+                  border: '2px dashed var(--border-strong)', borderRadius: 10, padding: '20px',
                   textAlign: 'center', cursor: 'pointer', transition: 'border 0.15s',
-                  background: form.file ? '#F0FDF4' : '#FAFAFA'
+                  background: form.file ? 'var(--green-soft)' : 'var(--surface-sunken)'
                 }}
               >
                 {form.file ? (
-                  <div style={{ color: '#065F46', fontSize: 13, fontWeight: 500 }}>
-                    ✅ {form.file.name} ({formatBytes(form.file.size)})
+                  <div style={{ color: 'var(--green-ink)', fontSize: 13, fontWeight: 600 }}>
+                    {form.file.name} ({formatBytes(form.file.size)})
                   </div>
                 ) : (
-                  <div style={{ color: '#6B7280', fontSize: 13 }}>
+                  <div style={{ color: 'var(--text-muted)', fontSize: 13 }}>
                     <Upload size={20} style={{ margin: '0 auto 6px', display: 'block' }} />
                     Click to select a file (PDF, JPG, PNG, DOC)
                   </div>
@@ -208,9 +261,9 @@ export default function Documents() {
             </div>
             {uploading && (
               <div>
-                <div style={{ fontSize: 12, color: '#6B7280', marginBottom: 4 }}>Uploading... {progress}%</div>
+                <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>Uploading... {progress}%</div>
                 <div className="progress-bar">
-                  <div className="progress-fill" style={{ width: `${progress}%`, background: '#10B981' }} />
+                  <div className="progress-fill" style={{ width: `${progress}%`, background: 'var(--green)' }} />
                 </div>
               </div>
             )}

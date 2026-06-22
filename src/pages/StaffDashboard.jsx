@@ -315,7 +315,7 @@ export default function StaffDashboard() {
                 <>
                   <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
                     <div style={{ fontSize:13, fontWeight:600 }}>My Removal Requests</div>
-                    <button className="btn btn-ghost btn-sm" onClick={() => navigate('/requests')}>View All →</button>
+                    <button className="btn btn-ghost btn-sm" onClick={() => navigate('/requests')}>View All </button>
                   </div>
                   {myRequests.length === 0 && <div style={{ color:'#9CA3AF', fontSize:13, textAlign:'center', paddingTop:40 }}>No requests submitted.</div>}
                   {myRequests.map(req => {
@@ -352,14 +352,14 @@ export default function StaffDashboard() {
                               alert('Reminder sent to CEO!');
                             }}
                             style={{ fontSize:11, padding:'4px 10px', borderRadius:6, border:'1px solid #E5E7EB', background:'#fff', cursor:'pointer', fontWeight:500 }}>
-                            {reminding[req.id] ? 'Sending...' : '🔔 Remind CEO'}
+                            {reminding[req.id] ? 'Sending...' : 'Remind CEO'}
                           </button>
                         )}
                         {req.status === 'accepted' && (
-                          <div style={{ fontSize:11, color:'#10B981', fontWeight:600 }}>✓ Approved — you have been removed.</div>
+                          <div style={{ fontSize:11, color:'#10B981', fontWeight:600 }}>Approved — you have been removed.</div>
                         )}
                         {req.status === 'rejected' && (
-                          <div style={{ fontSize:11, color:'#EF4444', fontWeight:600 }}>✗ Request was declined by CEO.</div>
+                          <div style={{ fontSize:11, color:'#EF4444', fontWeight:600 }}>Request was declined by CEO.</div>
                         )}
                       </div>
                     );
@@ -426,7 +426,7 @@ export default function StaffDashboard() {
           <div style={{ ...CARD, marginBottom: 20 }}>
             {/* Title + batch chips row */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
-              <h3 style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>📅 Batch Activity Hub <span style={{ fontSize: 12, color: '#9CA3AF', fontWeight: 400 }}>(active only)</span></h3>
+              <h3 style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>Batch Activity Hub <span style={{ fontSize: 12, color: '#9CA3AF', fontWeight: 400 }}>(active only)</span></h3>
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                 {myBatches.map(b => (
                   <button key={b.id} onClick={() => { setHubBatch(b.id); setHubFilter('all'); setHubTypeFilter(''); setHubSearch(''); setHubPage(0); }}
@@ -446,9 +446,9 @@ export default function StaffDashboard() {
                 <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
                   {[
                     { key: 'all',        label: 'All'            },
-                    { key: 'schedule',   label: '🗓 Classes'     },
-                    { key: 'assessment', label: '📝 Assessments' },
-                    { key: 'task',       label: '✅ Assignments'  },
+                    { key: 'schedule',   label: 'Classes'     },
+                    { key: 'assessment', label: 'Assessments' },
+                    { key: 'task',       label: 'Assignments'  },
                   ].map(f => (
                     <button key={f.key} onClick={() => { setHubFilter(f.key); setHubTypeFilter(''); setHubPage(0); }}
                       style={{ padding: '4px 12px', borderRadius: 20, border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 600,
@@ -462,9 +462,9 @@ export default function StaffDashboard() {
                 {/* Time filter pills */}
                 <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', borderLeft: '1px solid #E5E7EB', paddingLeft: 8 }}>
                   {[
-                    { key: 'active',   label: '⚡ Active'   },
-                    { key: 'upcoming', label: '📅 Upcoming' },
-                    { key: 'past',     label: '🕐 Past'     },
+                    { key: 'active',   label: 'Active'   },
+                    { key: 'upcoming', label: 'Upcoming' },
+                    { key: 'past',     label: 'Past'     },
                     { key: 'all',      label: 'All Time'    },
                   ].map(f => (
                     <button key={f.key} onClick={() => { setHubTimeFilter(f.key); setHubPage(0); }}
@@ -524,9 +524,9 @@ export default function StaffDashboard() {
                 {/* Count row */}
                 <div style={{ display: 'flex', gap: 16, marginBottom: 10, fontSize: 12, color: '#6B7280', flexWrap: 'wrap' }}>
                   <span style={{ fontWeight: 600, color: 'var(--text)' }}>{list.length} item{list.length !== 1 ? 's' : ''}</span>
-                  <span>🗓 {hubItems.filter(i=>i._kind==='schedule').length} classes</span>
-                  <span>📝 {hubItems.filter(i=>i._kind==='assessment').length} assessments</span>
-                  <span>✅ {hubItems.filter(i=>i._kind==='task').length} assignments</span>
+                  <span>{hubItems.filter(i=>i._kind==='schedule').length} classes</span>
+                  <span>{hubItems.filter(i=>i._kind==='assessment').length} assessments</span>
+                  <span>{hubItems.filter(i=>i._kind==='task').length} assignments</span>
                 </div>
 
                 {pageList.length === 0 ? (
@@ -552,7 +552,7 @@ export default function StaffDashboard() {
                           <span style={{ fontSize: 11, padding: '3px 10px', borderRadius: 20, background: c.bg, color: c.color, fontWeight: 600, flexShrink: 0, whiteSpace: 'nowrap' }}>
                             {item._kind === 'schedule' ? 'Class' : item._kind === 'assessment' ? 'Assessment' : 'Assignment'}
                           </span>
-                          <span style={{ fontSize: 11, color: '#9CA3AF', flexShrink: 0 }}>→</span>
+                          <span style={{ fontSize: 11, color: '#9CA3AF', flexShrink: 0 }}></span>
                         </div>
                       );
                     })}
@@ -562,9 +562,9 @@ export default function StaffDashboard() {
                 {/* Pagination */}
                 {totalPages > 1 && (
                   <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 8, marginTop: 14, paddingTop: 12, borderTop: '1px solid #F3F4F6' }}>
-                    <button className="btn btn-ghost btn-sm" disabled={hubPage === 0} onClick={() => setHubPage(p => p - 1)}>← Prev</button>
+                    <button className="btn btn-ghost btn-sm" disabled={hubPage === 0} onClick={() => setHubPage(p => p - 1)}>Prev</button>
                     <span style={{ fontSize: 12, color: '#6B7280' }}>Page {hubPage + 1} of {totalPages} · {list.length} items</span>
-                    <button className="btn btn-ghost btn-sm" disabled={hubPage >= totalPages - 1} onClick={() => setHubPage(p => p + 1)}>Next →</button>
+                    <button className="btn btn-ghost btn-sm" disabled={hubPage >= totalPages - 1} onClick={() => setHubPage(p => p + 1)}>Next </button>
                   </div>
                 )}
               </>
@@ -697,8 +697,7 @@ export default function StaffDashboard() {
               ))}
               {atRisk.length > 5 && (
                 <Link to="/students" style={{ fontSize: 12, color: 'var(--brand)', textAlign: 'center', padding: '6px 0', fontWeight: 500 }}>
-                  +{atRisk.length - 5} more →
-                </Link>
+                  +{atRisk.length - 5} more                 </Link>
               )}
             </div>
           )}

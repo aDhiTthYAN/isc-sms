@@ -44,16 +44,11 @@ const formatDate = (d) =>
 
 const statusBadge = (status) => {
   const map = {
-    upcoming:  { bg:'#EFF6FF', color:'#1D4ED8', label:'Upcoming' },
-    completed: { bg:'#F0FDF4', color:'#15803D', label:'Completed' },
+    upcoming:  { cls:'badge-blue',  label:'Upcoming' },
+    completed: { cls:'badge-green', label:'Completed' },
   };
-  const s = map[status] || { bg:'#F3F4F6', color:'#6B7280', label: status || '—' };
-  return (
-    <span style={{ fontSize:11, fontWeight:600, padding:'2px 8px', borderRadius:20,
-      background: s.bg, color: s.color }}>
-      {s.label}
-    </span>
-  );
+  const s = map[status] || { cls:'badge-gray', label: status || '—' };
+  return <span className={`badge ${s.cls}`}>{s.label}</span>;
 };
 
 // ── Component ──────────────────────────────────────────────────
@@ -341,28 +336,59 @@ export default function Assessments({ filterBatchId = null }) {
   return (
     <div>
       {/* Header */}
-      <div className="page-header">
-        <h2>
-          <ClipboardList size={20} style={{ marginRight:8, verticalAlign:'middle' }}/>
-          Assessments
-        </h2>
-        <button className="btn btn-primary" onClick={() => setShowCreate(true)}>
-          <Plus size={14}/> Create Assessment
-        </button>
-      </div>
-
-      {/* Scope tabs */}
       {!filterBatchId && (
-        <div style={{ display:'flex', gap:0, background:'#F3F4F6', borderRadius:10, padding:3, marginBottom:14, width:'fit-content' }}>
+        <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', gap:16, flexWrap:'wrap', marginBottom:18 }}>
+          <div>
+            <h2 style={{ fontSize:24, fontWeight:700 }}>Assessments</h2>
+            <div style={{ fontSize:13, color:'var(--text-muted)', marginTop:3 }}>Manage exams, quizzes and evaluation records across all batches.</div>
+          </div>
+          <button className="btn btn-primary" onClick={() => setShowCreate(true)}>
+            <Plus size={16}/> Add Assessment
+          </button>
+        </div>
+      )}
+      {filterBatchId && (
+        <div className="page-header">
+          <h2><ClipboardList size={20} style={{ marginRight:8, verticalAlign:'middle' }}/>Assessments</h2>
+          <button className="btn btn-primary" onClick={() => setShowCreate(true)}><Plus size={14}/> Add Assessment</button>
+        </div>
+      )}
+
+      {/* KPI tiles */}
+      {!filterBatchId && (() => {
+        const total = assessments.length;
+        const completed = assessments.filter(a => a.status === 'completed').length;
+        const scheduled = assessments.filter(a => a.status === 'upcoming').length;
+        const withResults = Object.keys(resultCounts).filter(k => resultCounts[k] > 0).length;
+        const tiles = [
+          { label:'Total Assessments', value: total,       hero: true },
+          { label:'Completed',         value: completed,   color:'var(--green-ink)' },
+          { label:'Scheduled',         value: scheduled,   color:'var(--blue-ink)' },
+          { label:'With Results',      value: withResults, color:'var(--amber-ink)' },
+        ];
+        return (
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:16, marginBottom:18 }}>
+            {tiles.map(t => (
+              <div key={t.label} className={t.hero ? '' : 'card'} style={t.hero
+                ? { background:'var(--grad-brand)', borderRadius:14, padding:'16px 20px', color:'#fff', boxShadow:'var(--shadow-md)' }
+                : { padding:'16px 20px' }}>
+                <div style={{ fontSize:12, color: t.hero ? 'rgba(255,255,255,.85)' : 'var(--text-muted)' }}>{t.label}</div>
+                <div style={{ fontFamily:'var(--font-display)', fontSize:26, fontWeight:700, lineHeight:1, marginTop:8, color: t.hero ? '#fff' : t.color }}>{t.value}</div>
+              </div>
+            ))}
+          </div>
+        );
+      })()}
+
+      {/* Scope pills */}
+      {!filterBatchId && (
+        <div className="segmented" style={{ marginBottom:14 }}>
           {[
-            { key:'all',     label:'All Assessments' },
-            { key:'batch',   label:'Batch Assessments' },
-            { key:'student', label:'Student Assessments' },
+            { key:'all',     label:'All' },
+            { key:'batch',   label:'Batch' },
+            { key:'student', label:'Student' },
           ].map(t => (
-            <button key={t.key} onClick={() => setFilterScope(t.key)}
-              style={{ padding:'6px 16px', borderRadius:8, border:'none', cursor:'pointer', fontSize:12, fontWeight:600,
-                background: filterScope === t.key ? '#1A1A2E' : 'transparent',
-                color: filterScope === t.key ? '#fff' : '#6B7280', transition:'all 0.15s' }}>
+            <button key={t.key} className={filterScope === t.key ? 'active' : ''} onClick={() => setFilterScope(t.key)}>
               {t.label}
             </button>
           ))}
@@ -426,9 +452,7 @@ export default function Assessments({ filterBatchId = null }) {
                 <tr key={a.id}>
                   <td style={{ fontWeight:600 }}>{a.title}</td>
                   <td>
-                    <span style={{ fontSize:10, fontWeight:600, padding:'2px 8px', borderRadius:10,
-                      background: a.studentId ? '#EDE9FE' : '#DBEAFE',
-                      color: a.studentId ? '#6D28D9' : '#1E40AF' }}>
+                    <span className={`badge ${a.studentId ? 'badge-violet' : 'badge-blue'}`} style={{ fontSize:10 }}>
                       {a.studentId ? 'Student' : 'Batch'}
                     </span>
                   </td>

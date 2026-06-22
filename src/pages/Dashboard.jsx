@@ -79,7 +79,7 @@ function BatchActivityHub({ batches, schedBatch, setSchedBatch, schedFilter, set
     <div style={{ background: '#fff', borderRadius: 14, border: '1px solid #E5E7EB', padding: '20px 22px', boxShadow: '0 1px 3px rgba(0,0,0,0.08), 0 4px 12px rgba(0,0,0,0.04)', marginBottom: 20 }}>
       {/* Header + batch chips */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14, flexWrap: 'wrap', gap: 10 }}>
-        <h3 style={{ fontSize: 15, fontWeight: 700, color: '#1A1A2E' }}>📅 Batch Activity Hub</h3>
+        <h3 style={{ fontSize: 15, fontWeight: 700, color: '#1A1A2E' }}>Batch Activity Hub</h3>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
           {batches.map(b => (
             <button key={b.id} onClick={() => { setSchedBatch(b.id); clearAll(); }}
@@ -97,7 +97,7 @@ function BatchActivityHub({ batches, schedBatch, setSchedBatch, schedFilter, set
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: 12, padding: '10px 12px', background: '#F8FAFC', borderRadius: 10, border: '1px solid #E5E7EB' }}>
           {/* Category pills */}
           <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-            {[{key:'all',label:'All'},{key:'schedule',label:'🗓 Classes'},{key:'assessment',label:'📝 Assessments'},{key:'task',label:'✅ Tasks'}].map(f => (
+            {[{key:'all',label:'All'},{key:'schedule',label:'Classes'},{key:'assessment',label:'Assessments'},{key:'task',label:'Tasks'}].map(f => (
               <button key={f.key} onClick={() => { setSchedFilter(f.key); setSchedTypeFilter(''); }}
                 style={{ padding: '4px 12px', borderRadius: 20, border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 600,
                   background: schedFilter === f.key ? 'var(--brand)' : 'var(--n-150)', color: schedFilter === f.key ? '#fff' : 'var(--text-sub)' }}>
@@ -108,7 +108,7 @@ function BatchActivityHub({ batches, schedBatch, setSchedBatch, schedFilter, set
 
           {/* Time filter */}
           <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', borderLeft: '1px solid #E5E7EB', paddingLeft: 8 }}>
-            {[{key:'active',label:'⚡ Active'},{key:'upcoming',label:'📅 Upcoming'},{key:'past',label:'🕐 Past'},{key:'all',label:'All Time'}].map(f => (
+            {[{key:'active',label:'Active'},{key:'upcoming',label:'Upcoming'},{key:'past',label:'Past'},{key:'all',label:'All Time'}].map(f => (
               <button key={f.key} onClick={() => setSchedTimeFilter(f.key)}
                 style={{ padding: '4px 10px', borderRadius: 20, border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 600,
                   background: schedTimeFilter === f.key ? 'var(--brand)' : 'var(--n-150)', color: schedTimeFilter === f.key ? '#fff' : 'var(--text-sub)' }}>
@@ -160,9 +160,9 @@ function BatchActivityHub({ batches, schedBatch, setSchedBatch, schedFilter, set
         <>
           <div style={{ marginBottom: 10, fontSize: 12, color: '#6B7280', display: 'flex', gap: 16, flexWrap: 'wrap' }}>
             <span style={{ fontWeight: 600, color: '#1A1A2E' }}>{list.length} item{list.length !== 1 ? 's' : ''}</span>
-            <span>🗓 {schedItems.filter(i=>i._kind==='schedule').length} classes</span>
-            <span>📝 {schedItems.filter(i=>i._kind==='assessment').length} assessments</span>
-            <span>✅ {schedItems.filter(i=>i._kind==='task').length} tasks</span>
+            <span>{schedItems.filter(i=>i._kind==='schedule').length} classes</span>
+            <span>{schedItems.filter(i=>i._kind==='assessment').length} assessments</span>
+            <span>{schedItems.filter(i=>i._kind==='task').length} tasks</span>
           </div>
           {list.length === 0 ? (
             <div style={{ textAlign: 'center', color: '#9CA3AF', padding: '24px 0', fontSize: 13 }}>No items match your filters.</div>
@@ -185,7 +185,7 @@ function BatchActivityHub({ batches, schedBatch, setSchedBatch, schedFilter, set
                     <span style={{ fontSize: 11, padding: '3px 10px', borderRadius: 20, background: c.bg, color: c.color, fontWeight: 600, flexShrink: 0, whiteSpace: 'nowrap' }}>
                       {item._kind === 'schedule' ? 'Class' : item._kind === 'assessment' ? 'Assessment' : 'Task'}
                     </span>
-                    <span style={{ fontSize: 11, color: '#9CA3AF', flexShrink: 0 }}>→</span>
+                    <span style={{ fontSize: 11, color: '#9CA3AF', flexShrink: 0 }}></span>
                   </div>
                 );
               })}
@@ -426,8 +426,7 @@ export default function Dashboard() {
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
           <div>
             <h1 style={{ fontSize: 24, fontWeight: 700, fontFamily: 'var(--font-display)', color: 'var(--text)', marginBottom: 4, margin: 0 }}>
-              Welcome back, {(profile?.name || 'there').split(' ')[0]} 👋
-            </h1>
+              Welcome back, {(profile?.name || 'there').split(' ')[0]}             </h1>
             <p style={{ fontSize: 14, color: 'var(--text-muted)', margin: '4px 0 0' }}>
               Here's what's happening across International Skills Club today.
             </p>
@@ -518,7 +517,7 @@ export default function Dashboard() {
                   <button
                     onClick={() => { setShowSidebar(false); navigate('/requests'); }}
                     style={{ marginTop: 8, padding: '9px', borderRadius: 8, border: '1px solid #E5E7EB', background: '#fff', color: 'var(--brand)', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}
-                  >View All Requests →</button>
+                  >View All Requests </button>
                 </div>
               )}
 
@@ -687,9 +686,9 @@ export default function Dashboard() {
           </div>
           {totalPages > 1 && (
             <div style={{ display: 'flex', justifyContent: 'center', gap: 6, marginTop: 12, paddingTop: 12, borderTop: '1px solid #F3F4F6' }}>
-              <button className="btn btn-ghost btn-sm" disabled={actPage === 0} onClick={() => setActPage(p => p - 1)}>← Prev</button>
+              <button className="btn btn-ghost btn-sm" disabled={actPage === 0} onClick={() => setActPage(p => p - 1)}>Prev</button>
               <span style={{ fontSize: 12, color: '#6B7280', alignSelf: 'center' }}>Page {actPage + 1} of {totalPages}</span>
-              <button className="btn btn-ghost btn-sm" disabled={actPage === totalPages - 1} onClick={() => setActPage(p => p + 1)}>Next →</button>
+              <button className="btn btn-ghost btn-sm" disabled={actPage === totalPages - 1} onClick={() => setActPage(p => p + 1)}>Next </button>
             </div>
           )}
         </div>
@@ -737,8 +736,7 @@ export default function Dashboard() {
           </div>
           {atRiskCount > 10 && (
             <Link to="/students" style={{ display: 'block', textAlign: 'center', marginTop: 12, fontSize: 12, color: '#E53935', fontWeight: 500 }}>
-              +{atRiskCount - 10} more at-risk students →
-            </Link>
+              +{atRiskCount - 10} more at-risk students             </Link>
           )}
         </div>
       </div>

@@ -1,10 +1,13 @@
 import { useEffect, useState } from 'react';
 import { getDailyReports, addReport } from '../firebase/services';
-import { Toast, Loading, FormRow } from '../components/ui';
+import { Modal, Toast, Loading, FormRow } from '../components/ui';
 import { useAuth } from '../context/AuthContext';
-import { Send, ChevronDown, ChevronUp } from 'lucide-react';
+import { Send, Plus, Calendar } from 'lucide-react';
 
 const STAFF_LIST = ['Priya S.', 'Arjun M.', 'Meena R.', 'John K.', 'Arun P.'];
+const ACCENTS = ['#E81620','#F4683B','#F5A623','#16A974','#11B4C6','#3B6EF6','#6366F1','#8B5CF6','#EC4899','#6E7488'];
+function avatarColor(name = '') { let h = 0; for (const c of name) h = (h * 31 + c.charCodeAt(0)) >>> 0; return ACCENTS[h % ACCENTS.length]; }
+function initials(name = '') { const p = name.trim().split(/\s+/); return ((p[0]?.[0] || '') + (p[1]?.[0] || '')).toUpperCase() || '?'; }
 
 export default function Reports() {
   const { profile } = useAuth();
@@ -12,7 +15,7 @@ export default function Reports() {
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState(null);
   const [saving, setSaving] = useState(false);
-  const [expanded, setExpanded] = useState({});
+  const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState({
     staffName: profile?.name || '',
     studentsContacted: '',
@@ -36,14 +39,9 @@ export default function Reports() {
     await addReport({ ...form, date: new Date().toLocaleDateString('en-IN') });
     setToast({ message: 'Report submitted successfully!', type: 'success' });
     setForm({ staffName: profile?.name || '', studentsContacted: '', followupsDone: '', newAdmissions: '', problemsFound: '', summary: '' });
+    setShowModal(false);
     load();
     setSaving(false);
-  };
-
-  const formatDate = (ts) => {
-    if (!ts) return '—';
-    const d = ts.toDate ? ts.toDate() : new Date(ts);
-    return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
   };
 
   const formatTime = (ts) => {
@@ -52,26 +50,104 @@ export default function Reports() {
     return d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
   };
 
-  // Group by date
-  const grouped = {};
-  reports.forEach(r => {
-    const key = r.date || formatDate(r.createdAt);
-    if (!grouped[key]) grouped[key] = [];
-    grouped[key].push(r);
+  const today = new Date().toLocaleDateString('en-IN', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' });
+
+  // Sort most recent first (no orderBy in Firestore — sort in JS)
+  const sorted = [...reports].sort((a, b) => {
+    const ta = a.createdAt?.toDate ? a.createdAt.toDate().getTime() : 0;
+    const tb = b.createdAt?.toDate ? b.createdAt.toDate().getTime() : 0;
+    return tb - ta;
   });
+
+  const totalCalls = reports.reduce((s, r) => s + (Number(r.studentsContacted) || 0), 0);
+  const totalFollowups = reports.reduce((s, r) => s + (Number(r.followupsDone) || 0), 0);
+  const totalAdmissions = reports.reduce((s, r) => s + (Number(r.newAdmissions) || 0), 0);
 
   if (loading) return <Loading />;
 
   return (
     <div>
-      <div className="page-header">
-        <h2>Daily Staff Reports</h2>
+      <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', gap:16, flexWrap:'wrap', marginBottom:18 }}>
+        <div>
+          <h2 style={{ fontSize:24, fontWeight:700 }}>Daily Reports</h2>
+          <div style={{ fontSize:13, color:'var(--text-muted)', marginTop:3 }}>End-of-day summaries submitted by each staff member.</div>
+        </div>
+        <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+          <button className="btn btn-secondary btn-sm" style={{ height:40 }}>
+            <Calendar size={14} /> {today}
+          </button>
+          <button className="btn btn-primary" onClick={() => setShowModal(true)}>
+            <Plus size={16} /> Submit Report
+          </button>
+        </div>
       </div>
 
-      <div className="grid-2" style={{ alignItems: 'start' }}>
-        {/* Submit form */}
-        <div className="card">
-          <h3 style={{ fontSize: 15, fontWeight: 600, marginBottom: 18 }}>📝 Submit Today's Report</h3>
+      {/* Summary tiles */}
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:16, marginBottom:18 }}>
+        <div style={{ background:'var(--grad-brand)', borderRadius:14, padding:'16px 20px', color:'#fff', boxShadow:'var(--shadow-md)' }}>
+          <div style={{ fontSize:12, color:'rgba(255,255,255,.85)' }}>Reports Today</div>
+          <div style={{ fontFamily:'var(--font-display)', fontSize:26, fontWeight:700, lineHeight:1, marginTop:8 }}>{reports.length}</div>
+        </div>
+        <div className="card" style={{ padding:'16px 20px' }}>
+          <div style={{ fontSize:12, color:'var(--text-muted)' }}>Calls Made</div>
+          <div style={{ fontFamily:'var(--font-display)', fontSize:26, fontWeight:700, lineHeight:1, marginTop:8, color:'var(--teal-ink)' }}>{totalCalls}</div>
+        </div>
+        <div className="card" style={{ padding:'16px 20px' }}>
+          <div style={{ fontSize:12, color:'var(--text-muted)' }}>Follow-ups Closed</div>
+          <div style={{ fontFamily:'var(--font-display)', fontSize:26, fontWeight:700, lineHeight:1, marginTop:8, color:'var(--green-ink)' }}>{totalFollowups}</div>
+        </div>
+        <div className="card" style={{ padding:'16px 20px' }}>
+          <div style={{ fontSize:12, color:'var(--text-muted)' }}>New Admissions</div>
+          <div style={{ fontFamily:'var(--font-display)', fontSize:26, fontWeight:700, lineHeight:1, marginTop:8, color:'var(--amber-ink)' }}>{totalAdmissions}</div>
+        </div>
+      </div>
+
+      {/* Report card list */}
+      <div style={{ display:'flex', flexDirection:'column', gap:12, maxWidth:980 }}>
+        {sorted.length === 0 && (
+          <div style={{ padding:'48px 20px', textAlign:'center', color:'var(--text-muted)', fontSize:13.5, background:'var(--surface)', border:'1px solid var(--border)', borderRadius:14 }}>
+            No reports submitted yet.
+          </div>
+        )}
+        {sorted.map(r => {
+          const metrics = [
+            { value: r.studentsContacted, label: 'calls',      color: 'var(--teal-ink)'  },
+            { value: r.followupsDone,     label: 'follow-ups', color: 'var(--green-ink)' },
+            { value: r.newAdmissions,     label: 'onboarded',  color: 'var(--blue-ink)'  },
+            { value: r.problemsFound,     label: 'problems',   color: 'var(--amber-ink)' },
+          ].filter(m => m.value);
+          return (
+            <div key={r.id} className="card" style={{ padding:'16px 20px' }}>
+              <div style={{ display:'flex', alignItems:'flex-start', gap:14 }}>
+                <div style={{ width:40, height:40, borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center', fontFamily:'var(--font-display)', fontWeight:700, fontSize:13, color:'#fff', flexShrink:0, background:avatarColor(r.staffName || '') }}>{initials(r.staffName || '')}</div>
+                <div style={{ flex:1, minWidth:0 }}>
+                  <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
+                    <span style={{ fontSize:14, fontWeight:600 }}>{r.staffName || '—'}</span>
+                    <span style={{ flex:1 }} />
+                    <span style={{ fontSize:11.5, color:'var(--text-muted)' }}>{r.date || ''}{formatTime(r.createdAt) ? ` · ${formatTime(r.createdAt)}` : ''}</span>
+                    <span className="badge badge-green"><span className="dot" />Submitted</span>
+                  </div>
+                  {r.summary && (
+                    <div style={{ fontSize:13, color:'var(--text-sub)', lineHeight:1.55, marginTop:9 }}>{r.summary}</div>
+                  )}
+                  {metrics.length > 0 && (
+                    <div style={{ display:'flex', alignItems:'center', gap:8, marginTop:11, flexWrap:'wrap' }}>
+                      {metrics.map(m => (
+                        <span key={m.label} style={{ display:'inline-flex', alignItems:'center', gap:6, background:'var(--surface-sunken)', borderRadius:8, padding:'5px 10px', fontSize:11.5, color:'var(--text-sub)' }}>
+                          <span style={{ fontFamily:'var(--font-display)', fontWeight:700, color:m.color }}>{m.value}</span>{m.label}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {showModal && (
+        <Modal title="Submit Today's Report" onClose={() => setShowModal(false)}>
           <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             <div className="form-group">
               <label className="form-label">Staff Name *</label>
@@ -104,79 +180,15 @@ export default function Reports() {
               <label className="form-label">Summary / Notes</label>
               <textarea className="form-input" rows={4} placeholder="What did you accomplish today? Any important updates for the CEO?" value={form.summary} onChange={e => setForm({ ...form, summary: e.target.value })} />
             </div>
-            <button type="submit" className="btn btn-primary" style={{ width: '100%' }} disabled={saving}>
-              <Send size={15} /> {saving ? 'Submitting...' : 'Submit Report'}
-            </button>
-          </form>
-        </div>
-
-        {/* CEO view */}
-        <div>
-          <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 14, color: '#6B7280' }}>
-            📊 All Reports ({reports.length} total)
-          </h3>
-          {Object.keys(grouped).length === 0 && (
-            <div className="card" style={{ textAlign: 'center', color: '#6B7280', padding: 40 }}>No reports submitted yet.</div>
-          )}
-          {Object.entries(grouped).map(([date, dayReports]) => (
-            <div key={date} style={{ marginBottom: 12 }}>
-              <button
-                onClick={() => setExpanded(prev => ({ ...prev, [date]: !prev[date] }))}
-                style={{
-                  width: '100%', padding: '10px 16px',
-                  background: '#fff', border: '1px solid #E5E7EB',
-                  borderRadius: expanded[date] ? '10px 10px 0 0' : 10,
-                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                  cursor: 'pointer', fontWeight: 600, fontSize: 14
-                }}
-              >
-                <span>📅 {date}</span>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ fontSize: 12, color: '#6B7280', fontWeight: 400 }}>{dayReports.length} report{dayReports.length > 1 ? 's' : ''}</span>
-                  {expanded[date] ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                </div>
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+              <button type="button" className="btn btn-ghost" onClick={() => setShowModal(false)}>Cancel</button>
+              <button type="submit" className="btn btn-primary" disabled={saving}>
+                <Send size={15} /> {saving ? 'Submitting...' : 'Submit Report'}
               </button>
-
-              {expanded[date] && (
-                <div style={{ border: '1px solid #E5E7EB', borderTop: 'none', borderRadius: '0 0 10px 10px', overflow: 'hidden' }}>
-                  {dayReports.map((r, i) => (
-                    <div key={r.id} style={{
-                      padding: '14px 16px',
-                      borderBottom: i < dayReports.length - 1 ? '1px solid #F3F4F6' : 'none',
-                      background: '#FAFAFA'
-                    }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}>
-                        <span style={{ fontWeight: 600, fontSize: 14 }}>{r.staffName}</span>
-                        <span style={{ fontSize: 12, color: '#9CA3AF' }}>{formatTime(r.createdAt)}</span>
-                      </div>
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 10 }}>
-                        {[
-                          { label: 'Contacted', value: r.studentsContacted, color: '#3B82F6' },
-                          { label: 'Follow-ups', value: r.followupsDone, color: '#8B5CF6' },
-                          { label: 'Admissions', value: r.newAdmissions, color: '#10B981' },
-                          { label: 'Problems', value: r.problemsFound, color: '#EF4444' },
-                        ].map(item => (
-                          <div key={item.label} style={{ background: '#fff', borderRadius: 8, padding: '8px 12px', border: '1px solid #E5E7EB' }}>
-                            <div style={{ fontSize: 11, color: '#9CA3AF', marginBottom: 2 }}>{item.label}</div>
-                            <div style={{ fontSize: 20, fontWeight: 700, fontFamily: 'Space Grotesk', color: item.color }}>
-                              {r[item.label === 'Contacted' ? 'studentsContacted' : item.label === 'Follow-ups' ? 'followupsDone' : item.label === 'Admissions' ? 'newAdmissions' : 'problemsFound'] || 0}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                      {r.summary && (
-                        <div style={{ fontSize: 13, color: '#374151', lineHeight: 1.6, padding: '8px 12px', background: '#fff', borderRadius: 8, border: '1px solid #E5E7EB' }}>
-                          {r.summary}
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
             </div>
-          ))}
-        </div>
-      </div>
+          </form>
+        </Modal>
+      )}
 
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
     </div>
