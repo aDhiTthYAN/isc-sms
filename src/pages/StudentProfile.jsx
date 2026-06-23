@@ -15,15 +15,19 @@ import {
 
 // ── Default Course Flow (fallback if batch has no custom flow) ──
 const DEFAULT_batchCourseFlow = [
-  { key: 'admission',        label: 'Student Admission',                   phase: 'onboarding' },
-  { key: 'parent_onboarding',label: 'Parent Onboarding',                   phase: 'onboarding' },
-  { key: 'group_admission',  label: 'Group Admission',                     phase: 'onboarding' },
-  { key: 'initial_assess',   label: 'Initial Assessment',                  phase: 'onboarding' },
-  { key: 'vark_analysis',    label: 'VARK Analysis',                       phase: 'onboarding' },
-  { key: 'kit_dispatch',     label: 'Kit Packing & Dispatch',              phase: 'onboarding' },
-  { key: 'class_start',      label: 'Class Start',                         phase: 'course' },
-  { key: 'first_activity',   label: 'First Activity',                      phase: 'course' },
-  { key: 'followup_monitor', label: 'Regular Follow-up & Progress Monitoring', phase: 'course' },
+  { key: 'admission',         label: 'Student Admission',                    phase: 'onboarding', fieldType: 'none' },
+  { key: 'parent_onboarding', label: 'Parent Onboarding',                    phase: 'onboarding', fieldType: 'none' },
+  { key: 'group_admission',   label: 'Group Admission',                      phase: 'onboarding', fieldType: 'none' },
+  { key: 'initial_assess',    label: 'Primary Assessment',                   phase: 'onboarding', fieldType: 'note', fieldLabel: 'Assessment Notes' },
+  { key: 'vark_analysis',     label: 'VARK Analysis',                        phase: 'onboarding', fieldType: 'dropdown', fieldLabel: 'VARK Learning Style', fieldOptions: ['Visual','Auditory','Read/Write','Kinesthetic','Visual-Auditory','Visual-Kinesthetic','Auditory-Kinesthetic','Multimodal'], displayInTable: true },
+  { key: 'kit_dispatch',      label: 'Kit Packing & Dispatch',               phase: 'onboarding', fieldType: 'none' },
+  { key: 'instagram_setup',   label: 'Instagram Account Open',               phase: 'onboarding', fieldType: 'none' },
+  { key: 'kit_activities',    label: 'Kit Activities',                       phase: 'course',     fieldType: 'none' },
+  { key: 'kit_insta',         label: 'Kit Activity on Instagram',            phase: 'course',     fieldType: 'none' },
+  { key: 'class_start',       label: 'Classes Started',                      phase: 'course',     fieldType: 'none' },
+  { key: 'first_recheck',     label: 'First Recheck on Progress',            phase: 'course',     fieldType: 'note', fieldLabel: 'Notes' },
+  { key: 'action_plan',       label: 'Action Plan on First Assessment',      phase: 'course',     fieldType: 'note', fieldLabel: 'Action Plan Details' },
+  { key: 'followup_monitor',  label: 'Regular Follow-up & Progress Monitoring', phase: 'course', fieldType: 'none' },
 ];
 
 const PHASE_LABELS = {
@@ -73,8 +77,9 @@ export default function StudentProfile() {
 
   // Course flow
   const [flowExpanded, setFlowExpanded] = useState({ onboarding: true, course: false });
-  const [flowNoteModal, setFlowNoteModal] = useState(null); // { key, label }
+  const [flowNoteModal, setFlowNoteModal] = useState(null); // step object
   const [flowNote,      setFlowNote]      = useState('');
+  const [flowValue,     setFlowValue]     = useState('');
   const [savingFlow,    setSavingFlow]    = useState(false);
 
   const isCEOorAdmin = profile?.role === 'ceo' || profile?.role === 'admin';
@@ -128,12 +133,12 @@ export default function StudentProfile() {
 
   const handleMarkFlow = async (step, done) => {
     if (done) {
-      setFlowNoteModal(step);
-      // Pre-fill existing note if re-opening a completed step
       const existing = flowStep(step.key);
       setFlowNote(existing?.note || '');
+      setFlowValue(existing?.value || '');
+      setFlowNoteModal(step);
     } else {
-      await updateCourseFlowStep(id, step.key, { done: false, date: '', note: '' });
+      await updateCourseFlowStep(id, step.key, { done: false, date: '', note: '', value: '' });
       setToast({ message: `"${step.label}" unmarked`, type: 'info' });
       load();
     }
@@ -141,14 +146,26 @@ export default function StudentProfile() {
 
   const handleSaveFlowNote = async () => {
     if (!flowNoteModal) return;
+    const ft = flowNoteModal.fieldType || 'none';
+    if (ft === 'dropdown' && !flowValue) {
+      setToast({ message: 'Please select a value before saving.', type: 'error' });
+      return;
+    }
     setSavingFlow(true);
-    await updateCourseFlowStep(id, flowNoteModal.key, {
+    const update = {
       done: true,
       date: new Date().toLocaleDateString('en-IN'),
       note: flowNote,
-    });
+      value: flowValue,
+    };
+    await updateCourseFlowStep(id, flowNoteModal.key, update);
+    // Also persist displayInTable field to student top-level (e.g. varkResult)
+    if (flowNoteModal.displayInTable && flowNoteModal.key === 'vark_analysis' && flowValue) {
+      await updateStudent(id, { varkResult: flowValue });
+    }
     setFlowNoteModal(null);
     setFlowNote('');
+    setFlowValue('');
     setSavingFlow(false);
     setToast({ message: `"${flowNoteModal.label}" marked complete!`, type: 'success' });
     load();
@@ -796,21 +813,42 @@ export default function StudentProfile() {
       )}
 
       {/* Course flow note */}
-      {flowNoteModal && (
-        <Modal title={`Mark Complete: ${flowNoteModal.label}`} onClose={() => { setFlowNoteModal(null); setFlowNote(''); }}>
-          <div className="form-group" style={{ marginBottom:14 }}>
-            <label className="form-label">Add a note (optional)</label>
-            <textarea className="form-input" rows={3} placeholder="Any observations or remarks about this step..."
-              value={flowNote} onChange={e => setFlowNote(e.target.value)}/>
-          </div>
-          <div style={{ display:'flex', gap:10, justifyContent:'flex-end' }}>
-            <button className="btn btn-ghost" onClick={() => { setFlowNoteModal(null); setFlowNote(''); }}>Cancel</button>
-            <button className="btn btn-primary" onClick={handleSaveFlowNote} disabled={savingFlow}>
-              {savingFlow?'Saving...':'Mark Complete '}
-            </button>
-          </div>
-        </Modal>
-      )}
+      {flowNoteModal && (() => {
+        const ft = flowNoteModal.fieldType || 'none';
+        const opts = flowNoteModal.fieldOptions || [];
+        const fieldLabel = flowNoteModal.fieldLabel || flowNoteModal.label;
+        return (
+          <Modal title={`Mark Complete: ${flowNoteModal.label}`} onClose={() => { setFlowNoteModal(null); setFlowNote(''); setFlowValue(''); }}>
+            {ft === 'dropdown' && (
+              <div className="form-group" style={{ marginBottom:14 }}>
+                <label className="form-label">{fieldLabel} *</label>
+                <select className="form-input" required value={flowValue} onChange={e => setFlowValue(e.target.value)}>
+                  <option value="">Select…</option>
+                  {opts.map(o => <option key={o} value={o}>{o}</option>)}
+                </select>
+              </div>
+            )}
+            {(ft === 'note' || ft === 'text') && (
+              <div className="form-group" style={{ marginBottom:14 }}>
+                <label className="form-label">{fieldLabel}</label>
+                <textarea className="form-input" rows={3} placeholder={`Enter ${fieldLabel.toLowerCase()}...`}
+                  value={flowValue} onChange={e => setFlowValue(e.target.value)}/>
+              </div>
+            )}
+            <div className="form-group" style={{ marginBottom:14 }}>
+              <label className="form-label">Additional Note (optional)</label>
+              <textarea className="form-input" rows={3} placeholder="Any observations or remarks about this step..."
+                value={flowNote} onChange={e => setFlowNote(e.target.value)}/>
+            </div>
+            <div style={{ display:'flex', gap:10, justifyContent:'flex-end' }}>
+              <button className="btn btn-ghost" onClick={() => { setFlowNoteModal(null); setFlowNote(''); setFlowValue(''); }}>Cancel</button>
+              <button className="btn btn-primary" onClick={handleSaveFlowNote} disabled={savingFlow}>
+                {savingFlow ? 'Saving...' : 'Mark Complete'}
+              </button>
+            </div>
+          </Modal>
+        );
+      })()}
 
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)}/>}
     </div>

@@ -360,8 +360,7 @@ export const sendPushNotification = async ({ toEmail, title, body }) => {
 
 // ── Daily Reports ──────────────────────────────────────────────
 export const getDailyReports = async () => {
-  const q = query(collection(db,'reports'), orderBy('createdAt','desc'), limit(100));
-  const snap = await getDocs(q);
+  const snap = await getDocs(query(collection(db,'reports'), limit(200)));
   return snap.docs.map(d => ({ id: d.id, ...d.data() }));
 };
 
