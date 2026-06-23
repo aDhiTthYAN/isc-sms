@@ -540,8 +540,8 @@ export default function Assessments({ filterBatchId = null }) {
             </div>
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
               <div className="form-group">
-                <label className="form-label">Total Marks *</label>
-                <input className="form-input" type="number" required min="1" placeholder="100"
+                <label className="form-label">Total Marks</label>
+                <input className="form-input" type="number" min="0" placeholder="100 (optional)"
                   value={createForm.totalMarks}
                   onChange={e => setCreateForm({ ...createForm, totalMarks: e.target.value })}/>
               </div>

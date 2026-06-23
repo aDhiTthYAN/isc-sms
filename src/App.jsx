@@ -23,6 +23,7 @@ import StaffManagement from './pages/StaffManagement';
 import BulkImport      from './pages/BulkImport';
 import Trash           from './pages/Trash';
 import Requests        from './pages/Requests';
+import Schedule        from './pages/Schedule';
 import PublicSchedule  from './pages/PublicSchedule';
 
 const NAV_BY_ROLE = {
@@ -32,6 +33,7 @@ const NAV_BY_ROLE = {
     { to: '/students',    label: 'All Students',      icon: 'Users'          },
     { to: '/followups',   label: 'Follow-Ups',        icon: 'PhoneCall'      },
     { to: '/batches',     label: 'Batches',           icon: 'School'         },
+    { to: '/schedule',    label: 'Schedule',          icon: 'CalendarDays'   },
     { section: 'ACADEMIC' },
     { to: '/assessments', label: 'Assessments',       icon: 'ClipboardList'  },
     { to: '/concerns',    label: 'Concerns',          icon: 'AlertCircle'    },
@@ -56,6 +58,7 @@ const NAV_BY_ROLE = {
     { section: 'Academic' },
     { to: '/assessments', label: 'Assessments',      icon: 'ClipboardList'   },
     { to: '/batches',     label: 'Batches',          icon: 'School'          },
+    { to: '/schedule',    label: 'Schedule',         icon: 'CalendarDays'    },
     { to: '/leaderboard', label: 'Leaderboard',      icon: 'Trophy'          },
     { section: 'Operations' },
     { to: '/reports',     label: 'Daily Reports',    icon: 'FileText'        },
@@ -66,6 +69,7 @@ const NAV_BY_ROLE = {
     { to: '/',            label: 'My Dashboard',     icon: 'LayoutDashboard' },
     { to: '/students',    label: 'My Students',      icon: 'Users'           },
     { to: '/batches',     label: 'Batches',          icon: 'School'          },
+    { to: '/schedule',    label: 'Schedule',         icon: 'CalendarDays'    },
     { to: '/followups',   label: 'My Follow-Ups',    icon: 'PhoneCall'       },
     { to: '/tasks',       label: 'My Tasks',         icon: 'CheckSquare'     },
     { to: '/assessments', label: 'Assessments',      icon: 'ClipboardList'   },
@@ -139,6 +143,7 @@ export default function App() {
             <Route path="/staff"         element={<StaffManagement />} />
             <Route path="/trash"         element={<Trash />}           />
             <Route path="/requests"      element={<Requests />}        />
+            <Route path="/schedule"      element={<Schedule />}        />
           </Route>
           <Route path="/public-schedule/:batchId" element={<PublicSchedule />} />
           <Route path="*" element={<Navigate to="/" replace />} />

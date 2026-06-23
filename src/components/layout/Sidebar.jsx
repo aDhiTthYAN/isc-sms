@@ -4,13 +4,13 @@ import {
   LayoutDashboard, Users, PhoneCall, AlertCircle,
   ClipboardList, School, CheckSquare, FileText,
   TrendingUp, FolderOpen, LogOut, ShieldCheck,
-  Trophy, Upload, UsersRound, Inbox, Trash2,
+  Trophy, Upload, UsersRound, Inbox, Trash2, CalendarDays,
 } from 'lucide-react';
 
 const ICONS = {
   LayoutDashboard, Users, PhoneCall, AlertCircle,
   ClipboardList, School, CheckSquare, FileText,
-  TrendingUp, FolderOpen, Trophy, Upload, UsersRound, Inbox, Trash2,
+  TrendingUp, FolderOpen, Trophy, Upload, UsersRound, Inbox, Trash2, CalendarDays,
 };
 
 // Tint color per nav item icon (matches design system)
@@ -30,6 +30,7 @@ const TINTS = {
   '/requests':    'var(--blue)',
   '/trash':       'var(--red)',
   '/bulk-import': 'var(--green)',
+  '/schedule':    'var(--violet)',
 };
 
 export default function Sidebar({ navItems = [] }) {

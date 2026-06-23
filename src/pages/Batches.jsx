@@ -219,30 +219,30 @@ function OnboardingStepPanel({ step, onClose, onMarkComplete, onRevoke }) {
   const setVal = (sid, v) => setFieldValues(p => ({ ...p, [sid]: v }));
 
   return (
-    <div style={{ position:'fixed', top:0, right:0, width:440, height:'100vh', background:'#fff', boxShadow:'-4px 0 24px rgba(0,0,0,0.12)', zIndex:1000, display:'flex', flexDirection:'column' }}>
-      <div style={{ padding:'18px 20px', borderBottom:'1px solid #E5E7EB', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+    <div style={{ position:'fixed', top:0, right:0, width:440, height:'100vh', background:'var(--white)', boxShadow:'-4px 0 24px rgba(0,0,0,0.12)', zIndex:1000, display:'flex', flexDirection:'column' }}>
+      <div style={{ padding:'18px 20px', borderBottom:'1px solid var(--border)', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
         <div>
-          <div style={{ fontWeight:700, fontSize:15, color:'#1A1A2E' }}>{step.label}</div>
-          <div style={{ fontSize:12, color:'#9CA3AF', textTransform:'capitalize' }}>
+          <div style={{ fontWeight:700, fontSize:15, color:'var(--text)' }}>{step.label}</div>
+          <div style={{ fontSize:12, color:'var(--text-muted)', textTransform:'capitalize' }}>
             {step.phase} phase
-            {ft !== 'none' && <span style={{ marginLeft:6, background:'#EDE9FE', color:'#6D28D9', borderRadius:8, padding:'1px 7px', fontSize:10, fontWeight:600 }}>{ft}</span>}
+            {ft !== 'none' && <span style={{ marginLeft:6, background:'var(--violet-soft)', color:'var(--violet-ink)', borderRadius:8, padding:'1px 7px', fontSize:10, fontWeight:600 }}>{ft}</span>}
           </div>
         </div>
-        <button onClick={onClose} style={{ background:'none', border:'none', cursor:'pointer', color:'#9CA3AF', padding:4 }}><X size={18}/></button>
+        <button onClick={onClose} style={{ background:'none', border:'none', cursor:'pointer', color:'var(--text-muted)', padding:4 }}><X size={18}/></button>
       </div>
-      <div style={{ padding:'10px 16px', borderBottom:'1px solid #F3F4F6' }}>
+      <div style={{ padding:'10px 16px', borderBottom:'1px solid var(--border)' }}>
         <input className="form-input" placeholder="Search by name or phone…" value={search}
           onChange={e => setSearch(e.target.value)} style={{ fontSize:12 }}/>
       </div>
-      <div style={{ display:'flex', borderBottom:'1px solid #E5E7EB' }}>
+      <div style={{ display:'flex', borderBottom:'1px solid var(--border)' }}>
         {[
-          { key:'not',       label:`Not Completed (${localNotCompleted.length})`, color:'#EF4444' },
-          { key:'completed', label:`Completed (${localCompleted.length})`,         color:'#10B981' },
+          { key:'not',       label:`Not Completed (${localNotCompleted.length})`, color:'var(--red-ink)' },
+          { key:'completed', label:`Completed (${localCompleted.length})`,         color:'var(--green-ink)' },
         ].map(t => (
           <button key={t.key} onClick={() => setTab(t.key)}
             style={{ flex:1, padding:'10px 0', fontSize:13, fontWeight:600, cursor:'pointer', background:'none', border:'none',
               borderBottom: tab===t.key ? `2px solid ${t.color}` : '2px solid transparent',
-              color: tab===t.key ? t.color : '#9CA3AF', transition:'all 0.15s' }}>
+              color: tab===t.key ? t.color : 'var(--text-muted)', transition:'all 0.15s' }}>
             {t.label}
           </button>
         ))}
@@ -260,21 +260,21 @@ function OnboardingStepPanel({ step, onClose, onMarkComplete, onRevoke }) {
               const val       = fieldValues[s.id] || '';
               const canMark   = !isDropped && (!needsVal || !!val);
               return (
-                <div key={s.id} style={{ display:'flex', alignItems:'flex-start', gap:10, padding:10, borderRadius:8, marginBottom:6, background: isDropped ? '#F9FAFB' : '#FFF8F8', border:`1px solid ${isDropped ? '#E5E7EB' : '#FEE2E2'}` }}>
-                  <div style={{ width:28, height:28, borderRadius:'50%', background: isDropped ? '#E5E7EB' : '#FEE2E2', display:'flex', alignItems:'center', justifyContent:'center', fontSize:11, fontWeight:700, color: isDropped ? '#9CA3AF' : '#E53935', flexShrink:0, marginTop:2 }}>
+                <div key={s.id} style={{ display:'flex', alignItems:'flex-start', gap:10, padding:10, borderRadius:8, marginBottom:6, background: isDropped ? 'var(--surface-sunken)' : 'var(--red-soft)', border:`1px solid ${isDropped ? 'var(--border)' : 'var(--red-soft)'}` }}>
+                  <div style={{ width:28, height:28, borderRadius:'50%', background: isDropped ? 'var(--border)' : 'var(--red-soft)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:11, fontWeight:700, color: isDropped ? 'var(--text-muted)' : 'var(--red-ink)', flexShrink:0, marginTop:2 }}>
                     {(s.name||'?').charAt(0).toUpperCase()}
                   </div>
                   <div style={{ flex:1, minWidth:0 }}>
                     <div style={{ fontSize:13, fontWeight:500, display:'flex', alignItems:'center', gap:6 }}>
                       {s.name}
-                      {isDropped && <span style={{ fontSize:10, padding:'1px 6px', borderRadius:8, background:'#E5E7EB', color:'#6B7280', fontWeight:600 }}>Dropped</span>}
+                      {isDropped && <span style={{ fontSize:10, padding:'1px 6px', borderRadius:8, background:'var(--surface-sunken)', color:'var(--text-muted)', fontWeight:600 }}>Dropped</span>}
                     </div>
-                    <div style={{ fontSize:11, color:'#9CA3AF', marginBottom: ft !== 'none' ? 6 : 0 }}>{s.phone||'—'}</div>
+                    <div style={{ fontSize:11, color:'var(--text-muted)', marginBottom: ft !== 'none' ? 6 : 0 }}>{s.phone||'—'}</div>
 
                     {/* Dynamic field input */}
                     {!isDropped && ft === 'dropdown' && (
                       <select value={val} onChange={e => setVal(s.id, e.target.value)}
-                        style={{ fontSize:11, padding:'3px 6px', borderRadius:6, border:'1px solid #E5E7EB', width:'100%', marginBottom:6 }}>
+                        className="form-input" style={{ fontSize:11, marginBottom:6 }}>
                         <option value="">Select {step.fieldLabel || 'option'}…</option>
                         {opts.map(o => <option key={o} value={o}>{o}</option>)}
                       </select>
@@ -282,24 +282,24 @@ function OnboardingStepPanel({ step, onClose, onMarkComplete, onRevoke }) {
                     {!isDropped && ft === 'note' && (
                       <textarea rows={2} value={val} onChange={e => setVal(s.id, e.target.value)}
                         placeholder={`${step.fieldLabel || 'Notes'} (optional)…`}
-                        style={{ fontSize:11, padding:'4px 8px', borderRadius:6, border:'1px solid #E5E7EB', width:'100%', marginBottom:6, resize:'vertical', fontFamily:'inherit' }}/>
+                        className="form-input" style={{ fontSize:11, marginBottom:6, resize:'vertical' }}/>
                     )}
                     {!isDropped && ft === 'text' && (
                       <input value={val} onChange={e => setVal(s.id, e.target.value)}
                         placeholder={step.fieldLabel || 'Enter value…'}
-                        style={{ fontSize:11, padding:'3px 8px', borderRadius:6, border:'1px solid #E5E7EB', width:'100%', marginBottom:6 }}/>
+                        className="form-input" style={{ fontSize:11, marginBottom:6 }}/>
                     )}
 
                     {!isDropped && (
                       <button disabled={marking[s.id] || !canMark}
                         onClick={() => doMark(s)}
                         style={{ fontSize:11, padding:'4px 10px', borderRadius:6, border:'none', cursor: canMark ? 'pointer' : 'default', fontWeight:600,
-                          background: marking[s.id] ? '#E5E7EB' : '#D1FAE5', color: marking[s.id] ? '#9CA3AF' : '#065F46',
+                          background: marking[s.id] ? 'var(--surface-sunken)' : 'var(--green-soft)', color: marking[s.id] ? 'var(--text-muted)' : 'var(--green-ink)',
                           opacity: canMark ? 1 : 0.5 }}>
                         {marking[s.id] ? 'Saving…' : ft === 'dropdown' ? `Mark Complete + Save ${step.fieldLabel||'Value'}` : 'Mark Complete'}
                       </button>
                     )}
-                    {isDropped && <div style={{ fontSize:11, color:'#9CA3AF', fontStyle:'italic' }}>Cannot mark — student is dropped</div>}
+                    {isDropped && <div style={{ fontSize:11, color:'var(--text-muted)', fontStyle:'italic' }}>Cannot mark — student is dropped</div>}
                   </div>
                 </div>
               );
@@ -316,20 +316,20 @@ function OnboardingStepPanel({ step, onClose, onMarkComplete, onRevoke }) {
             {filteredDone.map(s => {
               const savedVal = s.stepFieldValue || s.courseFlow?.[step.key]?.value || '';
               return (
-                <div key={s.id} style={{ display:'flex', alignItems:'center', gap:10, padding:'9px 10px', borderRadius:8, marginBottom:4, background:'#F0FDF4', border:'1px solid #BBF7D0' }}>
-                  <div style={{ width:28, height:28, borderRadius:'50%', background:'#D1FAE5', display:'flex', alignItems:'center', justifyContent:'center', fontSize:11, fontWeight:700, color:'#065F46', flexShrink:0 }}>
+                <div key={s.id} style={{ display:'flex', alignItems:'center', gap:10, padding:'9px 10px', borderRadius:8, marginBottom:4, background:'var(--green-soft)', border:'1px solid var(--green-soft)' }}>
+                  <div style={{ width:28, height:28, borderRadius:'50%', background:'var(--green-soft)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:11, fontWeight:700, color:'var(--green-ink)', flexShrink:0 }}>
                     {(s.name||'?').charAt(0).toUpperCase()}
                   </div>
                   <div style={{ flex:1, minWidth:0 }}>
                     <div style={{ fontSize:13, fontWeight:500 }}>{s.name}</div>
-                    <div style={{ fontSize:11, color:'#9CA3AF' }}>{s.phone||'—'}</div>
+                    <div style={{ fontSize:11, color:'var(--text-muted)' }}>{s.phone||'—'}</div>
                     {savedVal && (
-                      <div style={{ fontSize:11, marginTop:2, color: ft === 'note' ? '#64748B' : '#6D28D9', fontStyle: ft === 'note' ? 'italic' : 'normal', fontWeight: ft !== 'note' ? 600 : 400 }}>
+                      <div style={{ fontSize:11, marginTop:2, color: ft === 'note' ? 'var(--text-sub)' : 'var(--violet-ink)', fontStyle: ft === 'note' ? 'italic' : 'normal', fontWeight: ft !== 'note' ? 600 : 400 }}>
                         {step.fieldLabel ? `${step.fieldLabel}: ` : ''}{savedVal}
                       </div>
                     )}
                   </div>
-                  <CheckCircle size={14} style={{ color:'#10B981', flexShrink:0 }}/>
+                  <CheckCircle size={14} style={{ color:'var(--green-ink)', flexShrink:0 }}/>
                   <button disabled={marking[s.id]} onClick={() => doRevoke(s)}
                     style={{ fontSize:10, padding:'2px 8px', borderRadius:8, border:'1px solid #E5E7EB', background:'#fff', color:'#9CA3AF', cursor:'pointer', flexShrink:0 }}>
                     {marking[s.id] ? '…' : 'Undo'}
@@ -1852,43 +1852,43 @@ export default function Batches() {
             </div>
 
             {/* Right: Task detail */}
-            <div style={{ flex: 1, background: '#fff', borderRadius: 12, border: '1px solid #E5E7EB', padding: '18px 20px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+            <div style={{ flex: 1, background: 'var(--surface)', borderRadius: 12, border: '1px solid var(--border)', padding: '18px 20px', boxShadow: 'var(--shadow-xs)' }}>
               {!currentTask ? (
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#9CA3AF', gap: 12 }}>
-                  <CheckSquare size={40} style={{ color: '#E5E7EB' }} />
-                  <div style={{ fontSize: 14 }}>Select a task to view details</div>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-muted)', gap: 12 }}>
+                  <CheckSquare size={40} style={{ color: 'var(--border)' }} />
+                  <div style={{ fontSize: 14 }}>Select an assignment to view details</div>
                 </div>
               ) : (
                 <>
                   {/* Task header */}
-                  <div style={{ marginBottom: 16, paddingBottom: 14, borderBottom: '1px solid #F3F4F6' }}>
-                    <div style={{ fontWeight: 700, fontSize: 17, color: '#1A1A2E', marginBottom: 4 }}>{currentTask.title}</div>
+                  <div style={{ marginBottom: 16, paddingBottom: 14, borderBottom: '1px solid var(--border)' }}>
+                    <div style={{ fontWeight: 700, fontSize: 17, color: 'var(--text)', marginBottom: 4 }}>{currentTask.title}</div>
                     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
-                      {currentTask.subject && <span style={{ fontSize: 11, padding: '2px 9px', borderRadius: 10, background: '#EDE9FE', color: '#6D28D9', fontWeight: 600 }}>{currentTask.subject}</span>}
-                      {currentTask.assignedFaculty && <span style={{ fontSize: 11, padding: '2px 9px', borderRadius: 10, background: '#DBEAFE', color: '#1E40AF', fontWeight: 600 }}>{currentTask.assignedFaculty}</span>}
-                      {currentTask.dueDate && <span style={{ fontSize: 11, color: '#9CA3AF' }}>Due: {currentTask.dueDate}</span>}
+                      {currentTask.subject && <span className="badge badge-violet">{currentTask.subject}</span>}
+                      {currentTask.assignedFaculty && <span className="badge badge-blue">{currentTask.assignedFaculty}</span>}
+                      {currentTask.dueDate && <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Due: {currentTask.dueDate}</span>}
                     </div>
-                    {currentTask.description && <div style={{ fontSize: 13, color: '#6B7280', lineHeight: 1.6 }}>{currentTask.description}</div>}
+                    {currentTask.description && <div style={{ fontSize: 13, color: 'var(--text-sub)', lineHeight: 1.6 }}>{currentTask.description}</div>}
                     {/* All done banner */}
                     {(currentTask.submittedBy?.length || 0) >= batchStudents.length && batchStudents.length > 0 && (
-                      <div style={{ marginTop: 12, padding: '10px 16px', background: '#D1FAE5', borderRadius: 10, display: 'flex', alignItems: 'center', gap: 10 }}>
-                        <span style={{ fontSize: 20 }}></span>
+                      <div style={{ marginTop: 12, padding: '10px 16px', background: 'var(--green-soft)', borderRadius: 10, display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <CheckCircle size={16} style={{ color: 'var(--green-ink)', flexShrink:0 }} />
                         <div>
-                          <div style={{ fontWeight: 700, color: '#065F46', fontSize: 14 }}>All students completed this assignment!</div>
-                          <div style={{ fontSize: 12, color: '#047857' }}>Every student in this batch has submitted.</div>
+                          <div style={{ fontWeight: 700, color: 'var(--green-ink)', fontSize: 14 }}>All students completed this assignment!</div>
+                          <div style={{ fontSize: 12, color: 'var(--green-ink)' }}>Every student in this batch has submitted.</div>
                         </div>
                       </div>
                     )}
                     {/* Submission stats */}
-                    <div style={{ display: 'flex', gap: 16, marginTop: 12 }}>
+                    <div style={{ display: 'flex', gap: 12, marginTop: 12 }}>
                       {[
-                        { label: 'Submitted', value: currentTask.submittedBy?.length || 0, color: '#10B981', bg: '#D1FAE5' },
-                        { label: 'Pending',   value: batchStudents.length - (currentTask.submittedBy?.length || 0), color: '#F59E0B', bg: '#FEF3C7' },
-                        { label: 'Total',     value: batchStudents.length, color: '#0F3460', bg: '#DBEAFE' },
+                        { label: 'Submitted', value: currentTask.submittedBy?.length || 0, color: 'var(--green-ink)', bg: 'var(--green-soft)' },
+                        { label: 'Pending',   value: batchStudents.length - (currentTask.submittedBy?.length || 0), color: 'var(--amber-ink)', bg: 'var(--amber-soft)' },
+                        { label: 'Total',     value: batchStudents.length, color: 'var(--blue-ink)', bg: 'var(--blue-soft)' },
                       ].map(s => (
-                        <div key={s.label} style={{ padding: '8px 16px', borderRadius: 8, background: s.bg, textAlign: 'center' }}>
-                          <div style={{ fontSize: 20, fontWeight: 700, color: s.color }}>{s.value}</div>
-                          <div style={{ fontSize: 11, color: '#6B7280' }}>{s.label}</div>
+                        <div key={s.label} style={{ padding: '10px 16px', borderRadius: 10, background: s.bg, textAlign: 'center', flex:1 }}>
+                          <div style={{ fontSize: 22, fontWeight: 700, color: s.color, fontFamily:'var(--font-display)' }}>{s.value}</div>
+                          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop:2 }}>{s.label}</div>
                         </div>
                       ))}
                     </div>
