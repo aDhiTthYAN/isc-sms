@@ -54,9 +54,11 @@ function getSlotsForDate(date, schedules) {
 const TYPE_COLORS = {
   'live-class':  { bg:'var(--blue-soft)',   col:'var(--blue-ink)',   label:'Live Class' },
   'recorded':    { bg:'var(--violet-soft)', col:'var(--violet-ink)', label:'Recorded' },
+  'meeting':     { bg:'var(--indigo-soft)', col:'var(--indigo-ink)', label:'Meeting' },
   'assessment':  { bg:'var(--red-soft)',    col:'var(--red-ink)',    label:'Assessment' },
   'doubt':       { bg:'var(--amber-soft)',  col:'var(--amber-ink)',  label:'Doubt Session' },
   'revision':    { bg:'var(--teal-soft)',   col:'var(--teal-ink)',   label:'Revision' },
+  'event':       { bg:'var(--green-soft)',  col:'var(--green-ink)',  label:'Event' },
   'other':       { bg:'var(--surface-sunken)', col:'var(--text-muted)', label:'Other' },
 };
 const typeColor = (t) => TYPE_COLORS[t] || TYPE_COLORS.other;
@@ -138,9 +140,10 @@ export default function Schedule() {
   const loadAttReport = async () => {
     if (!selectedBatch) return;
     setReportLoading(true);
-    const sessionsWithDates = schedules.filter(s => s.scheduledDate || s.status === 'completed');
+    // Load attendance for EVERY session (recurring + one-time) so saved
+    // attendance always shows, regardless of date/status.
     const results = await Promise.all(
-      sessionsWithDates.map(async s => {
+      schedules.map(async s => {
         try {
           const att = await getSessionAttendance(s.id);
           return { session: s, attendance: att[0] || null };
@@ -268,7 +271,7 @@ export default function Schedule() {
     const pc = typeColor(slot.type);
     return (
       <div
-        onClick={() => { setSlotDetail(slot); if (!attSession) openAttendance(slot); }}
+        onClick={() => setSlotDetail(slot)}
         style={{
           padding: compact ? '2px 5px' : '4px 8px',
           borderRadius: 5, marginBottom: 2, cursor: 'pointer',
@@ -308,7 +311,7 @@ export default function Schedule() {
         </div>
         {selectedBatch && (
           <button className="btn btn-primary" onClick={() => setShowAdd(true)}>
-            <Plus size={16}/> Add Class
+            <Plus size={16}/> Add to Schedule
           </button>
         )}
       </div>
@@ -456,9 +459,9 @@ export default function Schedule() {
               {schedules.length === 0 && (
                 <div className="card" style={{ textAlign:'center', color:'var(--text-muted)', padding:40, marginTop:16 }}>
                   <Calendar size={32} style={{ color:'var(--border)', marginBottom:8 }}/>
-                  <div>No classes scheduled yet.</div>
+                  <div>Nothing scheduled yet — add classes, meetings or events.</div>
                   <button className="btn btn-primary" style={{ marginTop:12 }} onClick={() => setShowAdd(true)}>
-                    <Plus size={14}/> Add First Class
+                    <Plus size={14}/> Add First Entry
                   </button>
                 </div>
               )}
@@ -591,11 +594,11 @@ export default function Schedule() {
 
       {/* ── Add Class Modal ── */}
       {showAdd && (
-        <Modal title="Add Class to Schedule" onClose={() => { setShowAdd(false); setForm(blankForm()); }} wide>
+        <Modal title="Add to Schedule" onClose={() => { setShowAdd(false); setForm(blankForm()); }} wide>
           <form onSubmit={handleAdd} style={{ display:'flex', flexDirection:'column', gap:14 }}>
             <div className="form-group">
-              <label className="form-label">Class Title *</label>
-              <input className="form-input" required placeholder="e.g. Python Basics — Session 1"
+              <label className="form-label">Title *</label>
+              <input className="form-input" required placeholder="e.g. Python Basics — Session 1, Parent Meeting…"
                 value={form.title} onChange={e => setForm({ ...form, title: e.target.value })}/>
             </div>
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
@@ -641,9 +644,9 @@ export default function Schedule() {
             </div>
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
               <div className="form-group">
-                <label className="form-label">Faculty</label>
+                <label className="form-label">Faculty / Organizer</label>
                 <select className="form-input" value={form.facultyName} onChange={e => setForm({ ...form, facultyName: e.target.value })}>
-                  <option value="">— Select faculty —</option>
+                  <option value="">— Select person —</option>
                   {staffList.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
                 </select>
               </div>
@@ -699,7 +702,7 @@ export default function Schedule() {
             </div>
             <div style={{ display:'flex', gap:10, justifyContent:'flex-end' }}>
               <button type="button" className="btn btn-ghost" onClick={() => { setShowAdd(false); setForm(blankForm()); }}>Cancel</button>
-              <button type="submit" className="btn btn-primary" disabled={saving}>{saving ? 'Adding…' : 'Add Class'}</button>
+              <button type="submit" className="btn btn-primary" disabled={saving}>{saving ? 'Adding…' : 'Add to Schedule'}</button>
             </div>
           </form>
         </Modal>

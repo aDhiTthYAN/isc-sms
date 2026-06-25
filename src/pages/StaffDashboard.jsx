@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import {
-  getMyStudents, getMyTasks, getMyFollowUps, getStaffBatches, updateTask,
+  getMyStudents, getMyTasks, getMyFollowUps, getStaffBatches,
   getMyNotifications, markNotificationRead, getMyRequests, updateRequest, addNotification, createRequest,
   getBatchSchedules, getBatchTasks, getAssessments,
 } from '../firebase/services';
@@ -11,7 +11,7 @@ import { Loading } from '../components/ui';
 import { useAuth } from '../context/AuthContext';
 import {
   Users, CheckSquare, PhoneCall, School,
-  ChevronRight, AlertTriangle, Activity, Bell, Inbox, X
+  ChevronRight, AlertTriangle, Activity, Bell, Inbox, X, Phone
 } from 'lucide-react';
 
 const CARD = {
@@ -21,6 +21,20 @@ const CARD = {
   padding: '20px 22px',
   boxShadow: '0 1px 3px rgba(0,0,0,0.08), 0 4px 12px rgba(0,0,0,0.04)',
 };
+
+const ACCENTS = ['#E81620','#F4683B','#F5A623','#16A974','#11B4C6','#3B6EF6','#6366F1','#8B5CF6','#EC4899','#6E7488'];
+function avatarColor(name = '') { let h = 0; for (const c of name) h = (h * 31 + c.charCodeAt(0)) >>> 0; return ACCENTS[h % ACCENTS.length]; }
+function initials(name = '') { const p = name.trim().split(/\s+/); return ((p[0]?.[0] || '') + (p[1]?.[0] || '')).toUpperCase() || '?'; }
+function timeAgo(ts) {
+  if (!ts) return '';
+  const d = ts.toDate ? ts.toDate() : new Date(ts);
+  if (isNaN(d)) return '';
+  const diff = Math.floor((Date.now() - d) / 1000);
+  if (diff < 60)    return 'just now';
+  if (diff < 3600)  return `${Math.floor(diff / 60)}m ago`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+  return `${Math.floor(diff / 86400)}d ago`;
+}
 
 export default function StaffDashboard() {
   const { profile } = useAuth();
@@ -35,6 +49,7 @@ export default function StaffDashboard() {
   const [showSidebar,     setShowSidebar]     = useState(false);
   const [sidebarTab,      setSidebarTab]      = useState('notif'); // 'notif' | 'requests'
   const [reminding,       setReminding]       = useState({});
+  const [actFilter,       setActFilter]       = useState('all'); // 'all' | 'followup' | 'task'
 
   // Batch Activity Hub
   const [hubBatch,      setHubBatch]      = useState('');
@@ -249,6 +264,21 @@ export default function StaffDashboard() {
 
   const unreadNotifs = notifications.filter(n => !n.read).length;
   const pendingReqs  = myRequests.filter(r => r.status === 'pending').length;
+
+  // ── Recent Activity (merged tasks + follow-ups, newest first) ──
+  const recentActivity = [
+    ...tasks.map(t => ({ ...t, _type: 'task' })),
+    ...followups.map(f => ({ ...f, _type: 'followup' })),
+  ].sort((a, b) => {
+    const ta = a.createdAt?.toDate ? a.createdAt.toDate().getTime() : new Date(a.createdAt || 0).getTime();
+    const tb = b.createdAt?.toDate ? b.createdAt.toDate().getTime() : new Date(b.createdAt || 0).getTime();
+    return tb - ta;
+  });
+  const filteredActivity = recentActivity.filter(item => {
+    if (actFilter === 'followup') return item._type === 'followup';
+    if (actFilter === 'task')     return item._type === 'task';
+    return true;
+  }).slice(0, 6);
 
   return (
     <div>
@@ -614,55 +644,59 @@ export default function StaffDashboard() {
           </div>
         </div>
 
-        {/* My Upcoming Tasks */}
+        {/* Recent Activity */}
         <div style={CARD}>
-          {sHead('My Upcoming Tasks', '/tasks', 'View all')}
-          {pendingTasks.length === 0 && (
-            <p style={{ fontSize: 13, color: '#9CA3AF' }}>All tasks completed! Great work.</p>
-          )}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {pendingTasks.slice(0, 5).map(task => (
-              <div key={task.id} style={{
-                display: 'flex', alignItems: 'center', gap: 10, padding: '9px 10px',
-                background: '#FAFBFC', borderRadius: 8, border: '1px solid #F3F4F6',
-              }}>
-                <div style={{
-                  width: 18, height: 18, borderRadius: 5, flexShrink: 0,
-                  background: task.status === 'in-progress' ? '#F59E0B' : '#E5E7EB',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                }} />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 13, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{task.title}</div>
-                  <div style={{ fontSize: 11, color: '#9CA3AF', marginTop: 1 }}>
-                    {task.dueDate && `Due: ${task.dueDate}`}
-                    {task.priority === 'high' && <span style={{ color: '#EF4444', marginLeft: 6, fontWeight: 600 }}>● High</span>}
-                    {(() => {
-                      if (!task.dueDate) return null;
-                      const due = new Date(task.dueDate);
-                      if (isNaN(due)) return null;
-                      due.setHours(23, 59, 59, 999);
-                      const now = Date.now();
-                      const pill = (bg, ink, label) => (
-                        <span style={{ marginLeft: 6, padding: '1px 7px', borderRadius: 999, fontSize: 10, fontWeight: 600, background: bg, color: ink }}>{label}</span>
-                      );
-                      if (due.getTime() < now) return pill('var(--red-soft)', 'var(--red-ink)', 'Overdue');
-                      if (due.getTime() - now <= 48 * 3600 * 1000) return pill('var(--amber-soft)', 'var(--amber-ink)', 'Due soon');
-                      return null;
-                    })()}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+            <h3 style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>Recent Activity</h3>
+            <div style={{ display: 'inline-flex', background: 'var(--surface-sunken, #F3F4F6)', borderRadius: 9, padding: 3, gap: 2 }}>
+              {[
+                { key: 'all',      label: 'All'        },
+                { key: 'followup', label: 'Follow-ups' },
+                { key: 'task',     label: 'Tasks'      },
+              ].map(f => (
+                <button key={f.key} onClick={() => setActFilter(f.key)} style={{
+                  padding: '5px 12px', border: 'none', borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                  background: actFilter === f.key ? '#fff' : 'transparent',
+                  color:      actFilter === f.key ? 'var(--text)' : '#6B7280',
+                  boxShadow:  actFilter === f.key ? '0 1px 2px rgba(0,0,0,0.08)' : 'none',
+                }}>
+                  {f.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            {filteredActivity.length === 0 && (
+              <div style={{ color: '#9CA3AF', fontSize: 13, textAlign: 'center', padding: '32px 0' }}>No activity yet.</div>
+            )}
+            {filteredActivity.map((item, i) => {
+              const isFollowup = item._type === 'followup';
+              return (
+                <div key={item.id || i}
+                  onClick={() => navigate(isFollowup ? '/followups' : '/tasks')}
+                  style={{ display: 'flex', alignItems: 'flex-start', gap: 11, padding: 10, borderRadius: 10, cursor: 'pointer', transition: 'background .12s' }}
+                  onMouseEnter={e => e.currentTarget.style.background = '#F8FAFC'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                  <div style={{ width: 30, height: 30, borderRadius: 9, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: isFollowup ? 'var(--teal-soft, #CCFBF1)' : 'var(--amber-soft, #FEF3C7)' }}>
+                    {isFollowup
+                      ? <Phone size={15} style={{ color: 'var(--teal-ink, #0F766E)' }} />
+                      : <CheckSquare size={15} style={{ color: 'var(--amber-ink, #92400E)' }} />
+                    }
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {isFollowup ? (item.studentName || 'Unknown student') : `Task · ${item.title || 'Task'}`}
+                    </div>
+                    <div style={{ fontSize: 11.5, color: '#9CA3AF', marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {isFollowup ? item.note : `${item.status === 'completed' ? 'Completed' : item.status === 'in-progress' ? 'In progress' : 'To do'}${item.dueDate ? ` · Due ${item.dueDate}` : ''}`}
+                    </div>
+                  </div>
+                  <div style={{ fontSize: 11, color: '#9CA3AF', whiteSpace: 'nowrap', flexShrink: 0, marginTop: 2 }}>
+                    {timeAgo(item.createdAt)}
                   </div>
                 </div>
-                <button
-                  className="btn btn-sm"
-                  style={{ fontSize: 11, background: '#D1FAE5', color: '#065F46', border: 'none', flexShrink: 0 }}
-                  onClick={async () => {
-                    await updateTask(task.id, { status: 'completed', completedAt: new Date().toISOString() });
-                    setTasks(prev => prev.filter(t => t.id !== task.id));
-                  }}
-                >
-                  Done
-                </button>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       </div>
