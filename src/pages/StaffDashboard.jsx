@@ -274,10 +274,15 @@ export default function StaffDashboard() {
     const tb = b.createdAt?.toDate ? b.createdAt.toDate().getTime() : new Date(b.createdAt || 0).getTime();
     return tb - ta;
   });
+  // Keep only recent activity (last ~36h) so the dashboard stays relevant at scale.
+  const RECENT_WINDOW_MS = 36 * 60 * 60 * 1000;
+  const nowMs = Date.now();
   const filteredActivity = recentActivity.filter(item => {
-    if (actFilter === 'followup') return item._type === 'followup';
-    if (actFilter === 'task')     return item._type === 'task';
-    return true;
+    if (actFilter === 'followup' && item._type !== 'followup') return false;
+    if (actFilter === 'task'     && item._type !== 'task')     return false;
+    const ts = item.createdAt?.toDate ? item.createdAt.toDate().getTime() : (item.createdAt ? new Date(item.createdAt).getTime() : null);
+    if (!ts) return true;
+    return (nowMs - ts) <= RECENT_WINDOW_MS;
   }).slice(0, 6);
 
   return (
@@ -565,9 +570,9 @@ export default function StaffDashboard() {
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                     {pageList.map((item, i) => {
                       const c = kindColor[item._kind] || kindColor.task;
-                      const tab = item._kind === 'schedule' ? 'schedule' : item._kind === 'assessment' ? 'assessments' : 'tasks';
+                      const tab = item._kind === 'assessment' ? 'assessments' : 'tasks';
                       return (
-                        <div key={item.id || i} onClick={() => navigate('/batches', { state: { batchId: hubBatch, tab } })}
+                        <div key={item.id || i} onClick={() => item._kind === 'schedule' ? navigate('/schedule') : navigate('/batches', { state: { batchId: hubBatch, tab } })}
                           style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', borderRadius: 10, border: '1px solid #E5E7EB', cursor: 'pointer', background: '#fff', transition: 'background 0.12s' }}
                           onMouseEnter={e => e.currentTarget.style.background = '#F8FAFC'}
                           onMouseLeave={e => e.currentTarget.style.background = '#fff'}>

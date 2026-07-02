@@ -129,10 +129,12 @@ function BatchActivityHub({ batches, schedBatch, setSchedBatch, schedFilter, set
             <div style={{ display:'flex', flexDirection:'column', gap:8, maxHeight:400, overflowY:'auto' }}>
               {list.map((item, i) => {
                 const c = kindColors[item._kind] || kindColors.task;
-                const tab = item._kind === 'schedule' ? 'schedule' : item._kind === 'assessment' ? 'assessments' : 'tasks';
+                const tab = item._kind === 'assessment' ? 'assessments' : 'tasks';
                 return (
                   <div key={item.id || i}
-                    onClick={() => navigate('/batches', { state:{ batchId:schedBatch, tab } })}
+                    onClick={() => item._kind === 'schedule'
+                      ? navigate('/schedule')
+                      : navigate('/batches', { state:{ batchId:schedBatch, tab } })}
                     style={{ display:'flex', alignItems:'center', gap:12, padding:'11px 14px', borderRadius:10, border:'1px solid var(--border)', cursor:'pointer', background:'var(--surface)', transition:'background .12s' }}
                     onMouseEnter={e => e.currentTarget.style.background='var(--surface-hover)'}
                     onMouseLeave={e => e.currentTarget.style.background='var(--surface)'}>
@@ -320,10 +322,16 @@ export default function Dashboard() {
   const activeBatches = batches.filter(b => b.status === 'active');
   const unreadNotifs  = notifications.filter(n => !n.read).length;
 
+  // Only surface RECENT activity — items from the last ~36h — so the dashboard
+  // stays relevant as the data grows instead of showing history from day one.
+  const RECENT_WINDOW_MS = 36 * 60 * 60 * 1000;
+  const nowMs = Date.now();
   const filteredActivity = recentActivity.filter(item => {
-    if (actFilter === 'followup') return item._type === 'followup';
-    if (actFilter === 'task')     return item._type === 'task';
-    return true;
+    if (actFilter === 'followup' && item._type !== 'followup') return false;
+    if (actFilter === 'task'     && item._type !== 'task')     return false;
+    const ts = (item._ts ? item._ts * 1000 : (item.createdAt?.seconds ? item.createdAt.seconds * 1000 : null));
+    if (ts == null) return true; // no timestamp → keep (rare)
+    return (nowMs - ts) <= RECENT_WINDOW_MS;
   }).slice(0, 8);
 
   return (

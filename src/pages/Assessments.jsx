@@ -3,7 +3,7 @@ import {
   getAssessments, addAssessment, deleteAssessment,
   getBatches, getStaffProfiles, getBatchStudents,
   saveAssessmentResults, getAssessmentResults,
-  addNotification, createRequest,
+  addNotification, createRequest, updateTopLevelAssessment,
 } from '../firebase/services';
 import { Modal, Toast, Loading } from '../components/ui';
 import { useAuth } from '../context/AuthContext';
@@ -75,13 +75,27 @@ export default function Assessments({ filterBatchId = null }) {
   const [createForm,    setCreateForm]    = useState({
     title: '', batchId: filterBatchId || '', date: '', totalMarks: '',
     conductingStaff: [], status: 'upcoming', notes: '',
+    participantType: 'all', participantIds: [],
   });
+  const [createStudents, setCreateStudents] = useState([]);  // students of batch chosen in create form
+  const [createStudentSearch, setCreateStudentSearch] = useState('');
+  const [conductingSearch, setConductingSearch] = useState('');
+
+  // load students whenever the create-form batch changes (for specific selection)
+  useEffect(() => {
+    if (!showCreate || !createForm.batchId) { setCreateStudents([]); return; }
+    getBatchStudents(createForm.batchId)
+      .then(res => setCreateStudents(res.students || []))
+      .catch(() => setCreateStudents([]));
+  }, [createForm.batchId, showCreate]);
 
   // Import marks modal
   const [showImport,    setShowImport]    = useState(null);
   const [importStep,    setImportStep]    = useState(1);
   const [importPreview, setImportPreview] = useState(null);
   const [batchStudents, setBatchStudents] = useState([]);
+  const [manualMarks,   setManualMarks]   = useState({}); // studentId -> marks string
+  const [manualSearch,  setManualSearch]  = useState('');
   const fileRef = useRef();
 
   // View results modal
@@ -165,6 +179,10 @@ export default function Assessments({ filterBatchId = null }) {
         status:         createForm.status,
         notes:          createForm.notes,
         createdBy:      profile?.uid || profile?.email || 'unknown',
+        participantType: createForm.participantType,
+        participantStudents: createForm.participantType === 'all'
+          ? createStudents.map(s => ({ id: s.id, name: s.name, phone: s.phone || '' }))
+          : createStudents.filter(s => createForm.participantIds.includes(s.id)).map(s => ({ id: s.id, name: s.name, phone: s.phone || '' })),
       };
       await addAssessment(payload);
 
@@ -183,7 +201,8 @@ export default function Assessments({ filterBatchId = null }) {
 
       setToast({ message: 'Assessment created!', type: 'success' });
       setShowCreate(false);
-      setCreateForm({ title:'', batchId: filterBatchId||'', date:'', totalMarks:'', conductingStaff:[], status:'upcoming', notes:'' });
+      setCreateForm({ title:'', batchId: filterBatchId||'', date:'', totalMarks:'', conductingStaff:[], status:'upcoming', notes:'', participantType:'all', participantIds:[] });
+      setCreateStudentSearch('');
       load();
     } catch (err) {
       setToast({ message: 'Error: ' + err.message, type: 'error' });
@@ -197,13 +216,37 @@ export default function Assessments({ filterBatchId = null }) {
     setImportStep(1);
     setImportPreview(null);
     setBatchStudents([]);
+    setManualMarks({});
+    setManualSearch('');
     if (assessment.batchId) {
       try {
         const res = await getBatchStudents(assessment.batchId);
-        setBatchStudents(res.students || []);
+        // if the assessment targeted specific students, restrict to those
+        const all = res.students || [];
+        const scoped = assessment.participantType === 'specific' && assessment.participantStudents?.length
+          ? all.filter(s => assessment.participantStudents.some(p => p.id === s.id))
+          : all;
+        setBatchStudents(scoped);
       } catch { }
     }
     if (fileRef.current) fileRef.current.value = '';
+  };
+
+  // Build the preview from manually-typed marks
+  const buildManualPreview = () => {
+    const totalMarks = parseFloat(showImport?.totalMarks || '100');
+    const entered = batchStudents.filter(s => manualMarks[s.id] !== undefined && manualMarks[s.id] !== '');
+    if (!entered.length) { setToast({ message: 'Enter marks for at least one student.', type: 'error' }); return; }
+    const preview = entered.map(s => {
+      const marks = parseFloat(manualMarks[s.id]) || 0;
+      const percentage = totalMarks > 0 ? Math.round((marks / totalMarks) * 100 * 10) / 10 : 0;
+      return {
+        studentId: s.id, studentName: s.name, phone: s.phone || '',
+        marks, totalMarks, percentage, pass: marks >= totalMarks * 0.4, matched: true,
+      };
+    });
+    setImportPreview(preview);
+    setImportStep(3);
   };
 
   const handleCSVUpload = async (e) => {
@@ -244,21 +287,28 @@ export default function Assessments({ filterBatchId = null }) {
     setSaving(true);
     try {
       const toSave = importPreview.map(r => ({
-        assessmentId: showImport.id,
-        batchId:      showImport.batchId,
-        studentId:    r.studentId,
-        studentName:  r.studentName,
-        phone:        r.phone,
-        marks:        r.marks,
-        totalMarks:   r.totalMarks,
-        percentage:   r.percentage,
-        pass:         r.pass,
+        assessmentId:   showImport.id,
+        assessmentTitle: showImport.title,
+        batchId:        showImport.batchId,
+        studentId:      r.studentId,
+        studentName:    r.studentName,
+        phone:          r.phone,
+        // write BOTH field-name conventions so results display on every page
+        marks:          r.marks,
+        marksScored:    r.marks,
+        totalMarks:     r.totalMarks,
+        percentage:     r.percentage,
+        pass:           r.pass,
+        passed:         r.pass,
       }));
       await saveAssessmentResults(toSave);
+      // Marks entered → the assessment is now completed
+      try { await updateTopLevelAssessment(showImport.id, { status: 'completed' }); } catch {}
       setToast({ message: `Saved ${toSave.length} results!`, type: 'success' });
       setShowImport(null);
       // Refresh result counts
       setResultCounts(prev => ({ ...prev, [showImport.id]: toSave.length }));
+      load();
     } catch (err) {
       setToast({ message: 'Error: ' + err.message, type: 'error' });
     }
@@ -481,7 +531,21 @@ export default function Assessments({ filterBatchId = null }) {
                       </div>
                     ) : '—'}
                   </td>
-                  <td>{statusBadge(a.status)}</td>
+                  <td>
+                    <select className="form-input" style={{ height:30, fontSize:12, padding:'0 8px', width:'auto' }}
+                      value={a.status || 'upcoming'}
+                      onChange={async e => {
+                        try {
+                          await updateTopLevelAssessment(a.id, { status: e.target.value });
+                          setToast({ message: 'Status updated.', type: 'success' });
+                          load();
+                        } catch (err) { setToast({ message: 'Error: ' + err.message, type: 'error' }); }
+                      }}>
+                      <option value="upcoming">Upcoming</option>
+                      <option value="ongoing">Ongoing</option>
+                      <option value="completed">Completed</option>
+                    </select>
+                  </td>
                   <td style={{ color:'#6B7280', fontSize:13 }}>
                     {resultCounts[a.id] !== undefined ? resultCounts[a.id] : '—'}
                   </td>
@@ -555,29 +619,77 @@ export default function Assessments({ filterBatchId = null }) {
               </div>
             </div>
             <div className="form-group">
-              <label className="form-label">Conducting Staff</label>
-              <div style={{ display:'flex', flexWrap:'wrap', gap:8, padding:10, background:'#F9FAFB',
-                borderRadius:8, border:'1px solid #E5E7EB', minHeight:48 }}>
-                {staffList.filter(s => s.role !== 'ceo').map(s => {
-                  const selected = createForm.conductingStaff.some(x => x.uid === s.id);
-                  return (
-                    <div key={s.id}
-                      onClick={() => toggleConductingStaff({ uid: s.id, name: s.name, phone: s.phone||'', email: s.email||'' })}
-                      style={{
-                        padding:'5px 12px', borderRadius:20, fontSize:12, cursor:'pointer', fontWeight:500,
-                        background: selected ? '#E53935' : '#fff',
-                        color:      selected ? '#fff'    : '#374151',
-                        border: `1px solid ${selected ? '#E53935' : '#E5E7EB'}`,
-                      }}>
-                      {s.name} ({s.phone || 'no phone'})
-                    </div>
-                  );
-                })}
-                {staffList.filter(s => s.role !== 'ceo').length === 0 && (
-                  <span style={{ fontSize:12, color:'#9CA3AF' }}>No staff available.</span>
+              <label className="form-label">Conducting Staff (select all involved)</label>
+              <input className="form-input" placeholder="Type to filter staff by name or phone…" style={{ marginBottom:8 }}
+                value={conductingSearch} onChange={e => setConductingSearch(e.target.value)}/>
+              <div style={{ border:'1px solid var(--border)', borderRadius:8, padding:6, maxHeight:200, overflowY:'auto' }}>
+                {staffList
+                  .filter(s => s.role !== 'ceo' && s.active !== false)
+                  .filter(s => !conductingSearch || s.name?.toLowerCase().includes(conductingSearch.toLowerCase()) || (s.phone||'').includes(conductingSearch))
+                  .map(s => {
+                    const selected = createForm.conductingStaff.some(x => x.uid === s.id);
+                    return (
+                      <label key={s.id} style={{ display:'flex', alignItems:'center', gap:9, padding:'6px 8px', cursor:'pointer', borderRadius:6, background: selected ? 'var(--brand-50)' : 'transparent' }}>
+                        <input type="checkbox" checked={selected}
+                          onChange={() => toggleConductingStaff({ uid: s.id, name: s.name, phone: s.phone||'', email: s.email||'' })}/>
+                        <div style={{ flex:1, minWidth:0 }}>
+                          <div style={{ fontSize:13, fontWeight:500 }}>{s.name}</div>
+                          <div style={{ fontSize:11, color:'var(--text-muted)' }}>{s.phone || 'no phone'}{s.role ? ` · ${s.role}` : ''}</div>
+                        </div>
+                      </label>
+                    );
+                  })}
+                {staffList.filter(s => s.role !== 'ceo' && s.active !== false).length === 0 && (
+                  <span style={{ fontSize:12, color:'#9CA3AF', padding:8, display:'block' }}>No staff available.</span>
                 )}
               </div>
+              {createForm.conductingStaff.length > 0 && (
+                <div style={{ fontSize:12, color:'var(--text-muted)', marginTop:6 }}>{createForm.conductingStaff.length} selected</div>
+              )}
             </div>
+            {/* Students — all or specific, with type-to-filter showing details */}
+            <div className="form-group">
+              <label className="form-label">Students</label>
+              <div className="segmented" style={{ marginBottom:10 }}>
+                <button type="button" className={createForm.participantType==='all'?'active':''}
+                  onClick={() => setCreateForm(f => ({ ...f, participantType:'all', participantIds:[] }))}>
+                  All {createStudents.length} students
+                </button>
+                <button type="button" className={createForm.participantType==='specific'?'active':''}
+                  onClick={() => setCreateForm(f => ({ ...f, participantType:'specific' }))}>
+                  Select specific students
+                </button>
+              </div>
+              {createForm.participantType === 'specific' && (
+                <>
+                  <input className="form-input" placeholder="Type to filter by name or phone…" style={{ marginBottom:8 }}
+                    value={createStudentSearch} onChange={e => setCreateStudentSearch(e.target.value)}/>
+                  <div style={{ border:'1px solid var(--border)', borderRadius:8, padding:6, maxHeight:220, overflowY:'auto' }}>
+                    {!createForm.batchId && <div style={{ fontSize:12, color:'var(--text-muted)', padding:8 }}>Choose a batch first.</div>}
+                    {createForm.batchId && createStudents.length === 0 && <div style={{ fontSize:12, color:'var(--text-muted)', padding:8 }}>No students in this batch.</div>}
+                    {createStudents
+                      .filter(s => !createStudentSearch || s.name?.toLowerCase().includes(createStudentSearch.toLowerCase()) || (s.phone||'').includes(createStudentSearch))
+                      .map(s => {
+                        const checked = createForm.participantIds.includes(s.id);
+                        return (
+                          <label key={s.id} style={{ display:'flex', alignItems:'center', gap:9, padding:'6px 8px', cursor:'pointer', borderRadius:6, background: checked ? 'var(--brand-50)' : 'transparent' }}>
+                            <input type="checkbox" checked={checked}
+                              onChange={e => setCreateForm(f => ({ ...f, participantIds: e.target.checked ? [...f.participantIds, s.id] : f.participantIds.filter(id => id !== s.id) }))}/>
+                            <div style={{ flex:1, minWidth:0 }}>
+                              <div style={{ fontSize:13, fontWeight:500 }}>{s.name}</div>
+                              <div style={{ fontSize:11, color:'var(--text-muted)' }}>{s.phone || 'no phone'}{s.course ? ` · ${s.course}` : ''}{s.education ? ` · ${s.education}` : ''}</div>
+                            </div>
+                          </label>
+                        );
+                      })}
+                  </div>
+                  {createForm.participantIds.length > 0 && (
+                    <div style={{ fontSize:12, color:'var(--text-muted)', marginTop:6 }}>{createForm.participantIds.length} selected</div>
+                  )}
+                </>
+              )}
+            </div>
+
             <div className="form-group">
               <label className="form-label">Notes (optional)</label>
               <textarea className="form-input" rows={3} placeholder="Any additional notes…"
@@ -635,25 +747,60 @@ export default function Assessments({ filterBatchId = null }) {
             </div>
           )}
 
-          {/* Step 2 – Upload */}
+          {/* Step 2 – Upload OR manual entry */}
           {importStep === 2 && (
             <div>
               <input ref={fileRef} type="file" accept=".csv" style={{ display:'none' }}
                 onChange={handleCSVUpload}/>
               <div onClick={() => fileRef.current?.click()} style={{
-                border:'2px dashed #E5E7EB', borderRadius:10, padding:'40px 20px',
+                border:'2px dashed #E5E7EB', borderRadius:10, padding:'28px 20px',
                 textAlign:'center', cursor:'pointer', background:'#FAFAFA',
               }}>
-                <Upload size={32} style={{ color:'#D1D5DB', marginBottom:10 }}/>
-                <div style={{ fontSize:13, fontWeight:600, color:'#374151' }}>
-                  Click to choose a CSV file
-                </div>
-                <div style={{ fontSize:12, color:'#9CA3AF', marginTop:4 }}>
-                  Columns: Name, Phone, Marks
-                </div>
+                <Upload size={30} style={{ color:'#D1D5DB', marginBottom:8 }}/>
+                <div style={{ fontSize:13, fontWeight:600, color:'#374151' }}>Click to choose a CSV file</div>
+                <div style={{ fontSize:12, color:'#9CA3AF', marginTop:4 }}>Columns: Name, Phone, Marks</div>
               </div>
-              <div style={{ display:'flex', gap:10, justifyContent:'flex-end', marginTop:16 }}>
+
+              {/* Manual entry */}
+              <div style={{ display:'flex', alignItems:'center', gap:10, margin:'18px 0 10px' }}>
+                <div style={{ flex:1, height:1, background:'var(--border)' }}/>
+                <span style={{ fontSize:12, color:'var(--text-muted)', fontWeight:600 }}>OR enter marks manually</span>
+                <div style={{ flex:1, height:1, background:'var(--border)' }}/>
+              </div>
+              {batchStudents.length === 0 ? (
+                <div style={{ fontSize:12.5, color:'var(--text-muted)', textAlign:'center', padding:10 }}>
+                  No students found for this batch to enter marks for.
+                </div>
+              ) : (
+                <>
+                  <input className="form-input" placeholder="Filter students by name or phone…" style={{ marginBottom:8 }}
+                    value={manualSearch} onChange={e => setManualSearch(e.target.value)}/>
+                  <div style={{ maxHeight:260, overflowY:'auto', border:'1px solid var(--border)', borderRadius:8 }}>
+                    {batchStudents
+                      .filter(s => !manualSearch || s.name?.toLowerCase().includes(manualSearch.toLowerCase()) || (s.phone||'').includes(manualSearch))
+                      .map(s => (
+                        <div key={s.id} style={{ display:'flex', alignItems:'center', gap:10, padding:'7px 10px', borderBottom:'1px solid var(--border-soft)' }}>
+                          <div style={{ flex:1, minWidth:0 }}>
+                            <div style={{ fontSize:13, fontWeight:500 }}>{s.name}</div>
+                            <div style={{ fontSize:11, color:'var(--text-muted)' }}>{s.phone || 'no phone'}</div>
+                          </div>
+                          <input type="number" min="0" max={showImport.totalMarks || undefined}
+                            className="form-input" style={{ width:90, textAlign:'center' }}
+                            placeholder="Marks"
+                            value={manualMarks[s.id] ?? ''}
+                            onChange={e => setManualMarks(m => ({ ...m, [s.id]: e.target.value }))}/>
+                          <span style={{ fontSize:12, color:'var(--text-muted)', width:44 }}>/ {showImport.totalMarks}</span>
+                        </div>
+                      ))}
+                  </div>
+                </>
+              )}
+
+              <div style={{ display:'flex', gap:10, justifyContent:'space-between', marginTop:16 }}>
                 <button className="btn btn-ghost" onClick={() => setImportStep(1)}>Back</button>
+                {batchStudents.length > 0 && (
+                  <button className="btn btn-primary" onClick={buildManualPreview}>Preview Entered Marks</button>
+                )}
               </div>
             </div>
           )}
@@ -724,8 +871,8 @@ export default function Assessments({ filterBatchId = null }) {
           ) : (
             <>
               <div style={{ marginBottom:12, fontSize:13, color:'#374151', display:'flex', gap:16 }}>
-                <span><strong>{results.filter(r => r.pass).length}</strong> Pass</span>
-                <span><strong>{results.filter(r => !r.pass).length}</strong> Fail</span>
+                <span><strong>{results.filter(r => (r.pass ?? r.passed)).length}</strong> Pass</span>
+                <span><strong>{results.filter(r => !(r.pass ?? r.passed)).length}</strong> Fail</span>
                 <span><strong>{results.length}</strong> Total</span>
               </div>
               <div className="table-container">
@@ -741,20 +888,25 @@ export default function Assessments({ filterBatchId = null }) {
                     </tr>
                   </thead>
                   <tbody>
-                    {results.map((r, i) => (
-                      <tr key={r.id || i}>
-                        <td style={{ color:'#9CA3AF', fontSize:12 }}>{i + 1}</td>
-                        <td style={{ fontWeight:600 }}>{r.studentName}</td>
-                        <td style={{ color:'#6B7280' }}>{r.phone || '—'}</td>
-                        <td><strong>{r.marks}</strong> / {r.totalMarks}</td>
-                        <td style={{ color:'#6B7280' }}>{r.percentage !== undefined ? r.percentage + '%' : Math.round((r.marks / r.totalMarks) * 100) + '%'}</td>
-                        <td>
-                          <span style={{ fontWeight:700, color: r.pass ? '#10B981' : '#EF4444' }}>
-                            {r.pass ? 'Pass' : 'Fail'}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
+                    {results.map((r, i) => {
+                      const marks = r.marks ?? r.marksScored ?? 0;
+                      const passed = r.pass ?? r.passed;
+                      const pct = r.percentage !== undefined ? r.percentage : (r.totalMarks ? Math.round((marks / r.totalMarks) * 100) : 0);
+                      return (
+                        <tr key={r.id || i}>
+                          <td style={{ color:'#9CA3AF', fontSize:12 }}>{i + 1}</td>
+                          <td style={{ fontWeight:600 }}>{r.studentName}</td>
+                          <td style={{ color:'#6B7280' }}>{r.phone || '—'}</td>
+                          <td><strong>{marks}</strong> / {r.totalMarks}</td>
+                          <td style={{ color:'#6B7280' }}>{pct}%</td>
+                          <td>
+                            <span style={{ fontWeight:700, color: passed ? '#10B981' : '#EF4444' }}>
+                              {passed ? 'Pass' : 'Fail'}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>

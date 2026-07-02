@@ -3,7 +3,8 @@ import { useParams, useNavigate } from 'react-router-dom';
 import {
   getStudent, updateStudent, getBatches,
   getFollowUps, addFollowUp, getAssessments, addAssessment,
-  getStaffProfiles, updateWeakSubjects, updateCourseFlowStep, addNotification
+  getStaffProfiles, updateWeakSubjects, updateCourseFlowStep, addNotification,
+  getStudentReports, getStudentAttendanceSummary
 } from '../firebase/services';
 import { Modal, Toast, Avatar, StatusBadge, Loading, FormRow } from '../components/ui';
 import { useAuth } from '../context/AuthContext';
@@ -52,6 +53,8 @@ export default function StudentProfile() {
   const [batchCourseFlow, setBatchCourseFlow] = useState([]);
   const [followups,   setFollowups]   = useState([]);
   const [assessments, setAssessments] = useState([]);
+  const [classReports, setClassReports] = useState([]);
+  const [attendance,  setAttendance]  = useState(null);
   const [staffList,   setStaffList]   = useState([]);
   const [loading,     setLoading]     = useState(true);
   const [activeTab,   setActiveTab]   = useState('overview');
@@ -95,6 +98,8 @@ export default function StudentProfile() {
       setBatches(b);
       setFollowups(f);
       setAssessments(a);
+      getStudentReports(id).then(setClassReports).catch(() => setClassReports([]));
+      getStudentAttendanceSummary(id, s?.batchId).then(setAttendance).catch(() => setAttendance(null));
       setStaffList(st.filter(x => x.active !== false));
       setEditForm(s || {});
       setWeakSubjects(s?.weakSubjects || []);
@@ -297,6 +302,7 @@ export default function StudentProfile() {
           { key:'overview',   label:'Overview'                              },
           { key:'courseflow', label:`Course Flow (${flowDone}/${flowTotal})`},
           { key:'assessments',label:`Assessments (${assessments.length})`   },
+          { key:'performance',label:`Performance (${classReports.length})`  },
           { key:'followups',  label:`Follow-Ups (${followups.length})`      },
         ].map(t => (
           <div key={t.key} className={`tab ${activeTab===t.key?'active':''}`} onClick={() => setActiveTab(t.key)}>
@@ -640,6 +646,58 @@ export default function StudentProfile() {
         </div>
       )}
 
+      {/* ══ PERFORMANCE TAB ══ */}
+      {activeTab === 'performance' && (
+        <div>
+          {/* Summary tiles */}
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(150px,1fr))', gap:12, marginBottom:18 }}>
+            <div className="card" style={{ padding:'14px 16px' }}>
+              <div style={{ fontSize:11, color:'var(--text-muted)', fontWeight:600, textTransform:'uppercase', letterSpacing:'.04em' }}>Attendance</div>
+              <div style={{ fontSize:26, fontWeight:700, fontFamily:'var(--font-display)', color: attendance?.pct == null ? 'var(--text-muted)' : attendance.pct >= 75 ? 'var(--green-ink)' : attendance.pct >= 50 ? 'var(--amber-ink)' : 'var(--red-ink)' }}>
+                {attendance?.pct == null ? '—' : `${attendance.pct}%`}
+              </div>
+              <div style={{ fontSize:11.5, color:'var(--text-muted)' }}>{attendance ? `${attendance.present}/${attendance.total} classes present` : 'No attendance recorded'}</div>
+            </div>
+            <div className="card" style={{ padding:'14px 16px' }}>
+              <div style={{ fontSize:11, color:'var(--text-muted)', fontWeight:600, textTransform:'uppercase', letterSpacing:'.04em' }}>Class Reports</div>
+              <div style={{ fontSize:26, fontWeight:700, fontFamily:'var(--font-display)', color:'var(--brand)' }}>{classReports.length}</div>
+              <div style={{ fontSize:11.5, color:'var(--text-muted)' }}>from faculty across classes</div>
+            </div>
+            <div className="card" style={{ padding:'14px 16px' }}>
+              <div style={{ fontSize:11, color:'var(--text-muted)', fontWeight:600, textTransform:'uppercase', letterSpacing:'.04em' }}>Avg Assessment</div>
+              <div style={{ fontSize:26, fontWeight:700, fontFamily:'var(--font-display)', color:'var(--violet-ink)' }}>
+                {assessments.length ? `${Math.round(assessments.reduce((s,a)=>s+(a.percentage||0),0)/assessments.length)}%` : '—'}
+              </div>
+              <div style={{ fontSize:11.5, color:'var(--text-muted)' }}>{assessments.length} assessments</div>
+            </div>
+          </div>
+
+          {/* Class progress reports timeline */}
+          <div className="card" style={{ padding:'16px 20px' }}>
+            <div style={{ fontSize:14, fontWeight:700, marginBottom:12 }}>Progress Reports from Faculty</div>
+            {classReports.length === 0 ? (
+              <div style={{ fontSize:13, color:'var(--text-muted)', padding:'20px 0', textAlign:'center' }}>
+                No class reports yet. Faculty add these from the Schedule → Progress Reports after a class.
+              </div>
+            ) : (
+              <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+                {classReports.map(r => (
+                  <div key={r.id} style={{ borderLeft:'3px solid var(--brand)', paddingLeft:12 }}>
+                    <div style={{ display:'flex', gap:8, alignItems:'center', flexWrap:'wrap', marginBottom:2 }}>
+                      <span style={{ fontSize:13, fontWeight:600 }}>{r.sessionTitle || 'Class'}</span>
+                      {r.rating && <span className="badge badge-blue" style={{ textTransform:'capitalize' }}>{r.rating.replace('-',' ')}</span>}
+                      <span style={{ fontSize:11.5, color:'var(--text-muted)' }}>{r.batchName} · {r.sessionDate}</span>
+                    </div>
+                    {r.note && <div style={{ fontSize:12.5, color:'var(--text-sub)', marginBottom:2 }}>{r.note}</div>}
+                    <div style={{ fontSize:11, color:'var(--text-muted)' }}>— {r.facultyName || 'Staff'}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* ══ FOLLOW-UPS TAB ══ */}
       {activeTab === 'followups' && (
         <div className="grid-2" style={{ alignItems:'start' }}>
@@ -723,7 +781,7 @@ export default function StudentProfile() {
             <FormRow>
               <div className="form-group"><label className="form-label">Staff Assigned</label>
                 <select className="form-input" value={editForm.staffAssigned||''} onChange={e=>setEditForm({...editForm,staffAssigned:e.target.value})}>
-                  <option value="">Select</option>{staffList.map(s=><option key={s.id}>{s.name}</option>)}
+                  <option value="">Select</option>{staffList.filter(s=>s.active!==false).map(s=><option key={s.id}>{s.name}</option>)}
                 </select>
               </div>
               <div className="form-group"><label className="form-label">ClassPlus ID</label><input className="form-input" value={editForm.classplusId||''} onChange={e=>setEditForm({...editForm,classplusId:e.target.value})}/></div>

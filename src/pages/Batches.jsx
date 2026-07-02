@@ -170,12 +170,14 @@ function OnboardingStepPanel({ step, onClose, onMarkComplete, onRevoke }) {
   const [marking, setMarking]                 = useState({});
   const [localCompleted, setLocalCompleted]   = useState([]);
   const [localNotCompleted, setLocalNotCompleted] = useState([]);
+  const [customFor, setCustomFor]             = useState({}); // studentId -> typing a custom dropdown value
 
   useEffect(() => {
     setLocalCompleted(step?.completedStudents || []);
     setLocalNotCompleted(step?.notCompletedStudents || []);
     setSearch('');
     setFieldValues({});
+    setCustomFor({});
   }, [step?.key]);
 
   if (!step) return null;
@@ -272,12 +274,26 @@ function OnboardingStepPanel({ step, onClose, onMarkComplete, onRevoke }) {
                     <div style={{ fontSize:11, color:'var(--text-muted)', marginBottom: ft !== 'none' ? 6 : 0 }}>{s.phone||'—'}</div>
 
                     {/* Dynamic field input */}
-                    {!isDropped && ft === 'dropdown' && (
-                      <select value={val} onChange={e => setVal(s.id, e.target.value)}
+                    {!isDropped && ft === 'dropdown' && !customFor[s.id] && (
+                      <select value={opts.includes(val) ? val : ''} onChange={e => {
+                        if (e.target.value === '__add__') { setCustomFor(p => ({ ...p, [s.id]: true })); setVal(s.id, ''); }
+                        else setVal(s.id, e.target.value);
+                      }}
                         className="form-input" style={{ fontSize:11, marginBottom:6 }}>
                         <option value="">Select {step.fieldLabel || 'option'}…</option>
                         {opts.map(o => <option key={o} value={o}>{o}</option>)}
+                        <option value="__add__">＋ Add new option…</option>
                       </select>
+                    )}
+                    {!isDropped && ft === 'dropdown' && customFor[s.id] && (
+                      <div style={{ display:'flex', gap:6, marginBottom:6 }}>
+                        <input autoFocus value={val} onChange={e => setVal(s.id, e.target.value)}
+                          placeholder={`New ${step.fieldLabel || 'option'}…`}
+                          className="form-input" style={{ fontSize:11, flex:1 }}/>
+                        <button type="button" title="Back to list"
+                          onClick={() => { setCustomFor(p => ({ ...p, [s.id]: false })); setVal(s.id, ''); }}
+                          style={{ background:'var(--surface-sunken)', border:'1px solid var(--border)', borderRadius:6, cursor:'pointer', fontSize:11, padding:'0 8px', color:'var(--text-muted)' }}>✕</button>
+                      </div>
                     )}
                     {!isDropped && ft === 'note' && (
                       <textarea rows={2} value={val} onChange={e => setVal(s.id, e.target.value)}
@@ -416,7 +432,8 @@ export default function Batches() {
   // Assessments tab
   const [batchAssessments, setBatchAssessments]     = useState([]);
   const [showCreateAssessment, setShowCreateAssessment] = useState(false);
-  const [assessmentForm, setAssessmentForm]         = useState({ title:'', date:'', totalMarks:'', conductingStaff:[] });
+  const [assessmentForm, setAssessmentForm]         = useState({ title:'', date:'', totalMarks:'', conductingStaff:[], participantType:'all', participantIds:[] });
+  const [assessStudentSearch, setAssessStudentSearch] = useState('');
   const [assessmentResults, setAssessmentResults]   = useState({}); // assessmentId results[]
   const [showViewResults, setShowViewResults]       = useState(null); // assessment object
   const [showImportMarks, setShowImportMarks]       = useState(null); // assessment object
@@ -441,8 +458,10 @@ export default function Batches() {
   });
   const [facultySearch, setFacultySearch] = useState('');
   const [taskForm, setTaskForm] = useState({
-    title:'', subject:'', description:'', dueDate:'', assignedFaculty:''
+    title:'', subject:'', description:'', dueDate:'', assignedFaculty:'',
+    assignedType:'all', assignedStudentIds:[]
   });
+  const [taskStudentSearch, setTaskStudentSearch] = useState('');
 
   const [studentSearch, setStudentSearch] = useState('');
   const [studentStatusFilter, setStudentStatusFilter] = useState('');
@@ -692,8 +711,12 @@ export default function Batches() {
     try {
       const updatedStaffIds = (selectedBatch.staffIds || []).filter(id => id !== staffUid);
       const updatedStaffDetails = (selectedBatch.staffDetails || []).filter(s => s.uid !== staffUid);
-      await updateBatch(selectedBatch.id, { staffIds: updatedStaffIds, staffDetails: updatedStaffDetails });
-      const updated = { ...selectedBatch, staffIds: updatedStaffIds, staffDetails: updatedStaffDetails };
+      const patch = { staffIds: updatedStaffIds, staffDetails: updatedStaffDetails };
+      // If the removed staff was this batch's mentor, clear it too — otherwise the
+      // batch keeps showing in their assigned list (getStaffBatches matches mentorId).
+      if (selectedBatch.mentorId === staffUid) { patch.mentorId = ''; patch.mentorName = ''; }
+      await updateBatch(selectedBatch.id, patch);
+      const updated = { ...selectedBatch, ...patch };
       setSelectedBatch(updated);
       setBatches(prev => prev.map(b => b.id === selectedBatch.id ? updated : b));
       setToast({ message:'Staff removed from batch.', type:'success' });
@@ -751,6 +774,9 @@ export default function Batches() {
         batchId: selectedBatch.id, batchName: selectedBatch.name,
         createdBy: profile?.uid || profile?.email || 'unknown', createdByName: profile?.name || '',
         totalMarks: Number(assessmentForm.totalMarks),
+        participantStudents: assessmentForm.participantType === 'all'
+          ? batchStudents.map(s => ({ id: s.id, name: s.name, phone: s.phone || '' }))
+          : batchStudents.filter(s => assessmentForm.participantIds.includes(s.id)).map(s => ({ id: s.id, name: s.name, phone: s.phone || '' })),
       });
       // Notify other conducting staff
       for (const staffDetail of (assessmentForm.conductingStaff || [])) {
@@ -771,7 +797,8 @@ export default function Batches() {
       const asmts = await getAssessments(selectedBatch.id);
       setBatchAssessments(asmts);
       setShowCreateAssessment(false);
-      setAssessmentForm({ title:'', date:'', totalMarks:'', conductingStaff:[] });
+      setAssessmentForm({ title:'', date:'', totalMarks:'', conductingStaff:[], participantType:'all', participantIds:[] });
+      setAssessStudentSearch('');
       setToast({ message:'Assessment created!', type:'success' });
     } catch (err) {
       setToast({ message:'Error: ' + err.message, type:'error' });
@@ -878,7 +905,11 @@ export default function Batches() {
 
   const handleAddTask = async (e) => {
     e.preventDefault(); setSaving(true);
-    await addBatchTask({ ...taskForm, batchId:selectedBatch.id, batchName:selectedBatch.name, createdBy:profile?.name });
+    await addBatchTask({
+      ...taskForm,
+      assignedStudentIds: taskForm.assignedType === 'specific' ? taskForm.assignedStudentIds : [],
+      batchId:selectedBatch.id, batchName:selectedBatch.name, createdBy:profile?.name,
+    });
     // Notify the assigned faculty (in-app + email)
     if (taskForm.assignedFaculty) {
       const staff = staffList.find(s => s.name === taskForm.assignedFaculty);
@@ -898,7 +929,8 @@ export default function Batches() {
     }
     setToast({ message:'Task created!', type:'success' });
     setShowTask(false);
-    setTaskForm({ title:'', subject:'', description:'', dueDate:'', assignedFaculty:'' });
+    setTaskForm({ title:'', subject:'', description:'', dueDate:'', assignedFaculty:'', assignedType:'all', assignedStudentIds:[] });
+    setTaskStudentSearch('');
     const tasks = await getBatchTasks(selectedBatch.id);
     setBatchTasks(tasks); setSaving(false);
   };
@@ -1045,8 +1077,14 @@ export default function Batches() {
     const isMentorOrCEOAdmin = isCEOorAdmin || selectedBatch.mentorId === profile?.uid;
 
     // Task split panel data
+    // Students actually assigned to a given task (all, or a specific subset).
+    const assignedStudentsFor = (task) =>
+      (task?.assignedType === 'specific' && task?.assignedStudentIds?.length)
+        ? batchStudents.filter(s => task.assignedStudentIds.includes(s.id))
+        : batchStudents;
     const currentTask = selectedTask ? batchTasks.find(t => t.id === selectedTask) : null;
-    const taskStudents = batchStudents.filter(s => {
+    const currentTaskStudents = assignedStudentsFor(currentTask);
+    const taskStudents = currentTaskStudents.filter(s => {
       if (!currentTask) return false;
       const submitted = currentTask.submittedBy?.find(x => x.studentId === s.id);
       if (taskFilter === 'submitted') return !!submitted;
@@ -1121,7 +1159,7 @@ export default function Batches() {
             {activeTab === 'students' && !isExpired && (
               <>
                 <button className="btn btn-ghost" onClick={() => setShowBulk(true)}><Upload size={14}/> Bulk CSV</button>
-                {isCEOorAdmin && <button className="btn btn-primary" onClick={() => setShowAddStudent(true)}><UserPlus size={14}/> Add Student</button>}
+                <button className="btn btn-primary" onClick={() => setShowAddStudent(true)}><UserPlus size={14}/> Add Student</button>
                 {profile?.role === 'ceo' && batchStudents.length > 0 && (
                   <button
                     className="btn btn-sm"
@@ -1146,12 +1184,6 @@ export default function Batches() {
                     <Trash2 size={13}/> Delete All
                   </button>
                 )}
-              </>
-            )}
-            {activeTab === 'schedule' && (
-              <>
-                <button className="btn btn-ghost btn-sm" onClick={() => setShowShareSchedule(true)}>Share</button>
-                {!isExpired && <button className="btn btn-primary" onClick={() => setShowSchedule(true)}><Plus size={14}/> Add Class</button>}
               </>
             )}
             {activeTab === 'tasks' && !isExpired && (
@@ -1190,7 +1222,6 @@ export default function Batches() {
           {[
             { key:'students',    label:`Students (${count})`               },
             { key:'onboarding',  label:'Onboarding Analytics'              },
-            { key:'schedule',    label:`Schedule (${schedules.length})`    },
             { key:'tasks',       label:`Assignments (${batchTasks.length})` },
             { key:'assessments', label:`Assessments (${batchAssessments.length})` },
             { key:'staff',       label:`Staff (${batchStaffDetails.length + (selectedBatch.mentorId ? 1 : 0)})` },
@@ -1508,241 +1539,6 @@ export default function Batches() {
           );
         })()}
 
-        {/* ── SCHEDULE TAB ── */}
-        {activeTab === 'schedule' && (() => {
-          const today = new Date();
-          today.setHours(0,0,0,0);
-          const weekDates = getWeekDates(calendarDate);
-          const monthCells = getMonthDates(calendarDate);
-          const monthLabel = calendarDate.toLocaleString('default', { month:'long', year:'numeric' });
-          const weekLabel = `${weekDates[0].toLocaleDateString('default',{month:'short',day:'numeric'})} – ${weekDates[6].toLocaleDateString('default',{month:'short',day:'numeric',year:'numeric'})}`;
-
-          const SlotPill = ({ slot, compact }) => {
-            const pc = slotPillColor(slot);
-            const isOverdue = overdueSessions.find(s => s.id === slot.id);
-            return (
-              <div
-                onClick={() => setCalendarSlotDetail(slot)}
-                style={{
-                  padding: compact ? '2px 6px' : '4px 8px',
-                  borderRadius: 6,
-                  background: isOverdue ? '#FEF3C7' : pc.bg,
-                  color: isOverdue ? '#92400E' : pc.col,
-                  fontSize: compact ? 10 : 11,
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  whiteSpace: 'nowrap',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  marginBottom: 2,
-                  border: `1px solid ${isOverdue ? '#FDE68A' : pc.col+'30'}`,
-                }}
-                title={slot.title}
-              >
-                {isOverdue && ''}{slot.time && `${slot.time} `}{slot.title}
-              </div>
-            );
-          };
-
-          return (
-            <div>
-              {/* Overdue warning banner */}
-              {overdueSessions.length > 0 && (
-                <div style={{ padding: '12px 16px', background: '#FEF3C7', borderRadius: 10, border: '1px solid #FDE68A', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <AlertTriangle size={16} style={{ color: '#F59E0B', flexShrink: 0 }} />
-                  <div style={{ flex: 1, fontSize: 13, color: '#92400E', fontWeight: 500 }}>
-                    {overdueSessions.length} class{overdueSessions.length > 1 ? 'es' : ''} from the past have not been marked. Please update their status.
-                  </div>
-                </div>
-              )}
-
-              {/* Calendar toolbar */}
-              <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:14, flexWrap:'wrap' }}>
-                {/* View toggle */}
-                <div style={{ display:'flex', background:'var(--n-100)', borderRadius:8, padding:2 }}>
-                  {['week','month'].map(v => (
-                    <button key={v} onClick={() => setCalendarView(v)}
-                      style={{ padding:'5px 14px', borderRadius:6, border:'none', cursor:'pointer', fontSize:12, fontWeight:600,
-                        background: calendarView === v ? 'var(--brand)' : 'transparent',
-                        color: calendarView === v ? '#fff' : 'var(--text-muted)',
-                        transition:'all 0.15s' }}
-                    >{v.charAt(0).toUpperCase()+v.slice(1)}</button>
-                  ))}
-                </div>
-                {/* Navigation */}
-                <button className="btn btn-ghost btn-sm" onClick={() => {
-                  const d = new Date(calendarDate);
-                  if (calendarView === 'week') d.setDate(d.getDate()-7);
-                  else d.setMonth(d.getMonth()-1);
-                  setCalendarDate(d);
-                }}></button>
-                <span style={{ fontSize:13, fontWeight:600, minWidth:180, textAlign:'center' }}>
-                  {calendarView === 'week' ? weekLabel : monthLabel}
-                </span>
-                <button className="btn btn-ghost btn-sm" onClick={() => {
-                  const d = new Date(calendarDate);
-                  if (calendarView === 'week') d.setDate(d.getDate()+7);
-                  else d.setMonth(d.getMonth()+1);
-                  setCalendarDate(d);
-                }}></button>
-                <button className="btn btn-ghost btn-sm" onClick={() => setCalendarDate(new Date())}>Today</button>
-                <div style={{ flex:1 }}/>
-                <button className="btn btn-ghost btn-sm" onClick={() => setShowShareSchedule(true)}>
-                  Share Schedule
-                </button>
-              </div>
-
-              {/* Week view */}
-              {calendarView === 'week' && (
-                <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)', gap:8 }}>
-                  {weekDates.map((date, idx) => {
-                    const isToday = date.toDateString() === today.toDateString();
-                    const slots = getSlotsForDate(date, schedules);
-                    const dayLabel = date.toLocaleDateString('default',{weekday:'short'});
-                    const dateNum = date.getDate();
-                    const monthShort = date.toLocaleDateString('default',{month:'short'});
-                    return (
-                      <div key={idx} style={{
-                        background: '#fff', borderRadius: 10,
-                        border: `2px solid ${isToday ? 'var(--brand)' : 'var(--border)'}`,
-                        minHeight: 140, padding: '10px 8px',
-                        boxShadow: isToday ? '0 0 0 2px rgba(79,70,229,0.18)' : '0 1px 3px rgba(0,0,0,0.05)',
-                      }}>
-                        <div style={{ textAlign:'center', marginBottom:8 }}>
-                          <div style={{ fontSize:11, color: isToday ? 'var(--brand)' : 'var(--text-muted)', fontWeight:600 }}>{dayLabel}</div>
-                          <div style={{
-                            width:28, height:28, borderRadius:'50%', margin:'4px auto 0',
-                            background: isToday ? 'var(--brand)' : 'transparent',
-                            color: isToday ? '#fff' : 'var(--text)',
-                            display:'flex', alignItems:'center', justifyContent:'center',
-                            fontWeight:700, fontSize:14,
-                          }}>{dateNum}</div>
-                          {isToday && <div style={{ fontSize:9, color:'var(--brand)', fontWeight:600 }}>{monthShort}</div>}
-                        </div>
-                        <div>
-                          {slots.map(slot => <SlotPill key={slot.id} slot={slot} compact />)}
-                          {slots.length === 0 && <div style={{ fontSize:10, color:'#D1D5DB', textAlign:'center', marginTop:8 }}>—</div>}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-
-              {/* Month view */}
-              {calendarView === 'month' && (
-                <div>
-                  <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)', gap:1, marginBottom:2 }}>
-                    {['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(d => (
-                      <div key={d} style={{ textAlign:'center', fontSize:11, fontWeight:700, color:'#6B7280', padding:'6px 0' }}>{d}</div>
-                    ))}
-                  </div>
-                  <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)', gap:2 }}>
-                    {monthCells.map(({ date, inMonth }, idx) => {
-                      const isToday = date.toDateString() === today.toDateString();
-                      const slots = inMonth ? getSlotsForDate(date, schedules) : [];
-                      return (
-                        <div key={idx} style={{
-                          background: inMonth ? '#fff' : '#F9FAFB',
-                          borderRadius: 8, minHeight: 80, padding: '6px',
-                          border: `1px solid ${isToday ? 'var(--brand)' : 'var(--border)'}`,
-                          opacity: inMonth ? 1 : 0.4,
-                        }}>
-                          <div style={{
-                            width:22, height:22, borderRadius:'50%',
-                            background: isToday ? 'var(--brand)' : 'transparent',
-                            color: isToday ? '#fff' : inMonth ? '#1A1A2E' : '#9CA3AF',
-                            display:'flex', alignItems:'center', justifyContent:'center',
-                            fontWeight: isToday ? 700 : 500, fontSize:12, marginBottom:4,
-                          }}>{date.getDate()}</div>
-                          {slots.slice(0,3).map(slot => <SlotPill key={slot.id} slot={slot} compact />)}
-                          {slots.length > 3 && <div style={{ fontSize:9, color:'#9CA3AF', marginTop:2 }}>+{slots.length-3} more</div>}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {schedules.length === 0 && (
-                <div className="card" style={{ textAlign:'center', color:'#6B7280', padding:40, marginTop:16 }}>
-                  No schedule added yet. Click "Add Class" to create the timetable.
-                </div>
-              )}
-
-              {/* Slot detail popover */}
-              {calendarSlotDetail && (() => {
-                const slot = calendarSlotDetail;
-                const tc = typeColor(slot.type);
-                const isOverdue = overdueSessions.find(s => s.id === slot.id);
-                return (
-                  <Modal title={slot.title} onClose={() => setCalendarSlotDetail(null)}>
-                    <div style={{ display:'flex', flexDirection:'column', gap:10, fontSize:13 }}>
-                      <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
-                        <span style={{ padding:'2px 9px', borderRadius:10, background:tc.bg, color:tc.col, fontWeight:600, fontSize:11 }}>{tc.label}</span>
-                        {slot.status && <span style={{ padding:'2px 9px', borderRadius:10, fontWeight:600, fontSize:11,
-                          background: slot.status==='completed'?'#D1FAE5':slot.status==='cancelled'?'#FEE2E2':'#FEF3C7',
-                          color: slot.status==='completed'?'#065F46':slot.status==='cancelled'?'#991B1B':'#92400E' }}>{slot.status}</span>}
-                      </div>
-                      <div style={{ color:'#374151' }}>
-                        <div><strong>Day:</strong> {slot.scheduledDate ? slot.scheduledDate : slot.day} {slot.scheduledDate ? '(one-time)' : '(recurring)'}</div>
-                        <div><strong>Time:</strong> {slot.time} · {slot.duration} min</div>
-                        {slot.facultyName && <div><strong>Faculty:</strong> {slot.facultyName}</div>}
-                        {slot.meetLink && <div><strong>Link:</strong> <a href={slot.meetLink} target="_blank" rel="noreferrer" style={{ color:'#E53935' }}>Join </a></div>}
-                        {slot.notes && <div style={{ color:'#6B7280', marginTop:4 }}>{slot.notes}</div>}
-                      </div>
-
-                      {/* Status update */}
-                      <div className="form-group">
-                        <label className="form-label">Update Status</label>
-                        {isOverdue ? (
-                          <div style={{ display:'flex', gap:8 }}>
-                            <button className="btn btn-sm" style={{ background:'#D1FAE5', color:'#065F46', border:'none' }}
-                              onClick={async () => { await updateScheduleStatus(slot.id,'completed'); const sch=await getBatchSchedules(selectedBatch.id); setSchedules(sch); setCalendarSlotDetail(null); setShowAttendance(slot); }}>
-                              Mark Completed
-                            </button>
-                            <button className="btn btn-sm" style={{ background:'#FEE2E2', color:'#991B1B', border:'none' }}
-                              onClick={async () => { await updateScheduleStatus(slot.id,'cancelled'); const sch=await getBatchSchedules(selectedBatch.id); setSchedules(sch); setCalendarSlotDetail(null); }}>
-                              Mark Cancelled
-                            </button>
-                          </div>
-                        ) : (
-                          <select className="form-input" value={slot.status || ''} onChange={async e => {
-                            const ns = e.target.value; if (!ns) return;
-                            await updateScheduleStatus(slot.id, ns);
-                            const sch = await getBatchSchedules(selectedBatch.id);
-                            setSchedules(sch);
-                            setCalendarSlotDetail({ ...slot, status: ns });
-                          }}>
-                            <option value="">Mark as...</option>
-                            <option value="completed">Completed</option>
-                            <option value="cancelled">Cancelled</option>
-                            <option value="rescheduled">Rescheduled</option>
-                          </select>
-                        )}
-                      </div>
-
-                      <div style={{ display:'flex', gap:8, justifyContent:'space-between', marginTop:4 }}>
-                        <button className="btn btn-ghost btn-sm" onClick={() => { setCalendarSlotDetail(null); setShowAttendance(slot); }}>
-                          {attendanceSaved[slot.id] ? 'Attendance ' : 'Upload Attendance'}
-                        </button>
-                        <button className="btn btn-sm" style={{ background:'#FEE2E2', color:'#EF4444', border:'none' }}
-                          onClick={() => setConfirmDialog({ message: 'Delete this class slot?', onConfirm: async () => {
-                            await deleteBatchSchedule(slot.id);
-                            const sch = await getBatchSchedules(selectedBatch.id);
-                            setSchedules(sch);
-                            setCalendarSlotDetail(null);
-                          }})}>
-                          <Trash2 size={12}/> Delete
-                        </button>
-                      </div>
-                    </div>
-                  </Modal>
-                );
-              })()}
-            </div>
-          );
-        })()}
 
         {/* ── TASKS / ASSIGNMENTS TAB ── Split Panel ── */}
         {activeTab === 'tasks' && (
@@ -1751,10 +1547,8 @@ export default function Batches() {
             <div style={{ width: 300, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
               {/* KPI boxes — clickable filters */}
               {batchTasks.length > 0 && (() => {
-                const totalStudents = batchStudents.length || 1;
-                const allSubmitted  = batchTasks.reduce((n,t) => n + (t.submittedBy?.length||0), 0);
-                const allPending    = batchTasks.reduce((n,t) => n + Math.max(0, totalStudents - (t.submittedBy?.length||0)), 0);
-                const completedTasks = batchTasks.filter(t => (t.submittedBy?.length||0) >= totalStudents).length;
+                const taskTotal = (t) => assignedStudentsFor(t).length || 1;
+                const completedTasks = batchTasks.filter(t => (t.submittedBy?.length||0) >= taskTotal(t)).length;
                 const pendingTasks   = batchTasks.length - completedTasks;
                 return (
                   <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6, marginBottom:4 }}>
@@ -1762,7 +1556,7 @@ export default function Batches() {
                       { key:'all',       label:'All Assignments', value:batchTasks.length,  bg:'var(--blue-soft)',   col:'var(--blue-ink)' },
                       { key:'completed', label:'Fully Done',      value:completedTasks,      bg:'var(--green-soft)', col:'var(--green-ink)' },
                       { key:'pending',   label:'In Progress',     value:pendingTasks,        bg:'var(--amber-soft)', col:'var(--amber-ink)' },
-                      { key:'overdue',   label:'Overdue',         value:batchTasks.filter(t=>t.dueDate&&new Date(t.dueDate)<new Date()&&(t.submittedBy?.length||0)<totalStudents).length, bg:'var(--red-soft)', col:'var(--red-ink)' },
+                      { key:'overdue',   label:'Overdue',         value:batchTasks.filter(t=>t.dueDate&&new Date(t.dueDate)<new Date()&&(t.submittedBy?.length||0)<taskTotal(t)).length, bg:'var(--red-soft)', col:'var(--red-ink)' },
                     ].map(k => (
                       <div key={k.key} onClick={() => setTaskKpiFilter(k.key)}
                         style={{ background:k.bg, borderRadius:10, padding:'10px 12px', cursor:'pointer', border:`2px solid ${taskKpiFilter===k.key?k.col:'transparent'}`, transition:'all 0.15s' }}>
@@ -1781,14 +1575,13 @@ export default function Batches() {
               )}
               {batchTasks.filter(task => {
                 if (taskKpiFilter === 'all') return true;
-                const totalS = batchStudents.length || 1;
-                if (taskKpiFilter === 'completed') return (task.submittedBy?.length||0) >= totalS;
-                if (taskKpiFilter === 'pending')   return (task.submittedBy?.length||0) < totalS;
-                if (taskKpiFilter === 'overdue')   return task.dueDate && new Date(task.dueDate)<new Date() && (task.submittedBy?.length||0)<totalS;
+                if (taskKpiFilter === 'completed') return (task.submittedBy?.length||0) >= assignedStudentsFor(task).length;
+                if (taskKpiFilter === 'pending')   return (task.submittedBy?.length||0) < assignedStudentsFor(task).length;
+                if (taskKpiFilter === 'overdue')   return task.dueDate && new Date(task.dueDate)<new Date() && (task.submittedBy?.length||0)<assignedStudentsFor(task).length;
                 return true;
               }).map(task => {
                 const submitted = task.submittedBy?.length || 0;
-                const total = batchStudents.length || 1;
+                const total = assignedStudentsFor(task).length || 1;
                 const pctDone = Math.round(submitted / total * 100);
                 const isOverdue = task.dueDate && new Date(task.dueDate) < new Date() && submitted < total;
                 const isSelected = selectedTask === task.id;
@@ -1869,13 +1662,18 @@ export default function Batches() {
                       {currentTask.dueDate && <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Due: {currentTask.dueDate}</span>}
                     </div>
                     {currentTask.description && <div style={{ fontSize: 13, color: 'var(--text-sub)', lineHeight: 1.6 }}>{currentTask.description}</div>}
+                    {currentTask.assignedType === 'specific' && (
+                      <div style={{ marginTop: 8 }}>
+                        <span className="badge badge-amber">Assigned to {currentTaskStudents.length} specific student{currentTaskStudents.length !== 1 ? 's' : ''}</span>
+                      </div>
+                    )}
                     {/* All done banner */}
-                    {(currentTask.submittedBy?.length || 0) >= batchStudents.length && batchStudents.length > 0 && (
+                    {(currentTask.submittedBy?.length || 0) >= currentTaskStudents.length && currentTaskStudents.length > 0 && (
                       <div style={{ marginTop: 12, padding: '10px 16px', background: 'var(--green-soft)', borderRadius: 10, display: 'flex', alignItems: 'center', gap: 10 }}>
                         <CheckCircle size={16} style={{ color: 'var(--green-ink)', flexShrink:0 }} />
                         <div>
-                          <div style={{ fontWeight: 700, color: 'var(--green-ink)', fontSize: 14 }}>All students completed this assignment!</div>
-                          <div style={{ fontSize: 12, color: 'var(--green-ink)' }}>Every student in this batch has submitted.</div>
+                          <div style={{ fontWeight: 700, color: 'var(--green-ink)', fontSize: 14 }}>All assigned students completed this!</div>
+                          <div style={{ fontSize: 12, color: 'var(--green-ink)' }}>Everyone assigned has submitted.</div>
                         </div>
                       </div>
                     )}
@@ -1883,8 +1681,8 @@ export default function Batches() {
                     <div style={{ display: 'flex', gap: 12, marginTop: 12 }}>
                       {[
                         { label: 'Submitted', value: currentTask.submittedBy?.length || 0, color: 'var(--green-ink)', bg: 'var(--green-soft)' },
-                        { label: 'Pending',   value: batchStudents.length - (currentTask.submittedBy?.length || 0), color: 'var(--amber-ink)', bg: 'var(--amber-soft)' },
-                        { label: 'Total',     value: batchStudents.length, color: 'var(--blue-ink)', bg: 'var(--blue-soft)' },
+                        { label: 'Pending',   value: currentTaskStudents.length - (currentTask.submittedBy?.length || 0), color: 'var(--amber-ink)', bg: 'var(--amber-soft)' },
+                        { label: 'Assigned',  value: currentTaskStudents.length, color: 'var(--blue-ink)', bg: 'var(--blue-soft)' },
                       ].map(s => (
                         <div key={s.label} style={{ padding: '10px 16px', borderRadius: 10, background: s.bg, textAlign: 'center', flex:1 }}>
                           <div style={{ fontSize: 22, fontWeight: 700, color: s.color, fontFamily:'var(--font-display)' }}>{s.value}</div>
@@ -2174,6 +1972,49 @@ export default function Batches() {
                   )}
                 </div>
               </div>
+
+              {/* Participants — all students or a specific selection */}
+              <div className="form-group">
+                <label className="form-label">Students</label>
+                <div className="segmented" style={{ marginBottom:10 }}>
+                  <button type="button" className={assessmentForm.participantType==='all'?'active':''}
+                    onClick={() => setAssessmentForm(f => ({ ...f, participantType:'all', participantIds:[] }))}>
+                    All {batchStudents.length} students
+                  </button>
+                  <button type="button" className={assessmentForm.participantType==='specific'?'active':''}
+                    onClick={() => setAssessmentForm(f => ({ ...f, participantType:'specific' }))}>
+                    Select specific students
+                  </button>
+                </div>
+                {assessmentForm.participantType === 'specific' && (
+                  <>
+                    <input className="form-input" placeholder="Type to filter by name or phone…" style={{ marginBottom:8 }}
+                      value={assessStudentSearch} onChange={e => setAssessStudentSearch(e.target.value)}/>
+                    <div style={{ border:'1px solid var(--border)', borderRadius:8, padding:6, maxHeight:220, overflowY:'auto' }}>
+                      {batchStudents
+                        .filter(s => !assessStudentSearch || s.name?.toLowerCase().includes(assessStudentSearch.toLowerCase()) || (s.phone||'').includes(assessStudentSearch))
+                        .map(s => {
+                          const checked = assessmentForm.participantIds.includes(s.id);
+                          return (
+                            <label key={s.id} style={{ display:'flex', alignItems:'center', gap:9, padding:'6px 8px', cursor:'pointer', borderRadius:6, background: checked ? 'var(--brand-50)' : 'transparent' }}>
+                              <input type="checkbox" checked={checked}
+                                onChange={e => setAssessmentForm(f => ({ ...f, participantIds: e.target.checked ? [...f.participantIds, s.id] : f.participantIds.filter(id => id !== s.id) }))}/>
+                              <div style={{ flex:1, minWidth:0 }}>
+                                <div style={{ fontSize:13, fontWeight:500 }}>{s.name}</div>
+                                <div style={{ fontSize:11, color:'var(--text-muted)' }}>{s.phone || 'no phone'}{s.course ? ` · ${s.course}` : ''}{s.education ? ` · ${s.education}` : ''}</div>
+                              </div>
+                            </label>
+                          );
+                        })}
+                      {batchStudents.length === 0 && <div style={{ fontSize:12, color:'var(--text-muted)', padding:8 }}>No students in this batch.</div>}
+                    </div>
+                    {assessmentForm.participantIds.length > 0 && (
+                      <div style={{ fontSize:12, color:'var(--text-muted)', marginTop:6 }}>{assessmentForm.participantIds.length} selected</div>
+                    )}
+                  </>
+                )}
+              </div>
+
               <div style={{ display:'flex', gap:10, justifyContent:'flex-end' }}>
                 <button className="btn btn-ghost" onClick={() => setShowCreateAssessment(false)}>Cancel</button>
                 <button className="btn btn-primary" disabled={!assessmentForm.title || !assessmentForm.totalMarks || saving} onClick={handleCreateAssessment}>
@@ -2301,7 +2142,7 @@ export default function Batches() {
             <input className="form-input" placeholder="Search staff..." style={{ marginBottom:12 }}
               value={staffSearch} onChange={e => setStaffSearch(e.target.value)} />
             <div style={{ maxHeight:280, overflowY:'auto', display:'flex', flexDirection:'column', gap:6, marginBottom:16 }}>
-              {staffList.filter(s => (!staffSearch || s.name?.toLowerCase().includes(staffSearch.toLowerCase()) || s.phone?.includes(staffSearch))).map(s => (
+              {staffList.filter(s => s.active !== false && (!staffSearch || s.name?.toLowerCase().includes(staffSearch.toLowerCase()) || s.phone?.includes(staffSearch))).map(s => (
                 <div key={s.id} onClick={() => setSelectedStaffIds(prev => prev.includes(s.id) ? prev.filter(x=>x!==s.id) : [...prev, s.id])}
                   style={{ display:'flex', alignItems:'center', gap:10, padding:'9px 12px', borderRadius:8, cursor:'pointer',
                     background: selectedStaffIds.includes(s.id) ? '#EFF6FF' : '#F9FAFB',
@@ -2356,7 +2197,7 @@ export default function Batches() {
                   <label className="form-label">Staff Assigned</label>
                   <select className="form-input" value={studentForm.staffAssigned||''} onChange={e => setStudentForm({...studentForm,staffAssigned:e.target.value})}>
                     <option value="">Select</option>
-                    {staffList.map(s=><option key={s.id}>{s.name}</option>)}
+                    {staffList.filter(s=>s.active!==false).map(s=><option key={s.id}>{s.name}</option>)}
                   </select>
                 </div>
                 <div className="form-group">
@@ -2388,7 +2229,7 @@ export default function Batches() {
               <div className="form-group" style={{ flex:1, margin:0 }}>
                 <select className="form-input" style={{ fontSize:12 }} value={bulkStaffAssign} onChange={e => setBulkStaffAssign(e.target.value)}>
                   <option value="">Assign all to staff (optional)</option>
-                  {staffList.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
+                  {staffList.filter(s=>s.active!==false).map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
                 </select>
               </div>
             </div>
@@ -2521,7 +2362,7 @@ export default function Batches() {
                     onChange={e => { const u=[...editSubjects]; u[idx]={...u[idx],facultyName:e.target.value}; setEditSubjects(u); }}>
                     <option value="">Select Faculty</option>
                     {(selectedBatch.faculties||[]).map((f,i)=><option key={i}>{f}</option>)}
-                    {staffList.map(s=><option key={s.id}>{s.name}</option>)}
+                    {staffList.filter(s=>s.active!==false).map(s=><option key={s.id}>{s.name}</option>)}
                   </select>
                   <button className="btn btn-ghost btn-sm" style={{ color:'#EF4444' }} onClick={() => setEditSubjects(editSubjects.filter((_,i)=>i!==idx))}><Trash2 size={13}/></button>
                 </div>
@@ -2537,93 +2378,7 @@ export default function Batches() {
           </Modal>
         )}
 
-        {/* Add Schedule */}
-        {showSchedule && (
-          <Modal title="Add Class" onClose={() => setShowSchedule(false)}>
-            <form onSubmit={handleAddSchedule} style={{ display:'flex', flexDirection:'column', gap:12 }}>
-              <div className="form-group"><label className="form-label">Title *</label><input className="form-input" required placeholder="e.g. Python Basics — Chapter 3" value={scheduleForm.title} onChange={e=>setScheduleForm({...scheduleForm,title:e.target.value})}/></div>
-              {/* Recurring toggle */}
-              <div style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 12px', background:'#F9FAFB', borderRadius:8, border:'1px solid #E5E7EB' }}>
-                <label style={{ display:'flex', alignItems:'center', gap:8, fontSize:13, cursor:'pointer', flex:1 }}>
-                  <input type="checkbox" checked={!!scheduleForm.recurring}
-                    onChange={e => setScheduleForm({...scheduleForm, recurring: e.target.checked, scheduledDate: e.target.checked ? '' : scheduleForm.scheduledDate})}/>
-                  <span>Recurring weekly class</span>
-                </label>
-                <span style={{ fontSize:11, color:'#9CA3AF' }}>{scheduleForm.recurring ? 'Repeats every week on the selected day' : 'One-time class on a specific date'}</span>
-              </div>
-              {!scheduleForm.recurring && (
-                <div className="form-group">
-                  <label className="form-label">Date *</label>
-                  <input className="form-input" type="date" required={!scheduleForm.recurring} value={scheduleForm.scheduledDate} onChange={e=>setScheduleForm({...scheduleForm,scheduledDate:e.target.value})}/>
-                </div>
-              )}
-              <FormRow>
-                <div className="form-group">
-                  <label className="form-label">Day of week {scheduleForm.recurring ? '*' : '(optional)'}</label>
-                  <select className="form-input" value={scheduleForm.day} onChange={e=>setScheduleForm({...scheduleForm,day:e.target.value})} disabled={!scheduleForm.recurring}>
-                    {DAYS.map(d=><option key={d}>{d}</option>)}
-                  </select>
-                </div>
-                <div className="form-group"><label className="form-label">Time *</label><input className="form-input" type="time" required value={scheduleForm.time} onChange={e=>setScheduleForm({...scheduleForm,time:e.target.value})}/></div>
-              </FormRow>
-              <FormRow>
-                <div className="form-group">
-                  <label className="form-label">Type</label>
-                  <select className="form-input" value={scheduleForm.type} onChange={e=>setScheduleForm({...scheduleForm,type:e.target.value})}>
-                    <option value="live-class">Live Class</option>
-                    <option value="recorded">Recorded Session</option>
-                    <option value="assignment">Assignment</option>
-                  </select>
-                </div>
-                <div className="form-group"><label className="form-label">Duration (min)</label><input className="form-input" type="number" value={scheduleForm.duration} onChange={e=>setScheduleForm({...scheduleForm,duration:e.target.value})}/></div>
-              </FormRow>
-              <FormRow>
-                <div className="form-group">
-                  <label className="form-label">Faculty</label>
-                  <div style={{ position: 'relative' }}>
-                    <input
-                      className="form-input"
-                      placeholder="Search faculty name…"
-                      value={facultySearch || scheduleForm.facultyName}
-                      onChange={e => { setFacultySearch(e.target.value); setScheduleForm({...scheduleForm, facultyName: ''}); }}
-                      autoComplete="off"
-                    />
-                    {facultySearch && (
-                      <div style={{ position:'absolute', top:'100%', left:0, right:0, background:'#fff', border:'1px solid #E5E7EB', borderRadius:8, boxShadow:'0 4px 12px rgba(0,0,0,0.1)', zIndex:200, maxHeight:180, overflowY:'auto' }}>
-                        {[
-                          ...(selectedBatch.faculties||[]).map(f => ({ name: f, role:'faculty', email:'' })),
-                          ...staffList,
-                        ].filter(s => s.name?.toLowerCase().includes(facultySearch.toLowerCase())).map((s, i) => (
-                          <div key={i} onClick={() => { setScheduleForm({...scheduleForm, facultyName: s.name}); setFacultySearch(''); }}
-                            style={{ padding:'9px 12px', cursor:'pointer', fontSize:13, display:'flex', justifyContent:'space-between', alignItems:'center' }}
-                            onMouseEnter={e=>e.currentTarget.style.background='#F0F4FF'}
-                            onMouseLeave={e=>e.currentTarget.style.background='#fff'}>
-                            <span style={{ fontWeight:500 }}>{s.name}</span>
-                            <span style={{ fontSize:11, color:'#9CA3AF' }}>{s.role||'faculty'}</span>
-                          </div>
-                        ))}
-                        {[...(selectedBatch.faculties||[]), ...staffList].filter(s => s.name?.toLowerCase().includes(facultySearch.toLowerCase())).length === 0 && (
-                          <div style={{ padding:'10px 12px', fontSize:12, color:'#9CA3AF' }}>No match found</div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                  {scheduleForm.facultyName && (
-                    <div style={{ fontSize:11, color:'#10B981', marginTop:4 }}>Selected: <strong>{scheduleForm.facultyName}</strong></div>
-                  )}
-                </div>
-                <div className="form-group"><label className="form-label">Meet / Zoom Link</label><input className="form-input" type="url" placeholder="https://..." value={scheduleForm.meetLink} onChange={e=>setScheduleForm({...scheduleForm,meetLink:e.target.value})}/></div>
-              </FormRow>
-              <div className="form-group"><label className="form-label">Notes</label><textarea className="form-input" rows={2} value={scheduleForm.notes} onChange={e=>setScheduleForm({...scheduleForm,notes:e.target.value})}/></div>
-              <div style={{ display:'flex', gap:10, justifyContent:'flex-end' }}>
-                <button type="button" className="btn btn-ghost" onClick={() => setShowSchedule(false)}>Cancel</button>
-                <button type="submit" className="btn btn-primary" disabled={saving}>{saving?'Saving...':'Add to Schedule'}</button>
-              </div>
-            </form>
-          </Modal>
-        )}
-
-        {/* Add Task */}
+        {/* Add Task / Assignment */}
         {showTask && (
           <Modal title="Create Assignment / Task" onClose={() => setShowTask(false)}>
             <form onSubmit={handleAddTask} style={{ display:'flex', flexDirection:'column', gap:12 }}>
@@ -2633,11 +2388,9 @@ export default function Batches() {
                   <label className="form-label">Subject</label>
                   <select className="form-input" value={taskForm.subject} onChange={e=>setTaskForm({...taskForm,subject:e.target.value})}>
                     <option value="">Select subject</option>
-                    {/* Subjects from batch staff profiles */}
                     {[...new Set((selectedBatch.staffDetails||[]).flatMap(s => (s.subjects||[]).map(x => typeof x==='object'?x.name:x)).filter(Boolean))].map((sub,i) => (
                       <option key={i} value={sub}>{sub}</option>
                     ))}
-                    {/* Also any batch-level subjects */}
                     {(selectedBatch.subjects||[]).filter(s => s.name).map((s,i)=><option key={`bs-${i}`} value={s.name}>{s.name}</option>)}
                   </select>
                 </div>
@@ -2646,196 +2399,60 @@ export default function Batches() {
                   <select className="form-input" value={taskForm.assignedFaculty} onChange={e=>setTaskForm({...taskForm,assignedFaculty:e.target.value})}>
                     <option value="">Select faculty</option>
                     {(selectedBatch.faculties||[]).map((f,i)=><option key={i}>{f}</option>)}
-                    {staffList.map(s=><option key={s.id}>{s.name}</option>)}
+                    {staffList.filter(s=>s.active!==false).map(s=><option key={s.id}>{s.name}</option>)}
                   </select>
                 </div>
               </FormRow>
               <div className="form-group"><label className="form-label">Description / Instructions</label><textarea className="form-input" rows={3} value={taskForm.description} onChange={e=>setTaskForm({...taskForm,description:e.target.value})}/></div>
               <div className="form-group"><label className="form-label">Due Date</label><input className="form-input" type="date" value={taskForm.dueDate} onChange={e=>setTaskForm({...taskForm,dueDate:e.target.value})}/></div>
+
+              {/* Assign to all or specific students — different students can get different tasks */}
+              <div className="form-group">
+                <label className="form-label">Assign To</label>
+                <div className="segmented" style={{ marginBottom:10 }}>
+                  <button type="button" className={taskForm.assignedType==='all'?'active':''}
+                    onClick={() => setTaskForm(f => ({ ...f, assignedType:'all', assignedStudentIds:[] }))}>
+                    All {batchStudents.length} students
+                  </button>
+                  <button type="button" className={taskForm.assignedType==='specific'?'active':''}
+                    onClick={() => setTaskForm(f => ({ ...f, assignedType:'specific' }))}>
+                    Specific students
+                  </button>
+                </div>
+                {taskForm.assignedType === 'specific' && (
+                  <>
+                    <input className="form-input" placeholder="Type to filter by name or phone…" style={{ marginBottom:8 }}
+                      value={taskStudentSearch} onChange={e => setTaskStudentSearch(e.target.value)}/>
+                    <div style={{ border:'1px solid var(--border)', borderRadius:8, padding:6, maxHeight:200, overflowY:'auto' }}>
+                      {batchStudents
+                        .filter(s => !taskStudentSearch || s.name?.toLowerCase().includes(taskStudentSearch.toLowerCase()) || (s.phone||'').includes(taskStudentSearch))
+                        .map(s => {
+                          const checked = taskForm.assignedStudentIds.includes(s.id);
+                          return (
+                            <label key={s.id} style={{ display:'flex', alignItems:'center', gap:9, padding:'6px 8px', cursor:'pointer', borderRadius:6, background: checked ? 'var(--brand-50)' : 'transparent' }}>
+                              <input type="checkbox" checked={checked}
+                                onChange={e => setTaskForm(f => ({ ...f, assignedStudentIds: e.target.checked ? [...f.assignedStudentIds, s.id] : f.assignedStudentIds.filter(id => id !== s.id) }))}/>
+                              <div style={{ flex:1, minWidth:0 }}>
+                                <div style={{ fontSize:13, fontWeight:500 }}>{s.name}</div>
+                                <div style={{ fontSize:11, color:'var(--text-muted)' }}>{s.phone || 'no phone'}{s.course ? ` · ${s.course}` : ''}</div>
+                              </div>
+                            </label>
+                          );
+                        })}
+                      {batchStudents.length === 0 && <div style={{ fontSize:12, color:'var(--text-muted)', padding:8 }}>No students in this batch.</div>}
+                    </div>
+                    {taskForm.assignedStudentIds.length > 0 && (
+                      <div style={{ fontSize:12, color:'var(--text-muted)', marginTop:6 }}>{taskForm.assignedStudentIds.length} student(s) will get this assignment</div>
+                    )}
+                  </>
+                )}
+              </div>
+
               <div style={{ display:'flex', gap:10, justifyContent:'flex-end' }}>
                 <button type="button" className="btn btn-ghost" onClick={() => setShowTask(false)}>Cancel</button>
                 <button type="submit" className="btn btn-primary" disabled={saving}>{saving?'Creating...':'Create Task'}</button>
               </div>
             </form>
-          </Modal>
-        )}
-
-        {/* Attendance CSV Upload Modal */}
-        {showAttendance && (
-          <Modal title={`Upload Attendance — ${showAttendance.title}`} onClose={() => { setShowAttendance(null); setAttendanceCsv(null); setAttendancePreview(null); }}>
-            <div style={{ padding:'10px 14px', background:'#EFF6FF', borderRadius:8, fontSize:12, color:'#1E40AF', marginBottom:14 }}>
-              <strong>Instructions:</strong> Upload a CSV or Excel file with columns:
-              <code style={{ background:'#DBEAFE', padding:'1px 6px', borderRadius:4, marginLeft:4 }}>Name, Phone, Present</code>
-              <br/>The Present column should be <strong>Yes</strong> or <strong>No</strong>. Students are matched by phone number.
-            </div>
-            <input ref={attendanceFileRef} type="file" accept=".csv" style={{ display:'none' }}
-              onChange={async e => {
-                const text = await e.target.files[0]?.text();
-                if (!text) return;
-                const lines = text.trim().split('\n');
-                const headers = lines[0].split(',').map(h => h.trim().toLowerCase().replace(/\s+/g,''));
-                const rawRecords = lines.slice(1).map(line => {
-                  const vals = line.split(',').map(v => v.trim().replace(/^"|"$/g,''));
-                  const obj = {};
-                  headers.forEach((h, i) => { obj[h] = vals[i] || ''; });
-                  return obj;
-                }).filter(r => r.name || r.phone);
-                // Match to batch students by phone
-                const enriched = rawRecords.map(r => {
-                  const phone = r.phone || r.phonenumber || r.phone_number || '';
-                  const matched = batchStudents.find(s => s.phone === phone || s.whatsappNumber === phone);
-                  return {
-                    studentId: matched?.id || null,
-                    name: matched?.name || r.name || r.studentname || '?',
-                    phone,
-                    present: (r.present || r.attendance || '').toLowerCase() === 'yes',
-                    matched: !!matched,
-                  };
-                });
-                setAttendanceCsv(rawRecords);
-                setAttendancePreview(enriched);
-              }}
-            />
-            <div onClick={() => attendanceFileRef.current.click()} style={{
-              border:'2px dashed #E5E7EB', borderRadius:10, padding:'28px 20px', textAlign:'center',
-              cursor:'pointer', background:'#FAFAFA', marginBottom:14, transition:'border-color 0.15s',
-            }}
-              onMouseEnter={e => e.currentTarget.style.borderColor = '#E53935'}
-              onMouseLeave={e => e.currentTarget.style.borderColor = '#E5E7EB'}
-            >
-              <Upload size={26} style={{ color:'#D1D5DB', marginBottom:8 }}/>
-              <div style={{ fontSize:13, fontWeight:500, color:'#374151' }}>
-                {attendancePreview ? `${attendancePreview.length} records loaded` : 'Click to upload attendance CSV'}
-              </div>
-              {!attendancePreview && <div style={{ fontSize:11, color:'#9CA3AF', marginTop:4 }}>Supports .csv format</div>}
-            </div>
-
-            {attendancePreview && (
-              <div style={{ marginBottom:14 }}>
-                <div style={{ fontSize:12, fontWeight:600, marginBottom:8, color:'#374151' }}>
-                  Preview ({attendancePreview.filter(r=>r.present).length} present / {attendancePreview.filter(r=>!r.present).length} absent)
-                </div>
-                <div style={{ maxHeight:240, overflowY:'auto', border:'1px solid #E5E7EB', borderRadius:8 }}>
-                  <table style={{ width:'100%', borderCollapse:'collapse', fontSize:12 }}>
-                    <thead>
-                      <tr style={{ background:'#F8FAFC', position:'sticky', top:0 }}>
-                        {['Name','Phone','Status','Matched'].map(h=>(
-                          <th key={h} style={{ padding:'7px 10px', textAlign:'left', fontSize:11, fontWeight:700, color:'#6B7280', textTransform:'uppercase', letterSpacing:'0.05em', borderBottom:'1px solid #E5E7EB' }}>{h}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {attendancePreview.map((r, i) => (
-                        <tr key={i} style={{ background: r.present ? '#F0FDF4' : '#FFF8F8' }}>
-                          <td style={{ padding:'7px 10px', fontWeight:500 }}>{r.name}</td>
-                          <td style={{ padding:'7px 10px', color:'#6B7280' }}>{r.phone || '—'}</td>
-                          <td style={{ padding:'7px 10px' }}>
-                            <span style={{ fontWeight:600, fontSize:11, color: r.present ? '#10B981' : '#EF4444' }}>
-                              {r.present ? 'Present' : 'Absent'}
-                            </span>
-                          </td>
-                          <td style={{ padding:'7px 10px' }}>
-                            <span style={{ fontSize:10, padding:'1px 7px', borderRadius:10, fontWeight:600,
-                              background: r.matched ? '#D1FAE5' : '#FEF3C7', color: r.matched ? '#065F46' : '#92400E' }}>
-                              {r.matched ? 'Matched' : 'No match'}
-                            </span>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
-
-            <div style={{ display:'flex', gap:10, justifyContent:'flex-end' }}>
-              <button className="btn btn-ghost" onClick={() => { setShowAttendance(null); setAttendanceCsv(null); setAttendancePreview(null); }}>Cancel</button>
-              <button
-                className="btn btn-primary"
-                disabled={!attendancePreview || saving}
-                onClick={async () => {
-                  setSaving(true);
-                  await saveAttendance(showAttendance.id, selectedBatch.id, attendancePreview.map(r => ({
-                    studentId: r.studentId,
-                    name: r.name,
-                    phone: r.phone,
-                    present: r.present,
-                  })));
-                  setAttendanceSaved(prev => ({ ...prev, [showAttendance.id]: true }));
-                  setToast({ message:'Attendance saved successfully!', type:'success' });
-                  setShowAttendance(null);
-                  setAttendanceCsv(null);
-                  setAttendancePreview(null);
-                  setSaving(false);
-                }}
-              >
-                {saving ? 'Saving...' : `Save Attendance (${attendancePreview?.length || 0} records)`}
-              </button>
-            </div>
-          </Modal>
-        )}
-
-        {/* Overdue class confirmation dialog */}
-        {overdueConfirm && (
-          <Modal title="Mark Overdue Class" onClose={() => setOverdueConfirm(null)}>
-            <div style={{ marginBottom:16, fontSize:14, color:'#374151', lineHeight:1.6 }}>
-              Did the class <strong>"{overdueConfirm.title}"</strong> ({overdueConfirm.day} at {overdueConfirm.time}) take place?
-              <br/>Please mark it as completed or cancelled, and optionally upload attendance.
-            </div>
-            <div style={{ display:'flex', gap:10 }}>
-              <button
-                className="btn btn-primary" style={{ flex:1 }}
-                onClick={async () => {
-                  await updateScheduleStatus(overdueConfirm.id, 'completed');
-                  const sch = await getBatchSchedules(selectedBatch.id);
-                  setSchedules(sch);
-                  setOverdueConfirm(null);
-                  setShowAttendance(overdueConfirm);
-                  setToast({ message:'Marked as completed. Upload attendance now.', type:'success' });
-                }}
-              >
-                Yes — Mark Completed
-              </button>
-              <button
-                className="btn btn-danger" style={{ flex:1 }}
-                onClick={async () => {
-                  await updateScheduleStatus(overdueConfirm.id, 'cancelled');
-                  const sch = await getBatchSchedules(selectedBatch.id);
-                  setSchedules(sch);
-                  setOverdueConfirm(null);
-                  setToast({ message:'Marked as cancelled.', type:'success' });
-                }}
-              >
-                No — Mark Cancelled
-              </button>
-            </div>
-          </Modal>
-        )}
-
-        {/* Share Schedule Modal */}
-        {showShareSchedule && (
-          <Modal title="Share Schedule" onClose={() => setShowShareSchedule(false)}>
-            <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
-              <p style={{ fontSize:13, color:'#374151', lineHeight:1.6 }}>
-                Share this link with students. They can view the class schedule without logging in.
-              </p>
-              <div style={{ display:'flex', gap:8, alignItems:'center' }}>
-                <input
-                  className="form-input"
-                  readOnly
-                  value={`${window.location.origin}/public-schedule/${selectedBatch.id}`}
-                  style={{ flex:1, fontFamily:'monospace', fontSize:12 }}
-                  onFocus={e => e.target.select()}
-                />
-                <button className="btn btn-primary btn-sm" onClick={() => {
-                  navigator.clipboard.writeText(`${window.location.origin}/public-schedule/${selectedBatch.id}`);
-                  setToast({ message:'Link copied!', type:'success' });
-                }}>Copy Link</button>
-              </div>
-              <div style={{ fontSize:11, color:'#9CA3AF' }}>
-                Anyone with this link can view the schedule (read-only, no login required).
-              </div>
-            </div>
           </Modal>
         )}
 
@@ -3026,7 +2643,7 @@ export default function Batches() {
                   setCreateForm({ ...createForm, mentorId: e.target.value, mentorName: sel?.name || '' });
                 }}>
                 <option value="">Select Mentor</option>
-                {staffList.filter(s=>s.role!=='ceo').map(s=>(
+                {staffList.filter(s=>s.role!=='ceo'&&s.active!==false).map(s=>(
                   <option key={s.id} value={s.id}>{s.name} ({s.phone || 'no phone'})</option>
                 ))}
               </select>
@@ -3034,7 +2651,7 @@ export default function Batches() {
             <div className="form-group">
               <label className="form-label">Assign Faculties / Staff</label>
               <div style={{ display:'flex', flexWrap:'wrap', gap:8, padding:'10px', background:'var(--bg)', borderRadius:8, border:'1px solid var(--border)', minHeight:48 }}>
-                {staffList.filter(s=>s.role!=='ceo').map(s=>(
+                {staffList.filter(s=>s.role!=='ceo'&&s.active!==false).map(s=>(
                   <div key={s.id} onClick={() => toggleFaculty(s.name)} style={{
                     padding:'5px 12px', borderRadius:20, fontSize:12, cursor:'pointer', fontWeight:500,
                     background: createForm.faculties.includes(s.name)?'#E53935':'var(--white)',

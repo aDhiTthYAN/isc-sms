@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
-import { collection, getDocs, doc, updateDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import { createStaffAccount } from '../firebase/adminAuth';
 import { Modal, Toast, Loading, Confirm, FormRow } from '../components/ui';
 import {
   Plus, ShieldOff, RefreshCw, Shield,
-  BookOpen, Edit, CheckCircle, Mail, Key
+  BookOpen, Edit, CheckCircle, Mail, Key, Trash2
 } from 'lucide-react';
 
 const ALL_SUBJECTS = [
@@ -37,6 +37,7 @@ export default function StaffManagement() {
   const [showSuccess, setShowSuccess] = useState(null);
   const [showSubjectModal, setShowSubjectModal] = useState(null);
   const [revoking, setRevoking]       = useState(null);
+  const [deleting, setDeleting]       = useState(null);
   const [toast, setToast]             = useState(null);
   const [saving, setSaving]           = useState(false);
   const [editingSubjects, setEditingSubjects] = useState([]);
@@ -88,6 +89,19 @@ export default function StaffManagement() {
   const handleRestore = async (member) => {
     await updateDoc(doc(db, 'staff', member.id), { active: true });
     setToast({ message: `Access restored for ${member.name}.`, type:'success' });
+    load();
+  };
+
+  // ── Permanent delete (revoked staff only) ──────────────────
+  const handlePermanentDelete = async () => {
+    if (!deleting) return;
+    try {
+      await deleteDoc(doc(db, 'staff', deleting.id));
+      setToast({ message: `${deleting.name} permanently deleted.`, type:'success' });
+    } catch (err) {
+      setToast({ message: 'Error: ' + err.message, type:'error' });
+    }
+    setDeleting(null);
     load();
   };
 
@@ -303,9 +317,13 @@ export default function StaffManagement() {
                       {member.role}
                     </span>
                   </td>
-                  <td>
+                  <td style={{ display:'flex', gap:6 }}>
                     <button className="btn btn-ghost btn-sm" onClick={() => handleRestore(member)}>
-                      <RefreshCw size={13}/> Restore Access
+                      <RefreshCw size={13}/> Restore
+                    </button>
+                    <button className="btn btn-sm" style={{ background:'var(--red-soft)', color:'var(--red-ink)', border:'none' }}
+                      onClick={() => setDeleting(member)}>
+                      <Trash2 size={13}/> Delete
                     </button>
                   </td>
                 </tr>
@@ -474,6 +492,22 @@ export default function StaffManagement() {
             <div style={{ display:'flex', gap:10, justifyContent:'flex-end' }}>
               <button className="btn btn-ghost" onClick={() => setRevoking(null)}>Cancel</button>
               <button className="btn btn-danger" onClick={handleRevoke}>Revoke Access</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {deleting && (
+        <div className="modal-overlay">
+          <div className="modal" style={{ maxWidth:400 }}>
+            <p style={{ marginBottom:16, fontSize:14, lineHeight:1.6 }}>
+              Permanently delete <strong>{deleting.name}</strong>?
+              This removes the staff profile for good and cannot be undone.
+              (Their login account in Firebase Auth is not affected.)
+            </p>
+            <div style={{ display:'flex', gap:10, justifyContent:'flex-end' }}>
+              <button className="btn btn-ghost" onClick={() => setDeleting(null)}>Cancel</button>
+              <button className="btn btn-danger" onClick={handlePermanentDelete}>Delete Permanently</button>
             </div>
           </div>
         </div>

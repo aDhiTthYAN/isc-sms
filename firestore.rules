@@ -81,6 +81,10 @@ service cloud.firestore {
       allow read, write: if isAuth();
     }
 
+    match /classReports/{doc} {
+      allow read, write: if isAuth();
+    }
+
     match /trash/{doc} {
       allow read, write: if isCEO();
     }

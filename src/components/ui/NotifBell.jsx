@@ -22,7 +22,17 @@ const DEFAULT_META = { icon: <Bell size={14} />, color: 'var(--text-muted)', bg:
 function getMeta(type) {
   if (!type) return DEFAULT_META;
   const key = type.toLowerCase().replace(/\s+/g, '_');
-  return TYPE_META[key] || TYPE_META[type] || DEFAULT_META;
+  if (TYPE_META[key] || TYPE_META[type]) return TYPE_META[key] || TYPE_META[type];
+  // Prefix match so variants (assessment_added, assessment_assignment,
+  // task_completed, request_update, …) route to the right page.
+  if (key.startsWith('assessment')) return TYPE_META.assessment;
+  if (key.startsWith('task'))       return TYPE_META.task;
+  if (key.startsWith('followup'))   return TYPE_META.followup;
+  if (key.startsWith('concern'))    return TYPE_META.concern;
+  if (key.startsWith('request'))    return TYPE_META.request_update;
+  if (key.startsWith('batch'))      return TYPE_META.batch_assignment;
+  if (key.startsWith('lead'))       return TYPE_META.lead;
+  return DEFAULT_META;
 }
 
 function timeAgo(ts) {

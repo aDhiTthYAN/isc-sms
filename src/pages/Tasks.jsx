@@ -114,6 +114,38 @@ export default function Tasks() {
     load();
   };
 
+  // Complete-with-note flow (staff writes a short note the CEO can read)
+  const [completing, setCompleting] = useState(null); // task being completed
+  const [doneNote,   setDoneNote]   = useState('');
+
+  const handleComplete = async () => {
+    if (!completing) return;
+    setSaving(true);
+    try {
+      await updateTask(completing.id, {
+        status: 'completed',
+        completionNote: doneNote.trim(),
+        completedBy: profile?.name || user?.email || '',
+        completedAt: new Date().toISOString(),
+      });
+      if (completing.assignedByEmail && completing.assignedByEmail !== user?.email) {
+        await addNotification({
+          toEmail:  completing.assignedByEmail,
+          toName:   completing.assignedBy || '',
+          fromName: profile?.name,
+          type:     'task',
+          message:  `Task completed: "${completing.title}"${doneNote.trim() ? ` — ${doneNote.trim()}` : ''}`,
+        });
+      }
+      setToast({ message: 'Task marked as completed!', type: 'success' });
+      setCompleting(null); setDoneNote('');
+      load();
+    } catch (err) {
+      setToast({ message: 'Error: ' + err.message, type: 'error' });
+    }
+    setSaving(false);
+  };
+
   if (loading) return <Loading />;
 
   const allFiltered = tasks.filter(t => {
@@ -321,8 +353,16 @@ export default function Tasks() {
                           </div>
                         </div>
 
-                        {/* Move buttons */}
-                        {isCEOorAdmin && (
+                        {/* Completion note (visible once completed) */}
+                        {col.key === 'completed' && task.completionNote && (
+                          <div style={{ marginTop:9, padding:'7px 10px', background:'var(--green-soft)', borderRadius:8, fontSize:11.5, color:'var(--green-ink)', lineHeight:1.45 }}>
+                            <strong>Note:</strong> {task.completionNote}
+                            {task.completedBy && <span style={{ opacity:.75 }}> — {task.completedBy}</span>}
+                          </div>
+                        )}
+
+                        {/* Move buttons — CEO/admin or the assigned staff member */}
+                        {(isCEOorAdmin || task.assignedToEmail === user?.email) && (
                           <div style={{ display:'flex', gap:6, marginTop:10, borderTop:'1px solid var(--border)', paddingTop:8 }}>
                             {col.key !== 'pending' && (
                               <button className="btn btn-ghost btn-sm" style={{ fontSize:11 }}
@@ -330,10 +370,16 @@ export default function Tasks() {
                                 Back
                               </button>
                             )}
-                            {col.key !== 'completed' && (
+                            {col.key === 'pending' && (
                               <button className="btn btn-primary btn-sm" style={{ fontSize:11 }}
-                                onClick={() => moveTask(task.id, col.key === 'pending' ? 'in-progress' : 'completed')}>
-                                {col.key === 'pending' ? 'Start' : 'Complete'}
+                                onClick={() => moveTask(task.id, 'in-progress')}>
+                                Start
+                              </button>
+                            )}
+                            {col.key === 'in-progress' && (
+                              <button className="btn btn-primary btn-sm" style={{ fontSize:11 }}
+                                onClick={() => { setCompleting(task); setDoneNote(''); }}>
+                                Complete
                               </button>
                             )}
                           </div>
@@ -423,7 +469,7 @@ export default function Tasks() {
               <select className="form-input" required value={form.staffId}
                 onChange={e => setForm({ ...form, staffId:e.target.value })}>
                 <option value="">Select staff member</option>
-                {staff.map(s => <option key={s.id} value={s.id}>{s.name} — {s.role}</option>)}
+                {staff.filter(s=>s.active!==false).map(s => <option key={s.id} value={s.id}>{s.name} — {s.role}</option>)}
               </select>
               {form.staffId && (
                 <div style={{ fontSize:11, color:'var(--text-muted)', marginTop:4 }}>
@@ -466,6 +512,24 @@ export default function Tasks() {
               </button>
             </div>
           </form>
+        </Modal>
+      )}
+
+      {/* Complete with note modal */}
+      {completing && (
+        <Modal title={`Complete — ${completing.title}`} onClose={() => setCompleting(null)}>
+          <div style={{ fontSize:13, color:'var(--text-sub)', marginBottom:12, lineHeight:1.5 }}>
+            Add a short note about what was done. This is visible to the person who assigned the task.
+          </div>
+          <textarea className="form-input" rows={3} autoFocus required
+            placeholder="e.g. Called all 12 parents, 2 need follow-up next week…"
+            value={doneNote} onChange={e => setDoneNote(e.target.value)}/>
+          <div style={{ display:'flex', gap:10, justifyContent:'flex-end', marginTop:14 }}>
+            <button className="btn btn-ghost" onClick={() => setCompleting(null)}>Cancel</button>
+            <button className="btn btn-primary" disabled={saving || !doneNote.trim()} onClick={handleComplete}>
+              {saving ? 'Saving…' : 'Mark Completed'}
+            </button>
+          </div>
         </Modal>
       )}
 

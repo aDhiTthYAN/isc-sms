@@ -206,6 +206,13 @@ export const getBatchSchedules = async (batchId) => {
     .sort((a,b) => (a.day||'').localeCompare(b.day||'') || (a.time||'').localeCompare(b.time||''));
 };
 
+// All schedules across every batch (for the global Schedule page "All" view)
+export const getAllSchedules = async () => {
+  const snap = await getDocs(collection(db,'schedules'));
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }))
+    .sort((a,b) => (a.day||'').localeCompare(b.day||'') || (a.time||'').localeCompare(b.time||''));
+};
+
 export const addBatchSchedule = async (data) =>
   addDoc(collection(db,'schedules'), { ...data, createdAt: serverTimestamp() });
 
@@ -439,6 +446,63 @@ export const getSessionAttendance = async (scheduleId) => {
 // Save attendance record (new signature for CSV upload modal)
 export const saveAttendanceRecord = async (data) =>
   addDoc(collection(db,'attendance'), { ...data, savedAt: serverTimestamp() });
+
+// ── Class progress reports (per-student notes after a class) ────
+// A report is written by a faculty for a student about a specific class session.
+// Any staff can later view all previous reports for a student (across faculty).
+export const saveClassReport = async (data) =>
+  addDoc(collection(db,'classReports'), { ...data, createdAt: serverTimestamp() });
+
+export const updateClassReport = async (id, data) =>
+  updateDoc(doc(db,'classReports', id), { ...data, updatedAt: serverTimestamp() });
+
+export const deleteClassReport = async (id) =>
+  deleteDoc(doc(db,'classReports', id));
+
+// All reports written for one class session (keyed by scheduleId)
+export const getSessionReports = async (scheduleId) => {
+  const q = query(collection(db,'classReports'), where('scheduleId','==',scheduleId));
+  const snap = await getDocs(q);
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }))
+    .sort((a,b) => (b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));
+};
+
+// All reports for a single student across every class & faculty
+export const getStudentReports = async (studentId) => {
+  const q = query(collection(db,'classReports'), where('studentId','==',studentId));
+  const snap = await getDocs(q);
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }))
+    .sort((a,b) => (b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));
+};
+
+// Attendance summary for one student (present/total across all their sessions)
+export const getStudentAttendanceSummary = async (studentId, batchId) => {
+  const q = batchId
+    ? query(collection(db,'attendance'), where('batchId','==',batchId))
+    : collection(db,'attendance');
+  const snap = await getDocs(q);
+  let present = 0, total = 0;
+  const sessions = [];
+  snap.docs.forEach(d => {
+    const data = d.data();
+    const recs = data.attendance || data.records || {};
+    const rec = recs[studentId];
+    if (rec) {
+      total += 1;
+      if (rec.present) present += 1;
+      sessions.push({ scheduleId: data.scheduleId, present: !!rec.present });
+    }
+  });
+  return { present, total, pct: total ? Math.round((present / total) * 100) : null, sessions };
+};
+
+// All reports for a batch (for batch-level progress overview)
+export const getBatchReports = async (batchId) => {
+  const q = query(collection(db,'classReports'), where('batchId','==',batchId));
+  const snap = await getDocs(q);
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }))
+    .sort((a,b) => (b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));
+};
 
 // Mark schedule status (update)
 export const markScheduleStatus = async (scheduleId, status) =>

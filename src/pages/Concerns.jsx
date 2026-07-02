@@ -253,7 +253,7 @@ export default function Concerns() {
                 <select className="form-input" value={form.assignedTo}
                   onChange={e => setForm({...form, assignedTo:e.target.value})}>
                   <option value="">No assignment</option>
-                  {staffList.filter(s => s.role !== 'ceo').map(s => (
+                  {staffList.filter(s => s.role !== 'ceo' && s.active !== false).map(s => (
                     <option key={s.id} value={s.id}>{s.name} ({s.role})</option>
                   ))}
                 </select>
