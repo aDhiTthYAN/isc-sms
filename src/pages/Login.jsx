@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Eye, EyeOff, ShieldCheck, Lock, ArrowRight } from 'lucide-react';
+import { Eye, EyeOff, ShieldCheck, Lock, ArrowRight, Mail } from 'lucide-react';
 
 const MAX_ATTEMPTS = 5;
 const LOCKOUT_SECS = 5 * 60;
@@ -71,163 +71,147 @@ export default function LoginPage() {
 
   return (
     <div style={{
-      minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
-      background: 'var(--grad-mesh)', position: 'relative', overflow: 'hidden', padding: 20,
+      width: '100%', height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
+      padding: 24,
+      background: 'radial-gradient(120% 120% at 0% 0%,#E7F1EF 0%,#F2F5F7 45%,#EEF1F5 100%)',
+      position: 'relative', overflow: 'hidden',
     }}>
-      {/* Floating blobs */}
-      <div style={{ position: 'absolute', top: '10%', left: '15%', width: 340, height: 340, borderRadius: '50%', background: 'rgba(139,131,255,0.22)', filter: 'blur(60px)', animation: 'floaty 9s ease-in-out infinite', pointerEvents: 'none' }} />
-      <div style={{ position: 'absolute', bottom: '15%', right: '12%', width: 280, height: 280, borderRadius: '50%', background: 'rgba(79,70,229,0.18)', filter: 'blur(70px)', animation: 'floaty 11s ease-in-out infinite reverse', pointerEvents: 'none' }} />
-      {/* Dot overlay */}
-      <div style={{ position: 'absolute', inset: 0, backgroundImage: 'radial-gradient(rgba(255,255,255,0.12) 1px, transparent 1px)', backgroundSize: '26px 26px', pointerEvents: 'none' }} />
+      <style>{`
+        @keyframes floaty { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-16px)} }
+        @keyframes fadein { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:none} }
+      `}</style>
 
-      <style>{`@keyframes floaty { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-14px)} }`}</style>
+      {/* Blobs */}
+      <div style={{ position:'absolute', width:480, height:480, borderRadius:'50%', background:'radial-gradient(circle,rgba(15,158,142,.18),transparent 65%)', top:-160, left:-120, animation:'floaty 11s ease-in-out infinite', pointerEvents:'none' }}/>
+      <div style={{ position:'absolute', width:420, height:420, borderRadius:'50%', background:'radial-gradient(circle,rgba(62,123,240,.12),transparent 65%)', bottom:-160, right:-90, animation:'floaty 9s ease-in-out infinite', pointerEvents:'none' }}/>
 
       {/* Card */}
       <div style={{
-        display: 'grid', gridTemplateColumns: '1fr 420px',
-        maxWidth: 880, width: '100%',
-        borderRadius: 24, overflow: 'hidden',
-        boxShadow: '0 40px 90px -30px rgba(13,11,40,.8)',
-        position: 'relative', zIndex: 1,
+        position:'relative', width:'min(980px,100%)',
+        display:'grid', gridTemplateColumns:'1.05fr 1fr',
+        background:'var(--surface)', border:'1px solid var(--border-soft)',
+        borderRadius:20, overflow:'hidden',
+        boxShadow:'0 40px 90px -34px rgba(16,24,40,.42)',
+        animation:'fadein .4s ease',
       }}>
 
-        {/* ── Left rail ── */}
+        {/* ── Left panel ── */}
         <div style={{
-          background: 'var(--grad-night)', padding: '42px 40px',
-          display: 'flex', flexDirection: 'column', color: '#fff',
+          background:'linear-gradient(160deg,#0C3A35 0%,#0B5F57 48%,#0F8E80 130%)',
+          color:'#fff', padding:'46px 42px',
+          display:'flex', flexDirection:'column', position:'relative', overflow:'hidden',
         }}>
-          {/* Logo lockup */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 32 }}>
-            <div style={{
-              width: 42, height: 40, borderRadius: 11, overflow: 'hidden', flexShrink: 0,
-              boxShadow: '0 8px 20px -6px rgba(232,22,32,.6)',
-              background: '#E81620', display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}>
-              <img src="/logo.svg" alt="ISC" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 11 }} onError={e => { e.target.style.display='none'; e.target.parentNode.innerHTML='<span style="font-family:var(--font-display);font-weight:700;font-size:13px;color:#fff">ISC</span>'; }} />
+          <div style={{ position:'absolute', width:360, height:360, borderRadius:'50%', background:'radial-gradient(circle,rgba(255,255,255,.10),transparent 60%)', top:-120, right:-80, pointerEvents:'none' }}/>
+
+          {/* Logo */}
+          <div style={{ display:'flex', alignItems:'center', gap:12, position:'relative' }}>
+            <div style={{ width:42, height:42, borderRadius:11, background:'#fff', display:'flex', alignItems:'center', justifyContent:'center', boxShadow:'0 8px 22px -8px rgba(0,0,0,.4)', flexShrink:0 }}>
+              <span style={{ fontFamily:'var(--font-display)', fontWeight:800, fontSize:15, color:'var(--accent-700)', letterSpacing:'-.03em' }}>ISC</span>
             </div>
-            <div>
-              <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 15, lineHeight: 1.2 }}>International<br />Skills Club</div>
-            </div>
+            <div style={{ fontFamily:'var(--font-display)', fontWeight:700, fontSize:15.5, lineHeight:1.15 }}>International<br/>Skills Club</div>
           </div>
 
           {/* Status pill */}
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 7, background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 20, padding: '5px 12px', fontSize: 12, fontWeight: 500, marginBottom: 28, width: 'fit-content' }}>
-            <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#16A974', flexShrink: 0 }} />
-            Student Management System · v3
+          <div style={{ display:'inline-flex', alignItems:'center', gap:7, alignSelf:'flex-start', marginTop:34, padding:'6px 12px', borderRadius:9999, background:'rgba(255,255,255,.08)', border:'1px solid rgba(255,255,255,.14)', fontSize:11.5, fontWeight:600, letterSpacing:'.01em' }}>
+            <span style={{ width:7, height:7, borderRadius:'50%', background:'#3FD9A8', boxShadow:'0 0 0 3px rgba(63,217,168,.25)', display:'inline-block' }}/>
+            Student Management System · v4
           </div>
 
-          {/* Headline */}
-          <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 27, fontWeight: 700, lineHeight: 1.22, letterSpacing: '-0.02em', marginBottom: 14, color: '#fff' }}>
-            Run your whole<br />academy from<br />one workspace.
+          <h2 style={{ fontFamily:'var(--font-display)', fontWeight:700, fontSize:30, lineHeight:1.12, letterSpacing:'-.025em', margin:'22px 0 12px', maxWidth:'13ch' }}>
+            Run your whole academy from one calm workspace.
           </h2>
-          <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.65)', lineHeight: 1.65, marginBottom: 'auto' }}>
+          <p style={{ fontSize:13.5, lineHeight:1.6, color:'rgba(255,255,255,.66)', margin:0, maxWidth:'34ch' }}>
             Track progress, manage batches, and monitor onboarding — all in real time.
           </p>
 
+          <div style={{ flex:1 }}/>
+
           {/* Stat tiles */}
-          <div style={{ display: 'flex', gap: 10, marginTop: 40 }}>
-            {[['248', 'Students'], ['12', 'Batches'], ['18', 'Staff']].map(([n, l]) => (
-              <div key={l} style={{ flex: 1, background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 13, padding: '14px 12px' }}>
-                <div style={{ fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 700, color: '#fff' }}>{n}</div>
-                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.55)', marginTop: 2 }}>{l}</div>
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:12, marginTop:30 }}>
+            {[['248','Students'],['12','Batches'],['18','Staff']].map(([n,l]) => (
+              <div key={l} style={{ padding:'14px', borderRadius:12, background:'rgba(255,255,255,.06)', border:'1px solid rgba(255,255,255,.12)' }}>
+                <div style={{ fontFamily:'var(--font-display)', fontWeight:700, fontSize:22, letterSpacing:'-.02em' }}>{n}</div>
+                <div style={{ fontSize:11, color:'rgba(255,255,255,.6)', marginTop:2 }}>{l}</div>
               </div>
             ))}
           </div>
         </div>
 
         {/* ── Right form ── */}
-        <div style={{ background: '#fff', padding: '44px 40px', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ padding:'50px 46px', display:'flex', flexDirection:'column', justifyContent:'center' }}>
           {/* Badge */}
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#FEF3C7', color: '#92400E', border: '1px solid #FDE68A', borderRadius: 20, padding: '5px 12px', fontSize: 12, fontWeight: 600, marginBottom: 28, width: 'fit-content' }}>
-            <ShieldCheck size={13} />
+          <div style={{ display:'inline-flex', alignItems:'center', gap:7, alignSelf:'flex-start', padding:'6px 12px', borderRadius:9999, background:'var(--accent-50)', color:'var(--accent-ink)', fontSize:11.5, fontWeight:700, marginBottom:24 }}>
+            <ShieldCheck size={13}/>
             Authorised staff only
           </div>
 
-          <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 26, fontWeight: 700, color: 'var(--text)', marginBottom: 6, letterSpacing: '-0.02em' }}>
-            Welcome back
-          </h1>
-          <p style={{ fontSize: 13.5, color: 'var(--text-muted)', marginBottom: 28 }}>
-            Sign in with your registered ISC credentials.
-          </p>
+          <h1 style={{ fontFamily:'var(--font-display)', fontWeight:700, fontSize:30, letterSpacing:'-.03em', color:'var(--ink)', margin:'0 0 6px' }}>Welcome back</h1>
+          <p style={{ fontSize:13.5, color:'var(--muted)', margin:'0 0 28px' }}>Sign in with your registered ISC credentials.</p>
 
-          {/* Lockout banner */}
           {locked && (
-            <div style={{ background: '#FEE2E2', color: '#991B1B', padding: '12px 14px', borderRadius: 10, fontSize: 13, marginBottom: 20, display: 'flex', alignItems: 'center', gap: 8 }}>
-              <Lock size={14} /> Account locked. Try again in <strong style={{ marginLeft: 4 }}>{mins}:{secs}</strong>
+            <div style={{ background:'var(--neg-50)', color:'var(--neg)', padding:'12px 14px', borderRadius:10, fontSize:13, marginBottom:20, display:'flex', alignItems:'center', gap:8 }}>
+              <Lock size={14}/> Account locked. Try again in <strong style={{ marginLeft:4 }}>{mins}:{secs}</strong>
             </div>
           )}
 
-          <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: 18 }} autoComplete="on" noValidate>
-            {/* Email */}
+          <form onSubmit={handleLogin} style={{ display:'flex', flexDirection:'column', gap:18 }} autoComplete="on" noValidate>
             <div className="form-group">
-              <label className="form-label">Email Address</label>
-              <input
-                className="form-input"
-                style={{ height: 46, borderRadius: 12 }}
-                type="email"
-                placeholder="you@internationalskillsclub.com"
-                value={email}
-                onChange={e => setEmail(e.target.value)}
-                autoComplete="email"
-                required
-                disabled={locked}
-              />
+              <label style={{ fontSize:11.5, fontWeight:700, letterSpacing:'.02em', color:'var(--sub)', textTransform:'uppercase', display:'block', marginBottom:8 }}>Email address</label>
+              <div style={{ display:'flex', alignItems:'center', gap:10, height:48, padding:'0 14px', border:'1px solid var(--border)', borderRadius:10, background:'var(--surface)', transition:'border-color .15s' }}
+                onFocusCapture={e => e.currentTarget.style.borderColor='var(--accent)'}
+                onBlurCapture={e => e.currentTarget.style.borderColor='var(--border)'}
+              >
+                <Mail size={16} style={{ color:'var(--muted)', flexShrink:0 }}/>
+                <input
+                  type="email" value={email} onChange={e => setEmail(e.target.value)}
+                  placeholder="you@internationalskillsclub.com"
+                  autoComplete="email" required disabled={locked}
+                  style={{ flex:1, border:'none', outline:'none', fontSize:14, color:'var(--text)', background:'transparent', fontFamily:'var(--font-body)' }}
+                />
+              </div>
             </div>
 
-            {/* Password */}
             <div className="form-group">
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                <label className="form-label" style={{ marginBottom: 0 }}>Password</label>
+              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:8 }}>
+                <label style={{ fontSize:11.5, fontWeight:700, letterSpacing:'.02em', color:'var(--sub)', textTransform:'uppercase' }}>Password</label>
                 <button type="button" onClick={handleReset} disabled={locked}
-                  style={{ background: 'none', border: 'none', color: 'var(--brand)', fontSize: 13, cursor: 'pointer', padding: 0, fontWeight: 500 }}>
+                  style={{ background:'none', border:'none', color:'var(--accent)', fontSize:12, cursor:'pointer', padding:0, fontWeight:600 }}>
                   Forgot?
                 </button>
               </div>
-              <div style={{ position: 'relative' }}>
+              <div style={{ display:'flex', alignItems:'center', gap:10, height:48, padding:'0 14px', border:'1px solid var(--border)', borderRadius:10, background:'var(--surface)', transition:'border-color .15s' }}
+                onFocusCapture={e => e.currentTarget.style.borderColor='var(--accent)'}
+                onBlurCapture={e => e.currentTarget.style.borderColor='var(--border)'}
+              >
+                <Lock size={16} style={{ color:'var(--muted)', flexShrink:0 }}/>
                 <input
-                  className="form-input"
-                  style={{ height: 46, borderRadius: 12, paddingRight: 44 }}
-                  type={showPw ? 'text' : 'password'}
-                  placeholder="••••••••"
-                  value={password}
-                  onChange={e => setPassword(e.target.value)}
-                  autoComplete="current-password"
-                  required
-                  disabled={locked}
+                  type={showPw ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)}
+                  placeholder="••••••••" autoComplete="current-password" required disabled={locked}
+                  style={{ flex:1, border:'none', outline:'none', fontSize:14, color:'var(--text)', background:'transparent', letterSpacing:'.04em', fontFamily:'var(--font-body)' }}
                 />
                 <button type="button" onClick={() => setShowPw(!showPw)} disabled={locked}
-                  style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 2, display: 'flex' }}>
-                  {showPw ? <EyeOff size={17} /> : <Eye size={17} />}
+                  style={{ background:'none', border:'none', cursor:'pointer', color:'var(--muted)', padding:2, display:'flex' }}>
+                  {showPw ? <EyeOff size={17}/> : <Eye size={17}/>}
                 </button>
               </div>
             </div>
 
-            {error && <div style={{ background: '#FEE2E2', color: '#991B1B', padding: '10px 14px', borderRadius: 10, fontSize: 13 }}>{error}</div>}
-            {resetSent && <div style={{ background: '#D1FAE5', color: '#065F46', padding: '10px 14px', borderRadius: 10, fontSize: 13 }}>Password reset email sent — check your inbox.</div>}
+            {error && <div style={{ background:'var(--neg-50)', color:'var(--neg)', padding:'10px 14px', borderRadius:10, fontSize:13 }}>{error}</div>}
+            {resetSent && <div style={{ background:'var(--pos-50)', color:'var(--pos)', padding:'10px 14px', borderRadius:10, fontSize:13 }}>Password reset email sent — check your inbox.</div>}
 
             <button
-              type="submit"
-              disabled={loading || locked}
-              style={{
-                height: 48, borderRadius: 12, border: 'none', cursor: loading || locked ? 'not-allowed' : 'pointer',
-                background: 'var(--grad-brand)', boxShadow: 'var(--shadow-brand)',
-                color: '#fff', fontSize: 14.5, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                transition: 'transform 0.15s, box-shadow 0.15s',
-                opacity: loading || locked ? 0.7 : 1,
-              }}
-              onMouseEnter={e => { if (!loading && !locked) { e.currentTarget.style.transform='translateY(-1px)'; e.currentTarget.style.boxShadow='var(--shadow-brand-h)'; } }}
-              onMouseLeave={e => { e.currentTarget.style.transform=''; e.currentTarget.style.boxShadow='var(--shadow-brand)'; }}
+              type="submit" disabled={loading || locked}
+              style={{ height:50, borderRadius:10, border:'none', cursor: loading || locked ? 'not-allowed' : 'pointer', background:'linear-gradient(135deg,#13B19E 0%,#0F9E8E 55%,#0C7E72 120%)', boxShadow:'0 10px 24px -10px rgba(15,158,142,.7)', color:'#fff', fontFamily:'var(--font-body)', fontSize:14.5, fontWeight:700, display:'flex', alignItems:'center', justifyContent:'center', gap:9, opacity: loading || locked ? 0.7 : 1, transition:'filter .15s' }}
+              onMouseEnter={e => { if (!loading && !locked) e.currentTarget.style.filter='brightness(1.05)'; }}
+              onMouseLeave={e => { e.currentTarget.style.filter=''; }}
             >
-              {loading ? 'Signing in…' : <><span>Sign In</span><ArrowRight size={16} /></>}
+              {loading ? 'Signing in…' : <><span>Sign In</span><ArrowRight size={17}/></>}
             </button>
           </form>
 
-          {/* Footer */}
-          <div style={{ marginTop: 'auto', paddingTop: 24, borderTop: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 8 }}>
-            <Lock size={12} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
-            <span style={{ fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.5 }}>
-              Unauthorised access attempts are logged and may be reported.
-            </span>
+          <div style={{ display:'flex', alignItems:'center', gap:8, marginTop:24, paddingTop:18, borderTop:'1px solid var(--border-soft)', color:'var(--faint)', fontSize:11 }}>
+            <Lock size={13}/>
+            Unauthorised access attempts are logged and may be reported.
           </div>
         </div>
       </div>

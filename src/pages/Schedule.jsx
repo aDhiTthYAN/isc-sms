@@ -51,15 +51,28 @@ function getSlotsForDate(date, schedules) {
   });
 }
 
+const HOUR_PX   = 56;   // px per hour in time grid
+const GRID_START = 8;   // 8 AM
+const HOURS = Array.from({ length: 13 }, (_, i) => i + GRID_START); // 8..20
+
+function slotPos(slot) {
+  const [hStr = '8', mStr = '0'] = (slot.time || '08:00').split(':');
+  const startH = parseInt(hStr) + parseInt(mStr) / 60;
+  const durH   = (parseInt(slot.duration) || 60) / 60;
+  const top    = Math.max(0, (startH - GRID_START) * HOUR_PX) + 2;
+  const height = Math.max(24, durH * HOUR_PX - 6);
+  return { top, height };
+}
+
 const TYPE_COLORS = {
-  'live-class':  { bg:'var(--blue-soft)',   col:'var(--blue-ink)',   label:'Live Class' },
-  'recorded':    { bg:'var(--violet-soft)', col:'var(--violet-ink)', label:'Recorded' },
-  'meeting':     { bg:'var(--indigo-soft)', col:'var(--indigo-ink)', label:'Meeting' },
-  'assessment':  { bg:'var(--red-soft)',    col:'var(--red-ink)',    label:'Assessment' },
-  'doubt':       { bg:'var(--amber-soft)',  col:'var(--amber-ink)',  label:'Doubt Session' },
-  'revision':    { bg:'var(--teal-soft)',   col:'var(--teal-ink)',   label:'Revision' },
-  'event':       { bg:'var(--green-soft)',  col:'var(--green-ink)',  label:'Event' },
-  'other':       { bg:'var(--surface-sunken)', col:'var(--text-muted)', label:'Other' },
+  'live-class':  { bg:'var(--pos-50)',     bar:'var(--pos)',     col:'var(--pos)',     label:'Live Class' },
+  'recorded':    { bg:'var(--purple-50)',  bar:'var(--purple)',  col:'var(--purple)',  label:'Recorded' },
+  'meeting':     { bg:'var(--info-50)',    bar:'var(--info)',    col:'var(--info)',    label:'Meeting' },
+  'assessment':  { bg:'var(--neg-50)',     bar:'var(--neg)',     col:'var(--neg)',     label:'Assessment' },
+  'doubt':       { bg:'var(--warn-50)',    bar:'var(--warn)',    col:'var(--warn)',    label:'Doubt Session' },
+  'revision':    { bg:'var(--accent-50)', bar:'var(--accent)',  col:'var(--accent)',  label:'Revision' },
+  'event':       { bg:'var(--pos-50)',     bar:'var(--pos)',     col:'var(--pos)',     label:'Event' },
+  'other':       { bg:'var(--surface-2)', bar:'var(--muted)',   col:'var(--muted)',   label:'Other' },
 };
 const typeColor = (t) => TYPE_COLORS[t] || TYPE_COLORS.other;
 
@@ -302,25 +315,26 @@ export default function Schedule() {
   return (
     <div>
       {/* ── Page Header ── */}
-      <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', gap:16, flexWrap:'wrap', marginBottom:18 }}>
+      <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', gap:16, flexWrap:'wrap', marginBottom:20 }}>
         <div>
-          <h2 style={{ fontSize:24, fontWeight:700 }}>Schedule</h2>
-          <div style={{ fontSize:13, color:'var(--text-muted)', marginTop:3 }}>
-            {isCEO ? 'View and manage class schedules across all batches.' : 'Your batch schedules and attendance.'}
-          </div>
+          <h1 style={{ fontSize:26, fontWeight:700, letterSpacing:'-0.03em', color:'var(--ink)', margin:0, fontFamily:'var(--font-display)' }}>Schedule</h1>
+          <p style={{ fontSize:14, color:'var(--muted)', margin:'6px 0 0' }}>Weekly timetable across all live batches.</p>
         </div>
         {selectedBatch && (
-          <button className="btn btn-primary" onClick={() => setShowAdd(true)}>
-            <Plus size={16}/> Add to Schedule
+          <button
+            onClick={() => setShowAdd(true)}
+            style={{ display:'flex', alignItems:'center', gap:7, height:40, padding:'0 16px', border:'none', borderRadius:9, background:'var(--accent)', color:'#fff', fontSize:13, fontWeight:600, cursor:'pointer', fontFamily:'var(--font-body)', boxShadow:'0 8px 18px -8px rgba(15,158,142,.6)', flexShrink:0 }}
+          >
+            <Plus size={15}/> Add Class
           </button>
         )}
       </div>
 
       {/* ── Batch Selector (mandatory) ── */}
       <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:20, padding:'14px 16px', background:'var(--surface)', border:'1px solid var(--border)', borderRadius:12 }}>
-        <Calendar size={18} style={{ color:'var(--brand)', flexShrink:0 }}/>
+        <Calendar size={18} style={{ color:'var(--accent)', flexShrink:0 }}/>
         <div style={{ flex:1 }}>
-          <div style={{ fontSize:11, fontWeight:700, color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:'0.05em', marginBottom:4 }}>Select Batch</div>
+          <div style={{ fontSize:11, fontWeight:700, color:'var(--muted)', textTransform:'uppercase', letterSpacing:'0.05em', marginBottom:4 }}>Select Batch</div>
           <select
             className="form-input"
             style={{ maxWidth:380 }}
@@ -335,7 +349,7 @@ export default function Schedule() {
           <div style={{ display:'flex', gap:12 }}>
             {[
               { label:'Classes', value:schedules.length, color:'var(--blue-ink)', bg:'var(--blue-soft)' },
-              { label:'Students', value:batchStudents.length, color:'var(--green-ink)', bg:'var(--green-soft)' },
+              { label:'Students', value:batchStudents.length, color:'var(--green-ink)', bg:'var(--pos-50)' },
             ].map(k => (
               <div key={k.label} style={{ padding:'8px 14px', borderRadius:10, background:k.bg, textAlign:'center', minWidth:72 }}>
                 <div style={{ fontSize:20, fontWeight:700, color:k.color, fontFamily:'var(--font-display)' }}>{k.value}</div>
@@ -347,7 +361,7 @@ export default function Schedule() {
       </div>
 
       {!selectedBatch && (
-        <div style={{ padding:'60px 20px', textAlign:'center', color:'var(--text-muted)', fontSize:14, background:'var(--surface)', border:'1px solid var(--border)', borderRadius:14 }}>
+        <div style={{ padding:'60px 20px', textAlign:'center', color:'var(--muted)', fontSize:14, background:'var(--surface)', border:'1px solid var(--border)', borderRadius:'var(--r-card)' }}>
           <Calendar size={36} style={{ color:'var(--border)', marginBottom:12 }}/>
           <div>Select a batch above to see the schedule</div>
           {batches.length === 0 && <div style={{ marginTop:8, fontSize:12 }}>No batches assigned to you yet.</div>}
@@ -372,52 +386,88 @@ export default function Schedule() {
           {activeTab === 'calendar' && (
             <div>
               {/* Toolbar */}
-              <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:14, flexWrap:'wrap' }}>
-                <div className="segmented">
+              <div style={{ display:'flex', alignItems:'center', gap:14, marginBottom:16, flexWrap:'wrap' }}>
+                <div style={{ display:'flex', background:'var(--surface)', border:'1px solid var(--border)', borderRadius:9, padding:3 }}>
                   {['week','month'].map(v => (
-                    <button key={v} className={view===v?'active':''} onClick={() => setView(v)}>
+                    <span key={v} onClick={() => setView(v)} style={{ padding:'6px 14px', borderRadius:7, fontSize:12.5, fontWeight:600, cursor:'pointer', background: view===v ? 'var(--accent-50)' : 'transparent', color: view===v ? 'var(--accent-ink)' : 'var(--muted)', transition:'all .14s' }}>
                       {v.charAt(0).toUpperCase()+v.slice(1)}
-                    </button>
+                    </span>
                   ))}
                 </div>
-                <button className="btn btn-ghost btn-sm" onClick={navPrev}><ChevronLeft size={14}/></button>
-                <span style={{ fontSize:13, fontWeight:600, minWidth:200, textAlign:'center' }}>
-                  {view === 'week' ? weekLabel : monthLabel}
-                </span>
-                <button className="btn btn-ghost btn-sm" onClick={navNext}><ChevronRight size={14}/></button>
-                <button className="btn btn-ghost btn-sm" onClick={() => setCalDate(new Date())}>Today</button>
+                <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                  <span onClick={navPrev} style={{ width:32, height:32, border:'1px solid var(--border)', borderRadius:8, background:'var(--surface)', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', color:'var(--sub)' }}><ChevronLeft size={15}/></span>
+                  <span style={{ fontSize:14, fontWeight:600, color:'var(--ink)', fontFamily:'var(--font-display)' }}>
+                    {view === 'week' ? weekLabel : monthLabel}
+                  </span>
+                  <span onClick={navNext} style={{ width:32, height:32, border:'1px solid var(--border)', borderRadius:8, background:'var(--surface)', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', color:'var(--sub)' }}><ChevronRight size={15}/></span>
+                </div>
+                <div style={{ flex:1 }}/>
+                <div style={{ display:'flex', alignItems:'center', gap:14, fontSize:12, color:'var(--sub)' }}>
+                  <span style={{ display:'flex', alignItems:'center', gap:6 }}><span style={{ width:9, height:9, borderRadius:3, background:'var(--pos)', display:'inline-block' }}/> Live class</span>
+                  <span style={{ display:'flex', alignItems:'center', gap:6 }}><span style={{ width:9, height:9, borderRadius:3, background:'var(--warn)', display:'inline-block' }}/> Needs marking</span>
+                </div>
               </div>
 
-              {/* Week view */}
+              {/* Week view — time grid */}
               {view === 'week' && (
-                <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)', gap:8 }}>
-                  {weekDates.map((date, idx) => {
-                    const isToday = date.toDateString() === today.toDateString();
-                    const slots = getSlotsForDate(date, schedules);
-                    return (
-                      <div key={idx} style={{
-                        background:'var(--surface)', borderRadius:10,
-                        border:`2px solid ${isToday?'var(--brand)':'var(--border)'}`,
-                        minHeight:130, padding:'10px 8px',
-                        boxShadow: isToday ? '0 0 0 2px rgba(79,70,229,0.12)' : 'var(--shadow-xs)',
-                      }}>
-                        <div style={{ textAlign:'center', marginBottom:8 }}>
-                          <div style={{ fontSize:11, color:isToday?'var(--brand)':'var(--text-muted)', fontWeight:600 }}>
-                            {date.toLocaleDateString('default',{weekday:'short'})}
+                <div style={{ background:'var(--surface)', border:'1px solid var(--border)', borderRadius:'var(--r-card)', boxShadow:'var(--sh-sm)', overflow:'hidden' }}>
+                  {/* Day headers */}
+                  <div style={{ display:'grid', gridTemplateColumns:'58px repeat(7,1fr)', borderBottom:'1px solid var(--border)' }}>
+                    <div style={{ borderRight:'1px solid var(--border-soft)' }}/>
+                    {weekDates.map((date, idx) => {
+                      const isToday = date.toDateString() === today.toDateString();
+                      return (
+                        <div key={idx} style={{ padding:'11px 0', textAlign:'center', borderRight:'1px solid var(--border-soft)', background: isToday ? 'rgba(15,158,142,.04)' : 'transparent' }}>
+                          <div style={{ fontSize:10.5, fontWeight:700, letterSpacing:'.08em', color:'var(--muted)' }}>
+                            {date.toLocaleDateString('default',{weekday:'short'}).toUpperCase()}
                           </div>
-                          <div style={{
-                            width:28, height:28, borderRadius:'50%', margin:'4px auto 0',
-                            background:isToday?'var(--brand)':'transparent',
-                            color:isToday?'#fff':'var(--text)',
-                            display:'flex', alignItems:'center', justifyContent:'center',
-                            fontWeight:700, fontSize:14,
-                          }}>{date.getDate()}</div>
+                          <div style={{ margin:'5px auto 0', width:28, height:28, borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center', fontSize:13, fontWeight:700, fontFamily:'var(--font-display)', background: isToday ? 'var(--accent)' : 'transparent', color: isToday ? '#fff' : 'var(--ink)' }}>
+                            {date.getDate()}
+                          </div>
                         </div>
-                        {slots.map(slot => <SlotPill key={slot.id} slot={slot} compact/>)}
-                        {slots.length === 0 && <div style={{ fontSize:10, color:'var(--border)', textAlign:'center', marginTop:8 }}>—</div>}
-                      </div>
-                    );
-                  })}
+                      );
+                    })}
+                  </div>
+                  {/* Time body */}
+                  <div style={{ display:'grid', gridTemplateColumns:'58px repeat(7,1fr)' }}>
+                    {/* Hour labels */}
+                    <div>
+                      {HOURS.map(h => (
+                        <div key={h} style={{ height:HOUR_PX, borderRight:'1px solid var(--border-soft)', borderBottom:'1px solid var(--border-soft)', fontSize:10.5, color:'var(--faint)', textAlign:'right', padding:'4px 8px 0 0' }}>
+                          {h}:00
+                        </div>
+                      ))}
+                    </div>
+                    {/* Day columns */}
+                    {weekDates.map((date, idx) => {
+                      const isToday = date.toDateString() === today.toDateString();
+                      const slots = getSlotsForDate(date, schedules);
+                      return (
+                        <div key={idx} style={{ position:'relative', height: HOURS.length * HOUR_PX, borderRight:'1px solid var(--border-soft)', background: isToday ? 'rgba(15,158,142,.04)' : 'transparent', backgroundImage:`repeating-linear-gradient(var(--border-soft) 0 1px, transparent 1px ${HOUR_PX}px)` }}>
+                          {slots.map(slot => {
+                            const pc = typeColor(slot.type);
+                            const { top, height } = slotPos(slot);
+                            const isLive = slot.type === 'live-class' || slot.status === 'completed';
+                            const slotBg  = isLive ? 'var(--pos-50)'  : slot.status === 'cancelled' ? 'var(--neg-50)'  : pc.bg;
+                            const slotBar = isLive ? 'var(--pos)'      : slot.status === 'cancelled' ? 'var(--neg)'     : pc.bar;
+                            const noteCol = slotBar;
+                            const noteLabel = isLive ? 'live' : slot.status === 'cancelled' ? 'cancelled' : slot.status || 'unmarked';
+                            return (
+                              <div
+                                key={slot.id}
+                                onClick={() => setSlotDetail(slot)}
+                                style={{ position:'absolute', left:4, right:4, top, height, background:slotBg, borderLeft:`3px solid ${slotBar}`, borderRadius:7, padding:'6px 8px', overflow:'hidden', cursor:'pointer' }}
+                              >
+                                <div style={{ fontSize:11.5, fontWeight:700, color:'var(--ink)', lineHeight:1.2 }}>{slot.title}</div>
+                                <div style={{ fontSize:10, color:'var(--sub)', marginTop:1 }}>{slot.time ? `${slot.time}–` : ''}{slot.duration ? `${Math.floor(parseInt(slot.duration)/60)||1}h` : ''}</div>
+                                <div style={{ fontSize:10, color:noteCol, fontWeight:600, marginTop:2 }}>{slot.facultyName || ''}{slot.facultyName ? ' · ' : ''}{noteLabel}</div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               )}
 
@@ -426,7 +476,7 @@ export default function Schedule() {
                 <div>
                   <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)', gap:1, marginBottom:4 }}>
                     {['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(d => (
-                      <div key={d} style={{ textAlign:'center', fontSize:11, fontWeight:700, color:'var(--text-muted)', padding:'6px 0' }}>{d}</div>
+                      <div key={d} style={{ textAlign:'center', fontSize:11, fontWeight:700, color:'var(--muted)', padding:'6px 0' }}>{d}</div>
                     ))}
                   </div>
                   <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)', gap:2 }}>
@@ -435,20 +485,20 @@ export default function Schedule() {
                       const slots = inMonth ? getSlotsForDate(date, schedules) : [];
                       return (
                         <div key={idx} style={{
-                          background:inMonth?'var(--surface)':'var(--surface-sunken)',
+                          background:inMonth?'var(--surface)':'var(--surface-2)',
                           borderRadius:8, minHeight:80, padding:6,
-                          border:`1px solid ${isToday?'var(--brand)':'var(--border)'}`,
+                          border:`1px solid ${isToday?'var(--accent)':'var(--border)'}`,
                           opacity:inMonth?1:0.4,
                         }}>
                           <div style={{
                             width:22, height:22, borderRadius:'50%',
-                            background:isToday?'var(--brand)':'transparent',
-                            color:isToday?'#fff':inMonth?'var(--text)':'var(--text-muted)',
+                            background:isToday?'var(--accent)':'transparent',
+                            color:isToday?'#fff':inMonth?'var(--text)':'var(--muted)',
                             display:'flex', alignItems:'center', justifyContent:'center',
                             fontWeight:isToday?700:500, fontSize:12, marginBottom:4,
                           }}>{date.getDate()}</div>
                           {slots.slice(0,3).map(slot => <SlotPill key={slot.id} slot={slot} compact/>)}
-                          {slots.length > 3 && <div style={{ fontSize:9, color:'var(--text-muted)', marginTop:2 }}>+{slots.length-3} more</div>}
+                          {slots.length > 3 && <div style={{ fontSize:9, color:'var(--muted)', marginTop:2 }}>+{slots.length-3} more</div>}
                         </div>
                       );
                     })}
@@ -457,7 +507,7 @@ export default function Schedule() {
               )}
 
               {schedules.length === 0 && (
-                <div className="card" style={{ textAlign:'center', color:'var(--text-muted)', padding:40, marginTop:16 }}>
+                <div className="card" style={{ textAlign:'center', color:'var(--muted)', padding:40, marginTop:16 }}>
                   <Calendar size={32} style={{ color:'var(--border)', marginBottom:8 }}/>
                   <div>Nothing scheduled yet — add classes, meetings or events.</div>
                   <button className="btn btn-primary" style={{ marginTop:12 }} onClick={() => setShowAdd(true)}>
@@ -483,10 +533,10 @@ export default function Schedule() {
                           )}
                         </div>
                         <div style={{ fontSize:16, fontWeight:700, color:'var(--text)', marginBottom:6 }}>{slotDetail.title}</div>
-                        <div style={{ fontSize:13, color:'var(--text-sub)', display:'flex', flexDirection:'column', gap:3 }}>
+                        <div style={{ fontSize:13, color:'var(--sub)', display:'flex', flexDirection:'column', gap:3 }}>
                           <div><strong>When:</strong> {slotDetail.scheduledDate || slotDetail.day} {slotDetail.scheduledDate ? '(one-time)' : '(recurring)'} {slotDetail.time && `at ${slotDetail.time}`} · {slotDetail.duration} min</div>
                           {slotDetail.facultyName && <div><strong>Faculty:</strong> {slotDetail.facultyName}</div>}
-                          {slotDetail.meetLink && <div><strong>Meet:</strong> <a href={slotDetail.meetLink} target="_blank" rel="noreferrer" style={{ color:'var(--brand)' }}>Join Link</a></div>}
+                          {slotDetail.meetLink && <div><strong>Meet:</strong> <a href={slotDetail.meetLink} target="_blank" rel="noreferrer" style={{ color:'var(--accent)' }}>Join Link</a></div>}
                           {slotDetail.notes && <div style={{ fontStyle:'italic' }}>{slotDetail.notes}</div>}
                           <div>
                             <strong>Participants:</strong>{' '}
@@ -497,10 +547,10 @@ export default function Schedule() {
                           </div>
                         </div>
                       </div>
-                      <button onClick={() => setSlotDetail(null)} style={{ background:'none', border:'none', cursor:'pointer', color:'var(--text-muted)', padding:4 }}><X size={16}/></button>
+                      <button onClick={() => setSlotDetail(null)} style={{ background:'none', border:'none', cursor:'pointer', color:'var(--muted)', padding:4 }}><X size={16}/></button>
                     </div>
                     <div style={{ display:'flex', gap:8, marginTop:14, flexWrap:'wrap' }}>
-                      <button className="btn btn-primary btn-sm" onClick={() => openAttendance(slotDetail)}>
+                      <button style={{ display:'flex', alignItems:'center', gap:6, height:32, padding:'0 12px', border:'none', borderRadius:8, background:'var(--accent)', color:'#fff', fontSize:12.5, fontWeight:600, cursor:'pointer' }} onClick={() => openAttendance(slotDetail)}>
                         <Users size={13}/> {savedAtt[slotDetail.id] ? 'Edit Attendance' : 'Mark Attendance'}
                       </button>
                       <select className="form-input" style={{ height:32, fontSize:12, flex:'0 0 auto' }}
@@ -517,7 +567,7 @@ export default function Schedule() {
                         <option value="cancelled">Cancelled</option>
                         <option value="rescheduled">Rescheduled</option>
                       </select>
-                      <button className="btn btn-sm" style={{ background:'var(--red-soft)', color:'var(--red-ink)', border:'none' }}
+                      <button className="btn btn-sm" style={{ background:'var(--neg-50)', color:'var(--red-ink)', border:'none' }}
                         onClick={async () => {
                           if (!window.confirm('Delete this class slot?')) return;
                           await deleteBatchSchedule(slotDetail.id);
@@ -538,7 +588,7 @@ export default function Schedule() {
           {activeTab === 'attendance' && (
             <div>
               <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:14, flexWrap:'wrap', gap:10 }}>
-                <div style={{ fontSize:13, color:'var(--text-muted)' }}>
+                <div style={{ fontSize:13, color:'var(--muted)' }}>
                   {reportLoading ? 'Loading report…' : `${attReport.length} sessions tracked`}
                 </div>
                 <button className="btn btn-secondary btn-sm" onClick={exportAttendance} disabled={attReport.length === 0}>
@@ -549,7 +599,7 @@ export default function Schedule() {
               {reportLoading && <Loading/>}
 
               {!reportLoading && attReport.length === 0 && (
-                <div className="card" style={{ textAlign:'center', padding:48, color:'var(--text-muted)' }}>
+                <div className="card" style={{ textAlign:'center', padding:48, color:'var(--muted)' }}>
                   No attendance data found. Mark attendance on sessions from the Calendar tab.
                 </div>
               )}
@@ -564,7 +614,7 @@ export default function Schedule() {
                     <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:10 }}>
                       <div style={{ flex:1 }}>
                         <div style={{ fontSize:14, fontWeight:600 }}>{session.title}</div>
-                        <div style={{ fontSize:12, color:'var(--text-muted)' }}>
+                        <div style={{ fontSize:12, color:'var(--muted)' }}>
                           {session.scheduledDate || session.day} {session.time && `· ${session.time}`} · {batchData?.name}
                         </div>
                       </div>
@@ -576,7 +626,7 @@ export default function Schedule() {
                         <div key={sid} style={{
                           display:'flex', alignItems:'center', gap:5, padding:'4px 10px',
                           borderRadius:20, fontSize:11, fontWeight:500,
-                          background: v.present ? 'var(--green-soft)' : 'var(--red-soft)',
+                          background: v.present ? 'var(--pos-50)' : 'var(--neg-50)',
                           color: v.present ? 'var(--green-ink)' : 'var(--red-ink)',
                         }}>
                           {v.present ? <CheckCircle size={11}/> : <XCircle size={11}/>}
@@ -670,7 +720,7 @@ export default function Schedule() {
               </div>
               {form.participantType === 'specific' && (
                 <div style={{ border:'1px solid var(--border)', borderRadius:8, padding:10, maxHeight:200, overflowY:'auto' }}>
-                  {batchStudents.length === 0 && <div style={{ fontSize:12, color:'var(--text-muted)' }}>No students in batch.</div>}
+                  {batchStudents.length === 0 && <div style={{ fontSize:12, color:'var(--muted)' }}>No students in batch.</div>}
                   {batchStudents.map(s => (
                     <label key={s.id} style={{ display:'flex', alignItems:'center', gap:8, padding:'5px 0', cursor:'pointer', fontSize:13 }}>
                       <input type="checkbox"
@@ -689,7 +739,7 @@ export default function Schedule() {
                 </div>
               )}
               {form.participantType === 'specific' && form.participantIds.length > 0 && (
-                <div style={{ fontSize:12, color:'var(--text-muted)', marginTop:6 }}>
+                <div style={{ fontSize:12, color:'var(--muted)', marginTop:6 }}>
                   {form.participantIds.length} student{form.participantIds.length !== 1 ? 's' : ''} selected
                 </div>
               )}
@@ -715,7 +765,7 @@ export default function Schedule() {
             <>
               <div style={{ display:'flex', gap:10, marginBottom:14, alignItems:'center', flexWrap:'wrap' }}>
                 <div style={{ position:'relative', flex:1, minWidth:180 }}>
-                  <Search size={13} style={{ position:'absolute', left:10, top:'50%', transform:'translateY(-50%)', color:'var(--text-muted)' }}/>
+                  <Search size={13} style={{ position:'absolute', left:10, top:'50%', transform:'translateY(-50%)', color:'var(--muted)' }}/>
                   <input className="form-input" style={{ paddingLeft:30 }} placeholder="Search student…"
                     value={attSearch} onChange={e => setAttSearch(e.target.value)}/>
                 </div>
@@ -737,8 +787,8 @@ export default function Schedule() {
                       style={{
                         display:'flex', alignItems:'center', gap:10, padding:'10px 12px',
                         borderRadius:9, cursor:'pointer', transition:'background 0.12s',
-                        background: isPresent ? 'var(--green-soft)' : 'var(--red-soft)',
-                        border: `1px solid ${isPresent ? 'var(--green-soft)' : 'var(--red-soft)'}`,
+                        background: isPresent ? 'var(--pos-50)' : 'var(--neg-50)',
+                        border: `1px solid ${isPresent ? 'var(--pos-50)' : 'var(--neg-50)'}`,
                       }}>
                       <div style={{ width:32, height:32, borderRadius:'50%', background:avatarColor(s.name), display:'flex', alignItems:'center', justifyContent:'center', fontSize:11, fontWeight:700, color:'#fff', flexShrink:0 }}>{initials(s.name)}</div>
                       <div style={{ flex:1, fontSize:13, fontWeight:500, color:'var(--text)' }}>{s.name}</div>

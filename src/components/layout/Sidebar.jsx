@@ -15,22 +15,22 @@ const ICONS = {
 
 // Tint color per nav item icon (matches design system)
 const TINTS = {
-  '/':            'var(--brand)',
-  '/students':    'var(--blue)',
-  '/followups':   'var(--teal)',
-  '/concerns':    'var(--orange)',
-  '/assessments': 'var(--violet)',
-  '/batches':     'var(--indigo)',
-  '/leaderboard': 'var(--amber)',
-  '/tasks':       'var(--green)',
+  '/':            'var(--accent)',
+  '/students':    'var(--info)',
+  '/followups':   'var(--accent)',
+  '/concerns':    'var(--warn)',
+  '/assessments': 'var(--purple)',
+  '/batches':     'var(--purple)',
+  '/leaderboard': 'var(--warn)',
+  '/tasks':       'var(--pos)',
   '/reports':     'var(--pink)',
-  '/leads':       'var(--teal)',
+  '/leads':       'var(--accent)',
   '/documents':   'var(--slate)',
   '/staff':       'var(--slate)',
-  '/requests':    'var(--blue)',
-  '/trash':       'var(--red)',
-  '/bulk-import': 'var(--green)',
-  '/schedule':    'var(--violet)',
+  '/requests':    'var(--info)',
+  '/trash':       'var(--neg)',
+  '/bulk-import': 'var(--pos)',
+  '/schedule':    'var(--info)',
 };
 
 export default function Sidebar({ navItems = [] }) {
@@ -59,7 +59,7 @@ export default function Sidebar({ navItems = [] }) {
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <div style={{
             width: 36, height: 36, borderRadius: 10, flexShrink: 0,
-            background: 'linear-gradient(135deg, #E81620 0%, #8E0A10 100%)',
+            background: 'linear-gradient(140deg, #13B19E 0%, #0C7E72 100%)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             color: '#fff', fontWeight: 800, fontSize: 13, fontFamily: 'var(--font-display)',
           }}>ISC</div>
@@ -94,8 +94,8 @@ export default function Sidebar({ navItems = [] }) {
               style={({ isActive }) => ({
                 display: 'flex', alignItems: 'center', gap: 10,
                 padding: '8px 10px', fontSize: 13.5,
-                color: isActive ? 'var(--brand-ink)' : 'var(--text-sub)',
-                background: isActive ? 'var(--brand-50)' : 'transparent',
+                color: isActive ? 'var(--accent-ink)' : 'var(--text-sub)',
+                background: isActive ? 'var(--accent-50)' : 'transparent',
                 borderRadius: 10,
                 textDecoration: 'none',
                 transition: 'all 0.15s',
@@ -107,7 +107,7 @@ export default function Sidebar({ navItems = [] }) {
             >
               {({ isActive }) => (
                 <>
-                  <span style={{ color: isActive ? 'var(--brand)' : tint, display: 'flex', flexShrink: 0 }}>
+                  <span style={{ color: isActive ? 'var(--accent)' : tint, display: 'flex', flexShrink: 0 }}>
                     <Icon size={17} />
                   </span>
                   <span style={{ flex: 1 }}>{item.label}</span>
