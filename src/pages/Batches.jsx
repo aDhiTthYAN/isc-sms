@@ -392,6 +392,8 @@ export default function Batches() {
   const [showTask,        setShowTask]        = useState(false);
   const [showFlowConfig,  setShowFlowConfig]  = useState(false);
   const [showFieldConfig, setShowFieldConfig] = useState(false);
+  const [showDates,       setShowDates]       = useState(false);
+  const [datesForm,       setDatesForm]       = useState({ startDate:'', endDate:'', courseDurationMonths:'' });
   const [showSubjectConfig, setShowSubjectConfig] = useState(false);
   const [showAttendance,  setShowAttendance]  = useState(null);
   const [confirmDialog,   setConfirmDialog]   = useState(null); // { message, onConfirm }
@@ -615,6 +617,19 @@ export default function Batches() {
     const updated = { ...selectedBatch, studentFields:editFields };
     setSelectedBatch(updated); setBatches(prev => prev.map(b => b.id===selectedBatch.id?updated:b));
     setShowFieldConfig(false); setToast({ message:'Student fields updated!', type:'success' }); setSaving(false);
+  };
+
+  const handleSaveDates = async () => {
+    setSaving(true);
+    const patch = {
+      startDate: datesForm.startDate || '',
+      endDate: datesForm.endDate || '',
+      courseDurationMonths: datesForm.courseDurationMonths ? Number(datesForm.courseDurationMonths) : '',
+    };
+    await updateBatch(selectedBatch.id, patch);
+    const updated = { ...selectedBatch, ...patch };
+    setSelectedBatch(updated); setBatches(prev => prev.map(b => b.id===selectedBatch.id?updated:b));
+    setShowDates(false); setToast({ message:'Course duration updated!', type:'success' }); setSaving(false);
   };
 
   const handleSaveSubjectConfig = async () => {
@@ -1076,7 +1091,12 @@ export default function Batches() {
     const flowAnalytics = getFlowAnalytics();
     const fullyOnboarded = batchStudents.filter(s => batchFlow.every(step => s.courseFlow?.[step.key]?.done)).length;
     const overdueSessions = getOverdueSessions();
-    const isExpired = selectedBatch.endDate && new Date(selectedBatch.endDate) < new Date();
+    const datePassed = selectedBatch.endDate && new Date(selectedBatch.endDate) < new Date();
+    // The CEO controls active/expired via the status dropdown. A batch is
+    // "active" (editable — can add students/tasks/assessments) only when its
+    // status is 'active'; the date-passed flag only shows an "Expired" hint.
+    const isActive = selectedBatch.status === 'active';
+    const isExpired = datePassed && !isActive;
     const isMentorOrCEOAdmin = isCEOorAdmin || selectedBatch.mentorId === profile?.uid;
 
     // Task split panel data
@@ -1138,6 +1158,13 @@ export default function Batches() {
                   </span>
                 )}
                 {isExpired && <span style={{ fontSize:11, padding:'2px 8px', borderRadius:10, background:'#E5E7EB', color:'#6B7280', fontWeight:600 }}>Expired</span>}
+                {isCEOorAdmin && (
+                  <button onClick={() => { setDatesForm({ startDate: selectedBatch.startDate || '', endDate: selectedBatch.endDate || '', courseDurationMonths: selectedBatch.courseDurationMonths || '' }); setShowDates(true); }}
+                    title="Edit course duration"
+                    style={{ fontSize:11, padding:'2px 8px', borderRadius:10, background:'var(--brand-50)', color:'var(--brand)', fontWeight:600, border:'none', cursor:'pointer', display:'inline-flex', alignItems:'center', gap:4 }}>
+                    <Settings size={11}/> Duration
+                  </button>
+                )}
               </div>
               <div style={{ fontSize:13, color:'#6B7280' }}>
                 {selectedBatch.course}
@@ -1156,10 +1183,10 @@ export default function Batches() {
                 <button className="btn btn-ghost btn-sm" onClick={() => { setEditFields([...batchFields]); setShowFieldConfig(true); }}><Settings size={13}/> Student Fields</button>
               </>
             )}
-            {activeTab === 'assessments' && !isExpired && (
+            {activeTab === 'assessments' && isActive && (
               <button className="btn btn-primary" onClick={() => setShowCreateAssessment(true)}><Plus size={14}/> Add Assessment</button>
             )}
-            {activeTab === 'students' && (
+            {activeTab === 'students' && isActive && (
               <>
                 <button className="btn btn-ghost" onClick={() => setShowBulk(true)}><Upload size={14}/> Bulk CSV</button>
                 <button className="btn btn-primary" onClick={() => setShowAddStudent(true)}><UserPlus size={14}/> Add Student</button>
@@ -1189,7 +1216,7 @@ export default function Batches() {
                 )}
               </>
             )}
-            {activeTab === 'tasks' && !isExpired && (
+            {activeTab === 'tasks' && isActive && (
               <button className="btn btn-primary" onClick={() => setShowTask(true)}><Plus size={14}/> Add Task</button>
             )}
             {profile?.role === 'ceo' && (
@@ -2349,6 +2376,27 @@ export default function Batches() {
             <div style={{ display:'flex', gap:10, justifyContent:'flex-end' }}>
               <button className="btn btn-ghost" onClick={() => setShowFieldConfig(false)}>Cancel</button>
               <button className="btn btn-primary" onClick={handleSaveFieldConfig} disabled={saving}>{saving?'Saving...':'Save Fields'}</button>
+            </div>
+          </Modal>
+        )}
+
+        {/* Edit course duration (CEO controls active/expired via dates + status) */}
+        {showDates && (
+          <Modal title={`Course Duration — ${selectedBatch.name}`} onClose={() => setShowDates(false)}>
+            <div style={{ fontSize:12.5, color:'var(--text-sub)', marginBottom:14, background:'var(--brand-50)', padding:'8px 12px', borderRadius:8 }}>
+              Set the course start &amp; end dates. A batch counts as <strong>Expired</strong> once its end date passes and its status isn't <strong>Active</strong>. Keep the status <strong>Active</strong> (top of the page) to keep adding students, tasks &amp; assessments even past the end date.
+            </div>
+            <FormRow>
+              <div className="form-group"><label className="form-label">Start Date</label>
+                <input className="form-input" type="date" value={datesForm.startDate} onChange={e => setDatesForm(f => ({ ...f, startDate:e.target.value }))}/></div>
+              <div className="form-group"><label className="form-label">End Date</label>
+                <input className="form-input" type="date" value={datesForm.endDate} onChange={e => setDatesForm(f => ({ ...f, endDate:e.target.value }))}/></div>
+            </FormRow>
+            <div className="form-group"><label className="form-label">Course Duration (months)</label>
+              <input className="form-input" type="number" min="0" value={datesForm.courseDurationMonths} onChange={e => setDatesForm(f => ({ ...f, courseDurationMonths:e.target.value }))}/></div>
+            <div style={{ display:'flex', gap:10, justifyContent:'flex-end', marginTop:8 }}>
+              <button className="btn btn-ghost" onClick={() => setShowDates(false)}>Cancel</button>
+              <button className="btn btn-primary" onClick={handleSaveDates} disabled={saving}>{saving?'Saving...':'Save Duration'}</button>
             </div>
           </Modal>
         )}

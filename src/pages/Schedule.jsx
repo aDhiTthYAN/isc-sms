@@ -4,6 +4,7 @@ import {
   deleteBatchSchedule, updateScheduleStatus, saveAttendance,
   getSessionAttendance, getBatchStudents, getStaffProfiles,
   saveClassReport, updateClassReport, getSessionReports, getStudentReports,
+  getAllAssessments,
 } from '../firebase/services';
 import { Modal, Toast, Loading } from '../components/ui';
 import { useAuth } from '../context/AuthContext';
@@ -43,7 +44,7 @@ function getMonthDates(anchor) {
   return cells;
 }
 
-function getSlotsForDate(date, schedules) {
+function getSlotsForDate(date, calendarSlots) {
   const dateStr = date.toISOString().slice(0, 10);
   const dayName = date.toLocaleDateString('default', { weekday: 'long' });
   return schedules.filter(s => {
@@ -88,6 +89,7 @@ export default function Schedule() {
   const [batches,       setBatches]       = useState([]);
   const [selectedBatch, setSelectedBatch] = useState(ALL); // default: show everything
   const [schedules,     setSchedules]     = useState([]);
+  const [assessments,   setAssessments]   = useState([]);
   const [staffList,     setStaffList]     = useState([]);
   const [loading,       setLoading]       = useState(true);
   const [toast,         setToast]         = useState(null);
@@ -150,11 +152,10 @@ export default function Schedule() {
 
   // ── Load batches + all schedules ──────────────────────────────
   const reloadSchedules = async (batchList) => {
-    const bl = batchList || batches;
     if (selectedBatch === ALL) {
-      const all = await getAllSchedules();
-      const ids = new Set(bl.map(b => b.id));
-      setSchedules(isCEO ? all : all.filter(s => ids.has(s.batchId)));
+      // Everyone (incl. staff) sees every batch's schedule so they can see
+      // what other staff have planned.
+      setSchedules(await getAllSchedules());
     } else {
       setSchedules(await getBatchSchedules(selectedBatch));
     }
@@ -163,16 +164,16 @@ export default function Schedule() {
   useEffect(() => {
     const load = async () => {
       setLoading(true);
-      const [bList, sList] = await Promise.all([
-        isCEO ? getBatches() : getStaffBatches(profile?.uid),
+      const [bList, sList, asmts] = await Promise.all([
+        getBatches(),          // all batches so staff can see every batch's schedule
         getStaffProfiles(),
+        getAllAssessments().catch(() => []),
       ]);
       setBatches(bList);
       setStaffList(sList);
+      setAssessments(asmts);
       // preload everything so the schedule shows immediately, no selection needed
-      const all = await getAllSchedules();
-      const ids = new Set(bList.map(b => b.id));
-      setSchedules(isCEO ? all : all.filter(s => ids.has(s.batchId)));
+      setSchedules(await getAllSchedules());
       setLoading(false);
     };
     load();
@@ -368,9 +369,11 @@ export default function Schedule() {
   const today = new Date(); today.setHours(0,0,0,0);
   const monthLabel = calDate.toLocaleString('default', { month: 'long', year: 'numeric' });
   const weekLabel = `${weekDates[0].toLocaleDateString('default',{month:'short',day:'numeric'})} – ${weekDates[6].toLocaleDateString('default',{month:'short',day:'numeric',year:'numeric'})}`;
+  const dayLabel  = calDate.toLocaleDateString('default', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
+  const curLabel  = view === 'week' ? weekLabel : view === 'month' ? monthLabel : dayLabel;
 
-  const navPrev = () => { const d = new Date(calDate); if (view === 'week') d.setDate(d.getDate() - 7); else d.setMonth(d.getMonth() - 1); setCalDate(d); };
-  const navNext = () => { const d = new Date(calDate); if (view === 'week') d.setDate(d.getDate() + 7); else d.setMonth(d.getMonth() + 1); setCalDate(d); };
+  const navPrev = () => { const d = new Date(calDate); if (view === 'week') d.setDate(d.getDate() - 7); else if (view === 'month') d.setMonth(d.getMonth() - 1); else d.setDate(d.getDate() - 1); setCalDate(d); };
+  const navNext = () => { const d = new Date(calDate); if (view === 'week') d.setDate(d.getDate() + 7); else if (view === 'month') d.setMonth(d.getMonth() + 1); else d.setDate(d.getDate() + 1); setCalDate(d); };
 
   const SlotPill = ({ slot, compact }) => {
     const pc = typeColor(slot.type);
@@ -384,6 +387,19 @@ export default function Schedule() {
   };
 
   if (loading) return <Loading />;
+
+  // Planned assessments become read-only calendar entries so staff can see them.
+  const assessmentSlots = assessments
+    .filter(a => a.date && (selectedBatch === ALL || a.batchId === selectedBatch))
+    .map(a => ({
+      id: 'assess-' + a.id, _assessment: true, type: 'assessment',
+      title: a.title || a.testName || 'Assessment',
+      batchId: a.batchId, batchName: a.batchName || batchName(a.batchId),
+      scheduledDate: a.date, time: a.time || '09:00', duration: 60,
+      facultyName: (a.conductingStaff || []).map(s => s.name).join(', '),
+      totalMarks: a.totalMarks, status: a.status,
+    }));
+  const calendarSlots = [...schedules, ...assessmentSlots];
 
   const filteredParticipants = attParticipants.filter(s => !attSearch || s.name?.toLowerCase().includes(attSearch.toLowerCase()));
   const presentCount = Object.values(attData).filter(v => v.present).length;
@@ -439,7 +455,7 @@ export default function Schedule() {
           {/* Toolbar */}
           <div style={{ display:'flex', alignItems:'center', gap:14, marginBottom:16, flexWrap:'wrap' }}>
             <div style={{ display:'flex', background:'var(--surface)', border:'1px solid var(--border)', borderRadius:9, padding:3 }}>
-              {['week','month'].map(v => (
+              {['day','week','month'].map(v => (
                 <span key={v} onClick={() => setView(v)} style={{ padding:'6px 14px', borderRadius:7, fontSize:12.5, fontWeight:600, cursor:'pointer', background: view===v ? 'var(--accent-50)' : 'transparent', color: view===v ? 'var(--accent-ink)' : 'var(--muted)', transition:'all .14s' }}>
                   {v.charAt(0).toUpperCase()+v.slice(1)}
                 </span>
@@ -447,13 +463,14 @@ export default function Schedule() {
             </div>
             <div style={{ display:'flex', alignItems:'center', gap:8 }}>
               <span onClick={navPrev} style={{ width:32, height:32, border:'1px solid var(--border)', borderRadius:8, background:'var(--surface)', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', color:'var(--sub)' }}><ChevronLeft size={15}/></span>
-              <span style={{ fontSize:14, fontWeight:600, color:'var(--ink)', fontFamily:'var(--font-display)' }}>{view === 'week' ? weekLabel : monthLabel}</span>
+              <span style={{ fontSize:14, fontWeight:600, color:'var(--ink)', fontFamily:'var(--font-display)' }}>{curLabel}</span>
               <span onClick={navNext} style={{ width:32, height:32, border:'1px solid var(--border)', borderRadius:8, background:'var(--surface)', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', color:'var(--sub)' }}><ChevronRight size={15}/></span>
             </div>
             <div style={{ flex:1 }}/>
             <div style={{ display:'flex', alignItems:'center', gap:14, fontSize:12, color:'var(--sub)' }}>
               <span style={{ display:'flex', alignItems:'center', gap:6 }}><span style={{ width:9, height:9, borderRadius:3, background:'var(--pos)', display:'inline-block' }}/> Live class</span>
               <span style={{ display:'flex', alignItems:'center', gap:6 }}><span style={{ width:9, height:9, borderRadius:3, background:'var(--info)', display:'inline-block' }}/> Meeting</span>
+              <span style={{ display:'flex', alignItems:'center', gap:6 }}><span style={{ width:9, height:9, borderRadius:3, background:'var(--neg)', display:'inline-block' }}/> Assessment</span>
             </div>
           </div>
 
@@ -480,7 +497,7 @@ export default function Schedule() {
                 </div>
                 {weekDates.map((date, idx) => {
                   const isToday = date.toDateString() === today.toDateString();
-                  const slots = getSlotsForDate(date, schedules);
+                  const slots = getSlotsForDate(date, calendarSlots);
                   return (
                     <div key={idx} style={{ position:'relative', height: HOURS.length * HOUR_PX, borderRight:'1px solid var(--border-soft)', background: isToday ? 'rgba(15,158,142,.04)' : 'transparent', backgroundImage:`repeating-linear-gradient(var(--border-soft) 0 1px, transparent 1px ${HOUR_PX}px)` }}>
                       {slots.map(slot => {
@@ -505,6 +522,49 @@ export default function Schedule() {
             </div>
           )}
 
+          {/* Day view — single day time grid */}
+          {view === 'day' && (() => {
+            const isToday = calDate.toDateString() === today.toDateString();
+            const slots = getSlotsForDate(calDate, calendarSlots);
+            return (
+              <div style={{ background:'var(--surface)', border:'1px solid var(--border)', borderRadius:'var(--r-card)', boxShadow:'var(--sh-sm)', overflow:'hidden' }}>
+                <div style={{ padding:'12px 16px', borderBottom:'1px solid var(--border)', display:'flex', alignItems:'center', gap:10 }}>
+                  <div style={{ width:32, height:32, borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center', fontSize:14, fontWeight:700, fontFamily:'var(--font-display)', background: isToday ? 'var(--accent)' : 'var(--surface-2)', color: isToday ? '#fff' : 'var(--ink)' }}>{calDate.getDate()}</div>
+                  <div>
+                    <div style={{ fontSize:13.5, fontWeight:700, color:'var(--ink)' }}>{calDate.toLocaleDateString('default',{weekday:'long'})}</div>
+                    <div style={{ fontSize:11.5, color:'var(--muted)' }}>{slots.length} scheduled</div>
+                  </div>
+                </div>
+                <div style={{ display:'grid', gridTemplateColumns:'58px 1fr' }}>
+                  <div>
+                    {HOURS.map(h => (
+                      <div key={h} style={{ height:HOUR_PX, borderRight:'1px solid var(--border-soft)', borderBottom:'1px solid var(--border-soft)', fontSize:10.5, color:'var(--faint)', textAlign:'right', padding:'4px 8px 0 0' }}>{h}:00</div>
+                    ))}
+                  </div>
+                  <div style={{ position:'relative', height: HOURS.length * HOUR_PX, background: isToday ? 'rgba(15,158,142,.04)' : 'transparent', backgroundImage:`repeating-linear-gradient(var(--border-soft) 0 1px, transparent 1px ${HOUR_PX}px)` }}>
+                    {slots.map(slot => {
+                      const pc = typeColor(slot.type);
+                      const { top, height } = slotPos(slot);
+                      const slotBg  = slot.status === 'cancelled' ? 'var(--neg-50)' : pc.bg;
+                      const slotBar = slot.status === 'cancelled' ? 'var(--neg)' : pc.bar;
+                      return (
+                        <div key={slot.id} onClick={() => setSlotDetail(slot)}
+                          style={{ position:'absolute', left:8, right:8, top, height, background:slotBg, borderLeft:`3px solid ${slotBar}`, borderRadius:7, padding:'6px 10px', overflow:'hidden', cursor:'pointer' }}>
+                          <div style={{ fontSize:12.5, fontWeight:700, color:'var(--ink)' }}>{slot.title}</div>
+                          <div style={{ fontSize:10.5, color:slotBar, fontWeight:700 }}>{slot.batchName || batchName(slot.batchId)}{slot._assessment ? ' · Assessment' : ''}</div>
+                          <div style={{ fontSize:10.5, color:'var(--sub)' }}>{slot.time ? `${slot.time} ` : ''}{slot.facultyName ? `· ${slot.facultyName}` : ''}</div>
+                        </div>
+                      );
+                    })}
+                    {slots.length === 0 && (
+                      <div style={{ position:'absolute', inset:0, display:'flex', alignItems:'center', justifyContent:'center', color:'var(--muted)', fontSize:13 }}>Nothing scheduled this day.</div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+
           {/* Month view */}
           {view === 'month' && (
             <div>
@@ -516,7 +576,7 @@ export default function Schedule() {
               <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)', gap:2 }}>
                 {monthCells.map(({ date, inMonth }, idx) => {
                   const isToday = date.toDateString() === today.toDateString();
-                  const slots = inMonth ? getSlotsForDate(date, schedules) : [];
+                  const slots = inMonth ? getSlotsForDate(date, calendarSlots) : [];
                   return (
                     <div key={idx} style={{ background:inMonth?'var(--surface)':'var(--surface-2)', borderRadius:8, minHeight:80, padding:6, border:`1px solid ${isToday?'var(--accent)':'var(--border)'}`, opacity:inMonth?1:0.4 }}>
                       <div style={{ width:22, height:22, borderRadius:'50%', background:isToday?'var(--accent)':'transparent', color:isToday?'#fff':inMonth?'var(--text)':'var(--muted)', display:'flex', alignItems:'center', justifyContent:'center', fontWeight:isToday?700:500, fontSize:12, marginBottom:4 }}>{date.getDate()}</div>
@@ -529,7 +589,7 @@ export default function Schedule() {
             </div>
           )}
 
-          {schedules.length === 0 && (
+          {calendarSlots.length === 0 && (
             <div className="card" style={{ textAlign:'center', color:'var(--muted)', padding:40, marginTop:16 }}>
               <Calendar size={32} style={{ color:'var(--border)', marginBottom:8 }}/>
               <div>Nothing scheduled yet — add classes, meetings or events.</div>
@@ -594,26 +654,33 @@ export default function Schedule() {
               )}
             </div>
 
-            <div style={{ display:'flex', gap:8, flexWrap:'wrap', borderTop:'1px solid var(--border)', paddingTop:14 }}>
-              <button className="btn btn-primary btn-sm" onClick={() => openAttendance(slotDetail)}>
-                <Users size={13}/> {savedAtt[slotDetail.id] ? 'Edit Attendance' : 'Mark Attendance'}
-              </button>
-              <button className="btn btn-sm" style={{ border:'1px solid var(--accent)', background:'var(--accent-50)', color:'var(--accent-ink)' }} onClick={() => openReports(slotDetail)}>
-                <MessageSquare size={13}/> Progress Reports
-              </button>
-              <select className="form-input" style={{ height:32, fontSize:12, flex:'0 0 auto', width:'auto' }} value={slotDetail.status || ''}
-                onChange={async e => { const ns = e.target.value; if (!ns) return; await updateScheduleStatus(slotDetail.id, ns); await reloadSchedules(); setSlotDetail({ ...slotDetail, status: ns }); }}>
-                <option value="">Update status…</option>
-                <option value="completed">Completed</option>
-                <option value="cancelled">Cancelled</option>
-                <option value="rescheduled">Rescheduled</option>
-              </select>
-              <div style={{ flex:1 }}/>
-              <button className="btn btn-sm" style={{ background:'var(--neg-50)', color:'var(--red-ink)', border:'none' }}
-                onClick={async () => { if (!window.confirm('Delete this entry?')) return; await deleteBatchSchedule(slotDetail.id); await reloadSchedules(); setSlotDetail(null); }}>
-                <Trash2 size={12}/> Delete
-              </button>
-            </div>
+            {slotDetail._assessment ? (
+              <div style={{ borderTop:'1px solid var(--border)', paddingTop:14, display:'flex', alignItems:'center', gap:10, flexWrap:'wrap' }}>
+                <span className="badge badge-red">Assessment</span>
+                <span style={{ fontSize:12.5, color:'var(--sub)' }}>Total marks: {slotDetail.totalMarks ?? '—'} · Manage marks &amp; results from the Assessments page.</span>
+              </div>
+            ) : (
+              <div style={{ display:'flex', gap:8, flexWrap:'wrap', borderTop:'1px solid var(--border)', paddingTop:14 }}>
+                <button className="btn btn-primary btn-sm" onClick={() => openAttendance(slotDetail)}>
+                  <Users size={13}/> {savedAtt[slotDetail.id] ? 'Edit Attendance' : 'Mark Attendance'}
+                </button>
+                <button className="btn btn-sm" style={{ border:'1px solid var(--accent)', background:'var(--accent-50)', color:'var(--accent-ink)' }} onClick={() => openReports(slotDetail)}>
+                  <MessageSquare size={13}/> Progress Reports
+                </button>
+                <select className="form-input" style={{ height:32, fontSize:12, flex:'0 0 auto', width:'auto' }} value={slotDetail.status || ''}
+                  onChange={async e => { const ns = e.target.value; if (!ns) return; await updateScheduleStatus(slotDetail.id, ns); await reloadSchedules(); setSlotDetail({ ...slotDetail, status: ns }); }}>
+                  <option value="">Update status…</option>
+                  <option value="completed">Completed</option>
+                  <option value="cancelled">Cancelled</option>
+                  <option value="rescheduled">Rescheduled</option>
+                </select>
+                <div style={{ flex:1 }}/>
+                <button className="btn btn-sm" style={{ background:'var(--neg-50)', color:'var(--red-ink)', border:'none' }}
+                  onClick={async () => { if (!window.confirm('Delete this entry?')) return; await deleteBatchSchedule(slotDetail.id); await reloadSchedules(); setSlotDetail(null); }}>
+                  <Trash2 size={12}/> Delete
+                </button>
+              </div>
+            )}
           </Modal>
         );
       })()}
