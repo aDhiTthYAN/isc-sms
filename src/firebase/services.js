@@ -475,6 +475,43 @@ export const getStudentReports = async (studentId) => {
     .sort((a,b) => (b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));
 };
 
+// Batch/main-page assessments a student took, merged with their marks.
+// Assessments live in `assessments` (with participantStudents) and marks in
+// `assessmentResults`; this joins them for a single student.
+export const getStudentBatchAssessments = async (studentId, batchId) => {
+  if (!batchId) return [];
+  const snap = await getDocs(query(collection(db,'assessments'), where('batchId','==',batchId)));
+  const assessments = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+    .filter(a => a.participantType !== 'specific'
+      || (a.participantStudents || []).some(p => p.id === studentId));
+  const out = [];
+  for (const a of assessments) {
+    let marks, percentage, pass;
+    try {
+      const res = await getAssessmentResults(a.id);
+      const mine = res.find(r => r.studentId === studentId);
+      if (mine) {
+        marks = mine.marks ?? mine.marksScored;
+        percentage = mine.percentage;
+        pass = mine.pass ?? mine.passed;
+      }
+    } catch {}
+    out.push({
+      id: a.id,
+      testName: a.title || a.testName || 'Assessment',
+      subject: a.subject || '',
+      date: a.date || '',
+      totalMarks: a.totalMarks,
+      marks: marks ?? null,
+      percentage: percentage ?? null,
+      pass,
+      status: a.status,
+      graded: marks != null,
+    });
+  }
+  return out.sort((x,y) => (y.date||'').localeCompare(x.date||''));
+};
+
 // Attendance summary for one student (present/total across all their sessions)
 export const getStudentAttendanceSummary = async (studentId, batchId) => {
   const q = batchId

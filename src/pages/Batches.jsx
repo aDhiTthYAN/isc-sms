@@ -1159,7 +1159,7 @@ export default function Batches() {
             {activeTab === 'assessments' && !isExpired && (
               <button className="btn btn-primary" onClick={() => setShowCreateAssessment(true)}><Plus size={14}/> Add Assessment</button>
             )}
-            {activeTab === 'students' && !isExpired && (
+            {activeTab === 'students' && (
               <>
                 <button className="btn btn-ghost" onClick={() => setShowBulk(true)}><Upload size={14}/> Bulk CSV</button>
                 <button className="btn btn-primary" onClick={() => setShowAddStudent(true)}><UserPlus size={14}/> Add Student</button>
@@ -1320,7 +1320,7 @@ export default function Batches() {
                         {!studentSearch && !studentStatusFilter && (
                           <div style={{ display:'flex', gap:8, justifyContent:'center', marginTop:12 }}>
                             <button className="btn btn-ghost" onClick={() => setShowBulk(true)}><Upload size={13}/> Import CSV</button>
-                            {isCEOorAdmin && <button className="btn btn-primary" onClick={() => setShowAddStudent(true)}><UserPlus size={13}/> Add Manually</button>}
+                            <button className="btn btn-primary" onClick={() => setShowAddStudent(true)}><UserPlus size={13}/> Add Manually</button>
                           </div>
                         )}
                       </td></tr>

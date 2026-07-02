@@ -4,7 +4,8 @@ import {
   getStudent, updateStudent, getBatches,
   getFollowUps, addFollowUp, getAssessments, addAssessment,
   getStaffProfiles, updateWeakSubjects, updateCourseFlowStep, addNotification,
-  getStudentReports, getStudentAttendanceSummary, getBatchTasks
+  getStudentReports, getStudentAttendanceSummary, getBatchTasks,
+  getStudentBatchAssessments
 } from '../firebase/services';
 import { Modal, Toast, Avatar, StatusBadge, Loading, FormRow } from '../components/ui';
 import { useAuth } from '../context/AuthContext';
@@ -93,12 +94,15 @@ export default function StudentProfile() {
       const s  = await getStudent(id).catch(() => null);
       const b  = await getBatches().catch(() => []);
       const f  = await getFollowUps(id).catch(() => []);
-      const a  = await getAssessments(id).catch(() => []);
+      const a  = await getAssessments(id).catch(() => []);       // student-level results added on this page
+      const ba = s?.batchId ? await getStudentBatchAssessments(id, s.batchId).catch(() => []) : []; // batch/main-page assessments
       const st = await getStaffProfiles().catch(() => []);
       setStudent(s);
       setBatches(b);
       setFollowups(f);
-      setAssessments(a);
+      // merge, de-dupe by id, newest first
+      const merged = [...a, ...ba].filter((v, i, arr) => arr.findIndex(x => x.id === v.id) === i);
+      setAssessments(merged);
       getStudentReports(id).then(setClassReports).catch(() => setClassReports([]));
       getStudentAttendanceSummary(id, s?.batchId).then(setAttendance).catch(() => setAttendance(null));
       if (s?.batchId) {
@@ -597,23 +601,30 @@ export default function StudentProfile() {
             <table>
               <thead><tr><th>#</th><th>Test Name</th><th>Subject</th><th>Date</th><th>Score</th><th>Percentage</th></tr></thead>
               <tbody>
-                {assessments.map((a, i) => (
-                  <tr key={a.id}>
-                    <td style={{ color:'#9CA3AF' }}>{i+1}</td>
-                    <td style={{ fontWeight:500 }}>{a.testName}</td>
-                    <td>{a.subject||'—'}</td>
-                    <td style={{ fontSize:12, color:'#6B7280' }}>{a.date||'—'}</td>
-                    <td>{a.marks}/{a.totalMarks}</td>
-                    <td>
-                      <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-                        <div className="progress-bar" style={{ width:80 }}>
-                          <div className="progress-fill" style={{ width:`${a.percentage}%`, background:a.percentage>=60?'#10B981':a.percentage>=40?'#F59E0B':'#EF4444' }}/>
-                        </div>
-                        <span style={{ fontSize:13, fontWeight:600, color:a.percentage>=60?'#10B981':a.percentage>=40?'#F59E0B':'#EF4444' }}>{a.percentage}%</span>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                {assessments.map((a, i) => {
+                  const graded = a.marks != null && a.percentage != null;
+                  return (
+                    <tr key={a.id}>
+                      <td style={{ color:'#9CA3AF' }}>{i+1}</td>
+                      <td style={{ fontWeight:500 }}>{a.testName}</td>
+                      <td>{a.subject||'—'}</td>
+                      <td style={{ fontSize:12, color:'#6B7280' }}>{a.date||'—'}</td>
+                      <td>{graded ? `${a.marks}/${a.totalMarks}` : <span style={{ color:'#9CA3AF' }}>— / {a.totalMarks}</span>}</td>
+                      <td>
+                        {graded ? (
+                          <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                            <div className="progress-bar" style={{ width:80 }}>
+                              <div className="progress-fill" style={{ width:`${a.percentage}%`, background:a.percentage>=60?'#10B981':a.percentage>=40?'#F59E0B':'#EF4444' }}/>
+                            </div>
+                            <span style={{ fontSize:13, fontWeight:600, color:a.percentage>=60?'#10B981':a.percentage>=40?'#F59E0B':'#EF4444' }}>{a.percentage}%</span>
+                          </div>
+                        ) : (
+                          <span className="badge badge-amber">{a.status === 'completed' ? 'Not marked' : 'Upcoming'}</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -624,7 +635,7 @@ export default function StudentProfile() {
               <h3 style={{ fontSize:14, fontWeight:600, marginBottom:14 }}>Subject-wise Average</h3>
               {(() => {
                 const bySubject = {};
-                assessments.forEach(a => {
+                assessments.filter(a => a.percentage != null).forEach(a => {
                   const sub = a.subject || 'General';
                   if (!bySubject[sub]) bySubject[sub] = [];
                   bySubject[sub].push(a.percentage);
@@ -802,11 +813,35 @@ export default function StudentProfile() {
               <div className="form-group"><label className="form-label">Phone</label><input className="form-input" value={editForm.phone||''} onChange={e=>setEditForm({...editForm,phone:e.target.value})}/></div>
             </FormRow>
             <FormRow>
+              <div className="form-group"><label className="form-label">Email</label><input className="form-input" value={editForm.email||''} onChange={e=>setEditForm({...editForm,email:e.target.value})}/></div>
+              <div className="form-group"><label className="form-label">WhatsApp Number</label><input className="form-input" value={editForm.whatsappNumber||''} onChange={e=>setEditForm({...editForm,whatsappNumber:e.target.value})}/></div>
+            </FormRow>
+            <FormRow>
+              <div className="form-group"><label className="form-label">Father's Name</label><input className="form-input" value={editForm.fatherName||''} onChange={e=>setEditForm({...editForm,fatherName:e.target.value})}/></div>
+              <div className="form-group"><label className="form-label">Mother's Name</label><input className="form-input" value={editForm.motherName||''} onChange={e=>setEditForm({...editForm,motherName:e.target.value})}/></div>
+            </FormRow>
+            <FormRow>
               <div className="form-group"><label className="form-label">Parent Name</label><input className="form-input" value={editForm.parentName||''} onChange={e=>setEditForm({...editForm,parentName:e.target.value})}/></div>
               <div className="form-group"><label className="form-label">Parent Phone</label><input className="form-input" value={editForm.parentPhone||''} onChange={e=>setEditForm({...editForm,parentPhone:e.target.value})}/></div>
             </FormRow>
             <FormRow>
+              <div className="form-group"><label className="form-label">School Name</label><input className="form-input" value={editForm.schoolName||''} onChange={e=>setEditForm({...editForm,schoolName:e.target.value})}/></div>
+              <div className="form-group"><label className="form-label">Occupation</label><input className="form-input" value={editForm.occupation||''} onChange={e=>setEditForm({...editForm,occupation:e.target.value})}/></div>
+            </FormRow>
+            <div className="form-group"><label className="form-label">Address</label><textarea className="form-input" rows={2} value={editForm.address||''} onChange={e=>setEditForm({...editForm,address:e.target.value})}/></div>
+            <FormRow>
+              <div className="form-group"><label className="form-label">Gender</label>
+                <select className="form-input" value={editForm.gender||''} onChange={e=>setEditForm({...editForm,gender:e.target.value})}>
+                  <option value="">Select</option>{['Girl','Boy','Other'].map(g=><option key={g} value={g}>{g}</option>)}
+                </select>
+              </div>
+              <div className="form-group"><label className="form-label">Age</label><input className="form-input" type="number" value={editForm.age||''} onChange={e=>setEditForm({...editForm,age:e.target.value})}/></div>
+            </FormRow>
+            <FormRow>
+              <div className="form-group"><label className="form-label">Syllabus</label><input className="form-input" value={editForm.syllabus||''} onChange={e=>setEditForm({...editForm,syllabus:e.target.value})}/></div>
               <div className="form-group"><label className="form-label">Class / Std</label><input className="form-input" value={editForm.classStd||''} onChange={e=>setEditForm({...editForm,classStd:e.target.value})}/></div>
+            </FormRow>
+            <FormRow>
               <div className="form-group"><label className="form-label">Status</label>
                 <select className="form-input" value={editForm.status||'active'} onChange={e=>setEditForm({...editForm,status:e.target.value})}>
                   {['active','moderate','at-risk','dropped'].map(s=><option key={s} value={s}>{s}</option>)}
