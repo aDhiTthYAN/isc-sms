@@ -4,7 +4,7 @@ import {
   getStudent, updateStudent, getBatches,
   getFollowUps, addFollowUp, getAssessments, addAssessment,
   getStaffProfiles, updateWeakSubjects, updateCourseFlowStep, addNotification,
-  getStudentReports, getStudentAttendanceSummary
+  getStudentReports, getStudentAttendanceSummary, getBatchTasks
 } from '../firebase/services';
 import { Modal, Toast, Avatar, StatusBadge, Loading, FormRow } from '../components/ui';
 import { useAuth } from '../context/AuthContext';
@@ -55,6 +55,7 @@ export default function StudentProfile() {
   const [assessments, setAssessments] = useState([]);
   const [classReports, setClassReports] = useState([]);
   const [attendance,  setAttendance]  = useState(null);
+  const [batchTasks,  setBatchTasks]  = useState([]);
   const [staffList,   setStaffList]   = useState([]);
   const [loading,     setLoading]     = useState(true);
   const [activeTab,   setActiveTab]   = useState('overview');
@@ -100,6 +101,12 @@ export default function StudentProfile() {
       setAssessments(a);
       getStudentReports(id).then(setClassReports).catch(() => setClassReports([]));
       getStudentAttendanceSummary(id, s?.batchId).then(setAttendance).catch(() => setAttendance(null));
+      if (s?.batchId) {
+        getBatchTasks(s.batchId)
+          .then(tasks => setBatchTasks(tasks.filter(t =>
+            t.assignedType !== 'specific' || (t.assignedStudentIds || []).includes(id))))
+          .catch(() => setBatchTasks([]));
+      }
       setStaffList(st.filter(x => x.active !== false));
       setEditForm(s || {});
       setWeakSubjects(s?.weakSubjects || []);
@@ -670,6 +677,38 @@ export default function StudentProfile() {
               </div>
               <div style={{ fontSize:11.5, color:'var(--text-muted)' }}>{assessments.length} assessments</div>
             </div>
+          </div>
+
+          {/* Assignments / activity submission tracker */}
+          <div className="card" style={{ padding:'16px 20px', marginBottom:16 }}>
+            <div style={{ fontSize:14, fontWeight:700, marginBottom:12 }}>Assignments &amp; Activities ({batchTasks.filter(t => t.submittedBy?.some(x => x.studentId === id)).length}/{batchTasks.length} done)</div>
+            {batchTasks.length === 0 ? (
+              <div style={{ fontSize:13, color:'var(--text-muted)', padding:'16px 0', textAlign:'center' }}>No assignments for this student yet.</div>
+            ) : (
+              <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                {batchTasks.map(t => {
+                  const sub = t.submittedBy?.find(x => x.studentId === id);
+                  const overdue = !sub && t.dueDate && new Date(t.dueDate) < new Date();
+                  return (
+                    <div key={t.id} style={{ display:'flex', alignItems:'center', gap:10, padding:'9px 12px', borderRadius:9, border:'1px solid var(--border)' }}>
+                      {sub
+                        ? <CheckCircle size={16} style={{ color:'var(--green-ink)', flexShrink:0 }}/>
+                        : <Circle size={16} style={{ color: overdue ? 'var(--red-ink)' : 'var(--text-muted)', flexShrink:0 }}/>}
+                      <div style={{ flex:1, minWidth:0 }}>
+                        <div style={{ fontSize:13, fontWeight:500 }}>{t.title}</div>
+                        <div style={{ fontSize:11, color:'var(--text-muted)' }}>
+                          {t.subject ? `${t.subject} · ` : ''}{t.dueDate ? `Due ${t.dueDate}` : 'No due date'}
+                          {t.assignedType === 'specific' ? ' · Individually assigned' : ''}
+                        </div>
+                      </div>
+                      <span className={`badge ${sub ? 'badge-green' : overdue ? 'badge-red' : 'badge-amber'}`}>
+                        {sub ? 'Submitted' : overdue ? 'Overdue' : 'Pending'}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           {/* Class progress reports timeline */}

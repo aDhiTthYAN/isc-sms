@@ -107,6 +107,7 @@ export default function Schedule() {
   const [form,          setForm]          = useState(blankForm());
   const [modalStudents, setModalStudents] = useState([]); // students of the batch chosen in the add form
   const [studentSearch, setStudentSearch] = useState(''); // filter in the specific-students picker
+  const [detailSearch,  setDetailSearch]  = useState(''); // filter students inside the slot-detail popup
 
   // Attendance modal
   const [attSession,    setAttSession]    = useState(null);
@@ -536,71 +537,86 @@ export default function Schedule() {
             </div>
           )}
 
-          {/* Slot detail card */}
-          {slotDetail && (() => {
-            const pc = typeColor(slotDetail.type);
-            const participants = slotDetail.participantStudents?.length ? slotDetail.participantStudents : null;
-            return (
-              <div className="card" style={{ marginTop:16, padding:'16px 20px' }}>
-                <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', gap:12 }}>
-                  <div style={{ flex:1 }}>
-                    <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginBottom:8, alignItems:'center' }}>
-                      <span style={{ padding:'2px 10px', borderRadius:10, background:pc.bg, color:pc.col, fontWeight:600, fontSize:11 }}>{pc.label}</span>
-                      <span style={{ padding:'2px 10px', borderRadius:10, background:'var(--surface-2)', color:'var(--sub)', fontWeight:600, fontSize:11 }}>{slotDetail.batchName || batchName(slotDetail.batchId)}</span>
-                      {slotDetail.status && <span className={`badge ${slotDetail.status==='completed'?'badge-green':slotDetail.status==='cancelled'?'badge-red':'badge-amber'}`}>{slotDetail.status}</span>}
-                    </div>
-                    <div style={{ fontSize:16, fontWeight:700, color:'var(--text)', marginBottom:6 }}>{slotDetail.title}</div>
-                    <div style={{ fontSize:13, color:'var(--sub)', display:'flex', flexDirection:'column', gap:3 }}>
-                      <div><strong>When:</strong> {slotDetail.scheduledDate || slotDetail.day} {slotDetail.scheduledDate ? '(one-time)' : '(recurring)'} {slotDetail.time && `at ${slotDetail.time}`} · {slotDetail.duration} min</div>
-                      <div><strong>Type:</strong> {pc.label}</div>
-                      {slotDetail.facultyName && <div><strong>Faculty / Organizer:</strong> {slotDetail.facultyName}</div>}
-                      {slotDetail.meetLink
-                        ? <div><strong>Meet link:</strong> <a href={slotDetail.meetLink} target="_blank" rel="noreferrer" style={{ color:'var(--accent)' }}>{slotDetail.meetLink}</a></div>
-                        : <div style={{ color:'var(--muted)' }}><strong style={{ color:'var(--sub)' }}>Meet link:</strong> none</div>}
-                      {slotDetail.notes && <div style={{ fontStyle:'italic' }}>“{slotDetail.notes}”</div>}
-                      <div><strong>Students:</strong>{' '}
-                        {participants
-                          ? <><span className="badge badge-blue">{participants.length} selected</span></>
-                          : <span className="badge badge-green">All batch students</span>}
-                      </div>
-                      {participants && (
-                        <div style={{ display:'flex', flexWrap:'wrap', gap:6, marginTop:2 }}>
-                          {participants.map(p => (
-                            <span key={p.id} style={{ display:'inline-flex', alignItems:'center', gap:5, padding:'3px 9px', borderRadius:20, background:'var(--surface-2)', fontSize:11.5, fontWeight:500 }}>
-                              <span style={{ width:18, height:18, borderRadius:'50%', background:avatarColor(p.name), display:'inline-flex', alignItems:'center', justifyContent:'center', fontSize:8, fontWeight:700, color:'#fff' }}>{initials(p.name)}</span>
-                              {p.name}
-                            </span>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  <button onClick={() => setSlotDetail(null)} style={{ background:'none', border:'none', cursor:'pointer', color:'var(--muted)', padding:4 }}><X size={16}/></button>
-                </div>
-                <div style={{ display:'flex', gap:8, marginTop:14, flexWrap:'wrap' }}>
-                  <button style={{ display:'flex', alignItems:'center', gap:6, height:32, padding:'0 12px', border:'none', borderRadius:8, background:'var(--accent)', color:'#fff', fontSize:12.5, fontWeight:600, cursor:'pointer' }} onClick={() => openAttendance(slotDetail)}>
-                    <Users size={13}/> {savedAtt[slotDetail.id] ? 'Edit Attendance' : 'Mark Attendance'}
-                  </button>
-                  <button style={{ display:'flex', alignItems:'center', gap:6, height:32, padding:'0 12px', border:'1px solid var(--accent)', borderRadius:8, background:'var(--accent-50)', color:'var(--accent-ink)', fontSize:12.5, fontWeight:600, cursor:'pointer' }} onClick={() => openReports(slotDetail)}>
-                    <MessageSquare size={13}/> Progress Reports
-                  </button>
-                  <select className="form-input" style={{ height:32, fontSize:12, flex:'0 0 auto' }} value={slotDetail.status || ''}
-                    onChange={async e => { const ns = e.target.value; if (!ns) return; await updateScheduleStatus(slotDetail.id, ns); await reloadSchedules(); setSlotDetail({ ...slotDetail, status: ns }); }}>
-                    <option value="">Update status…</option>
-                    <option value="completed">Completed</option>
-                    <option value="cancelled">Cancelled</option>
-                    <option value="rescheduled">Rescheduled</option>
-                  </select>
-                  <button className="btn btn-sm" style={{ background:'var(--neg-50)', color:'var(--red-ink)', border:'none' }}
-                    onClick={async () => { if (!window.confirm('Delete this entry?')) return; await deleteBatchSchedule(slotDetail.id); await reloadSchedules(); setSlotDetail(null); }}>
-                    <Trash2 size={12}/> Delete
-                  </button>
-                </div>
-              </div>
-            );
-          })()}
         </div>
       )}
+
+      {/* ── Slot detail popup ── */}
+      {slotDetail && (() => {
+        const pc = typeColor(slotDetail.type);
+        const participants = slotDetail.participantStudents?.length ? slotDetail.participantStudents : null;
+        const shown = participants
+          ? participants.filter(p => !detailSearch || p.name?.toLowerCase().includes(detailSearch.toLowerCase()) || (p.phone||'').includes(detailSearch))
+          : [];
+        return (
+          <Modal title={slotDetail.title} onClose={() => { setSlotDetail(null); setDetailSearch(''); }} wide>
+            <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginBottom:12, alignItems:'center' }}>
+              <span style={{ padding:'2px 10px', borderRadius:10, background:pc.bg, color:pc.col, fontWeight:600, fontSize:11 }}>{pc.label}</span>
+              <span style={{ padding:'2px 10px', borderRadius:10, background:'var(--surface-2)', color:'var(--sub)', fontWeight:600, fontSize:11 }}>{slotDetail.batchName || batchName(slotDetail.batchId)}</span>
+              {slotDetail.status && <span className={`badge ${slotDetail.status==='completed'?'badge-green':slotDetail.status==='cancelled'?'badge-red':'badge-amber'}`}>{slotDetail.status}</span>}
+            </div>
+            <div style={{ fontSize:13, color:'var(--sub)', display:'flex', flexDirection:'column', gap:4, marginBottom:14 }}>
+              <div><strong>When:</strong> {slotDetail.scheduledDate || slotDetail.day} {slotDetail.scheduledDate ? '(one-time)' : '(recurring)'} {slotDetail.time && `at ${slotDetail.time}`} · {slotDetail.duration} min</div>
+              {slotDetail.facultyName && <div><strong>Faculty / Organizer:</strong> {slotDetail.facultyName}</div>}
+              {slotDetail.meetLink
+                ? <div><strong>Meet link:</strong> <a href={slotDetail.meetLink} target="_blank" rel="noreferrer" style={{ color:'var(--accent)' }}>{slotDetail.meetLink}</a></div>
+                : <div style={{ color:'var(--muted)' }}><strong style={{ color:'var(--sub)' }}>Meet link:</strong> none</div>}
+              {slotDetail.notes && <div style={{ fontStyle:'italic' }}>“{slotDetail.notes}”</div>}
+            </div>
+
+            {/* Students — scales to thousands: count + search + capped scroll list */}
+            <div style={{ marginBottom:16 }}>
+              <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8, flexWrap:'wrap' }}>
+                <strong style={{ fontSize:13 }}>Students</strong>
+                {participants
+                  ? <span className="badge badge-blue">{participants.length} selected</span>
+                  : <span className="badge badge-green">All batch students</span>}
+              </div>
+              {participants && participants.length > 0 && (
+                <>
+                  {participants.length > 12 && (
+                    <div style={{ position:'relative', marginBottom:8 }}>
+                      <Search size={13} style={{ position:'absolute', left:10, top:'50%', transform:'translateY(-50%)', color:'var(--muted)' }}/>
+                      <input className="form-input" style={{ paddingLeft:30 }} placeholder={`Search ${participants.length} students…`}
+                        value={detailSearch} onChange={e => setDetailSearch(e.target.value)}/>
+                    </div>
+                  )}
+                  <div style={{ display:'flex', flexWrap:'wrap', gap:6, maxHeight:200, overflowY:'auto', padding:2 }}>
+                    {shown.slice(0, 300).map(p => (
+                      <span key={p.id} style={{ display:'inline-flex', alignItems:'center', gap:5, padding:'3px 9px', borderRadius:20, background:'var(--surface-2)', fontSize:11.5, fontWeight:500 }}>
+                        <span style={{ width:18, height:18, borderRadius:'50%', background:avatarColor(p.name), display:'inline-flex', alignItems:'center', justifyContent:'center', fontSize:8, fontWeight:700, color:'#fff' }}>{initials(p.name)}</span>
+                        {p.name}
+                      </span>
+                    ))}
+                    {shown.length === 0 && <span style={{ fontSize:12, color:'var(--muted)' }}>No match.</span>}
+                    {shown.length > 300 && <span style={{ fontSize:11.5, color:'var(--muted)', alignSelf:'center' }}>+{shown.length - 300} more — refine search to see them</span>}
+                  </div>
+                </>
+              )}
+            </div>
+
+            <div style={{ display:'flex', gap:8, flexWrap:'wrap', borderTop:'1px solid var(--border)', paddingTop:14 }}>
+              <button className="btn btn-primary btn-sm" onClick={() => openAttendance(slotDetail)}>
+                <Users size={13}/> {savedAtt[slotDetail.id] ? 'Edit Attendance' : 'Mark Attendance'}
+              </button>
+              <button className="btn btn-sm" style={{ border:'1px solid var(--accent)', background:'var(--accent-50)', color:'var(--accent-ink)' }} onClick={() => openReports(slotDetail)}>
+                <MessageSquare size={13}/> Progress Reports
+              </button>
+              <select className="form-input" style={{ height:32, fontSize:12, flex:'0 0 auto', width:'auto' }} value={slotDetail.status || ''}
+                onChange={async e => { const ns = e.target.value; if (!ns) return; await updateScheduleStatus(slotDetail.id, ns); await reloadSchedules(); setSlotDetail({ ...slotDetail, status: ns }); }}>
+                <option value="">Update status…</option>
+                <option value="completed">Completed</option>
+                <option value="cancelled">Cancelled</option>
+                <option value="rescheduled">Rescheduled</option>
+              </select>
+              <div style={{ flex:1 }}/>
+              <button className="btn btn-sm" style={{ background:'var(--neg-50)', color:'var(--red-ink)', border:'none' }}
+                onClick={async () => { if (!window.confirm('Delete this entry?')) return; await deleteBatchSchedule(slotDetail.id); await reloadSchedules(); setSlotDetail(null); }}>
+                <Trash2 size={12}/> Delete
+              </button>
+            </div>
+          </Modal>
+        );
+      })()}
 
       {/* ── ATTENDANCE REPORT TAB ── */}
       {activeTab === 'attendance' && (

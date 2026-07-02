@@ -52,6 +52,9 @@ const DEFAULT_COURSE_FLOW = [
 // Fields match the Google Form CSV columns in order:
 // Timestamp(joinDate), Name of Father, Name of Mother, Email, Address,
 // Phone number, Whatsapp Number, Occupation, Kids Name(name), Gender, Age, Class, School Name
+// Columns shown in the students table by default (when a field has no explicit showInList)
+const DEFAULT_LIST_KEYS = ['fatherName','motherName','phone','whatsappNumber','classStd','varkResult','syllabus'];
+
 const DEFAULT_STUDENT_FIELDS = [
   { key: 'fatherName',    label: 'Name of Father',            required: false, type: 'text'  },
   { key: 'motherName',    label: 'Name of Mother',            required: false, type: 'text'  },
@@ -1235,6 +1238,9 @@ export default function Batches() {
         {/* ── STUDENTS TAB ── */}
         {activeTab === 'students' && (() => {
           const PAGE = 20;
+          // Columns to show (configurable via "Show in list"); Name/Status/Onboarding/View are permanent.
+          const listFields = batchFields.filter(f => f.key !== 'name' &&
+            (f.showInList !== undefined ? f.showInList : DEFAULT_LIST_KEYS.includes(f.key)));
           const filtered = batchStudents.filter(s => {
             if (studentStatusFilter && s.status !== studentStatusFilter) return false;
             if (!studentSearch) return true;
@@ -1301,13 +1307,7 @@ export default function Batches() {
                   <thead>
                     <tr>
                       <th>Kids Name</th>
-                      <th>Father Name</th>
-                      <th>Mother Name</th>
-                      <th>Phone</th>
-                      <th>WhatsApp</th>
-                      <th>Class</th>
-                      <th>VARK</th>
-                      <th>Syllabus</th>
+                      {listFields.map(f => <th key={f.key}>{f.label}</th>)}
                       <th>Status</th>
                       <th>Onboarding</th>
                       <th></th>
@@ -1315,7 +1315,7 @@ export default function Batches() {
                   </thead>
                   <tbody>
                     {paginated.length === 0 && (
-                      <tr><td colSpan={11} style={{ textAlign:'center', padding:40, color:'#6B7280' }}>
+                      <tr><td colSpan={listFields.length + 4} style={{ textAlign:'center', padding:40, color:'#6B7280' }}>
                         {studentSearch || studentStatusFilter ? 'No students match your filter.' : 'No students yet.'}
                         {!studentSearch && !studentStatusFilter && (
                           <div style={{ display:'flex', gap:8, justifyContent:'center', marginTop:12 }}>
@@ -1336,27 +1336,21 @@ export default function Batches() {
                               <div style={{ fontWeight:500 }}>{s.name||'—'}</div>
                             </div>
                           </td>
-                          <td style={{ fontSize:13 }}>{s.fatherName||'—'}</td>
-                          <td style={{ fontSize:13 }}>{s.motherName||'—'}</td>
-                          <td style={{ fontSize:13 }}>{s.phone||'—'}</td>
-                          <td style={{ fontSize:13 }}>{s.whatsappNumber||'—'}</td>
-                          <td style={{ fontSize:13 }}>{s.classStd||'—'}</td>
-                          <td style={{ fontSize:12 }}>{s.varkResult||'—'}</td>
-                          <td style={{ fontSize:12 }}>
-                            <input
-                              defaultValue={s.syllabus||''}
-                              onBlur={async e => {
-                                const val = e.target.value.trim();
-                                if (val !== (s.syllabus||'')) {
-                                  await updateStudent(s.id, { syllabus: val });
-                                }
-                              }}
-                              style={{ border:'1px solid transparent', borderRadius:6, padding:'2px 6px', fontSize:12, width:'100%', background:'transparent', cursor:'text' }}
-                              onFocus={e => { e.target.style.borderColor='#E5E7EB'; e.target.style.background='#fff'; }}
-                              onBlurCapture={e => { e.target.style.borderColor='transparent'; e.target.style.background='transparent'; }}
-                              placeholder="—"
-                            />
-                          </td>
+                          {listFields.map(f => (
+                            <td key={f.key} style={{ fontSize:12.5 }}>
+                              <input
+                                defaultValue={s[f.key] ?? ''}
+                                onBlur={async e => {
+                                  const val = e.target.value.trim();
+                                  if (val !== (s[f.key] ?? '')) await updateStudent(s.id, { [f.key]: val });
+                                }}
+                                style={{ border:'1px solid transparent', borderRadius:6, padding:'2px 6px', fontSize:12.5, width:'100%', minWidth:80, background:'transparent', cursor:'text' }}
+                                onFocus={e => { e.target.style.borderColor='#E5E7EB'; e.target.style.background='#fff'; }}
+                                onBlurCapture={e => { e.target.style.borderColor='transparent'; e.target.style.background='transparent'; }}
+                                placeholder="—"
+                              />
+                            </td>
+                          ))}
                           <td>
                             <select
                               value={s.status||'active'}
@@ -2323,6 +2317,10 @@ export default function Batches() {
         {/* Student Fields Config */}
         {showFieldConfig && (
           <Modal title={`Configure Student Fields — ${selectedBatch.name}`} onClose={() => setShowFieldConfig(false)} wide>
+            <div style={{ fontSize:12.5, color:'var(--text-sub)', marginBottom:12, background:'var(--brand-50)', padding:'8px 12px', borderRadius:8 }}>
+              Tick <strong>Show in list</strong> to display that field as a column in the students table.
+              The <strong>Kids Name</strong>, <strong>Status</strong>, <strong>Onboarding</strong> and <strong>View</strong> columns are always shown.
+            </div>
             <div style={{ display:'flex', flexDirection:'column', gap:8, marginBottom:16 }}>
               {editFields.map((field, idx) => (
                 <div key={idx} style={{ display:'flex', gap:8, alignItems:'center', padding:'8px 12px', background:'#F9FAFB', borderRadius:8 }}>
@@ -2335,6 +2333,11 @@ export default function Batches() {
                   <label style={{ display:'flex', alignItems:'center', gap:4, fontSize:12, whiteSpace:'nowrap' }}>
                     <input type="checkbox" checked={field.required||false}
                       onChange={e => { const u=[...editFields]; u[idx]={...u[idx],required:e.target.checked}; setEditFields(u); }}/> Required
+                  </label>
+                  <label style={{ display:'flex', alignItems:'center', gap:4, fontSize:12, whiteSpace:'nowrap' }}>
+                    <input type="checkbox" checked={field.key==='name' ? true : (field.showInList !== undefined ? field.showInList : DEFAULT_LIST_KEYS.includes(field.key))}
+                      disabled={field.key==='name'}
+                      onChange={e => { const u=[...editFields]; u[idx]={...u[idx],showInList:e.target.checked}; setEditFields(u); }}/> Show in list
                   </label>
                   <button className="btn btn-ghost btn-sm" style={{ color:'#EF4444' }} onClick={() => setEditFields(editFields.filter((_,i)=>i!==idx))}><Trash2 size={13}/></button>
                 </div>

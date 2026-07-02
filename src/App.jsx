@@ -20,7 +20,6 @@ import Reports         from './pages/Reports';
 import Leads           from './pages/Leads';
 import Documents       from './pages/Documents';
 import StaffManagement from './pages/StaffManagement';
-import BulkImport      from './pages/BulkImport';
 import Trash           from './pages/Trash';
 import Requests        from './pages/Requests';
 import Schedule        from './pages/Schedule';
@@ -31,7 +30,6 @@ const NAV_BY_ROLE = {
     { section: 'OVERVIEW' },
     { to: '/',            label: 'Dashboard',        icon: 'LayoutDashboard' },
     { to: '/students',    label: 'All Students',      icon: 'Users'          },
-    { to: '/bulk-import', label: 'Import Students',   icon: 'Upload'         },
     { to: '/followups',   label: 'Follow-Ups',        icon: 'PhoneCall'      },
     { to: '/batches',     label: 'Batches',           icon: 'School'         },
     { to: '/schedule',    label: 'Schedule',          icon: 'CalendarDays'   },
@@ -145,7 +143,6 @@ export default function App() {
             <Route path="/trash"         element={<Trash />}           />
             <Route path="/requests"      element={<Requests />}        />
             <Route path="/schedule"      element={<Schedule />}        />
-            <Route path="/bulk-import"   element={<BulkImport />}      />
           </Route>
           <Route path="/public-schedule/:batchId" element={<PublicSchedule />} />
           <Route path="*" element={<Navigate to="/" replace />} />
