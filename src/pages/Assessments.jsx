@@ -532,7 +532,11 @@ export default function Assessments({ filterBatchId = null }) {
                     ) : '—'}
                   </td>
                   <td>
-                    <select className="form-input" style={{ height:30, fontSize:12, padding:'0 8px', width:'auto' }}
+                    <select className="form-input" style={{
+                        height:30, fontSize:12, padding:'0 8px', width:'auto', fontWeight:700, border:'none', cursor:'pointer',
+                        background: a.status==='completed' ? 'var(--green-soft)' : a.status==='ongoing' ? 'var(--amber-soft)' : 'var(--blue-soft)',
+                        color:      a.status==='completed' ? 'var(--green-ink)'  : a.status==='ongoing' ? 'var(--amber-ink)'  : 'var(--blue-ink)',
+                      }}
                       value={a.status || 'upcoming'}
                       onChange={async e => {
                         try {

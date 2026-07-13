@@ -57,6 +57,8 @@ export default function StudentProfile() {
   const [classReports, setClassReports] = useState([]);
   const [attendance,  setAttendance]  = useState(null);
   const [batchTasks,  setBatchTasks]  = useState([]);
+  const [perfFrom,    setPerfFrom]    = useState('');
+  const [perfTo,      setPerfTo]      = useState('');
   const [staffList,   setStaffList]   = useState([]);
   const [loading,     setLoading]     = useState(true);
   const [activeTab,   setActiveTab]   = useState('overview');
@@ -665,7 +667,18 @@ export default function StudentProfile() {
       )}
 
       {/* ══ PERFORMANCE TAB ══ */}
-      {activeTab === 'performance' && (
+      {activeTab === 'performance' && (() => {
+        const inRange = (dateStr) => {
+          if (!perfFrom && !perfTo) return true;
+          if (!dateStr) return false;
+          if (perfFrom && dateStr < perfFrom) return false;
+          if (perfTo && dateStr > perfTo) return false;
+          return true;
+        };
+        const shownReports = classReports.filter(r => inRange(r.sessionDate));
+        const shownTasks   = batchTasks.filter(t => inRange(t.dueDate) || (!t.dueDate && !perfFrom && !perfTo));
+        const absent = attendance ? attendance.total - attendance.present : 0;
+        return (
         <div>
           {/* Summary tiles */}
           <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(150px,1fr))', gap:12, marginBottom:18 }}>
@@ -674,7 +687,11 @@ export default function StudentProfile() {
               <div style={{ fontSize:26, fontWeight:700, fontFamily:'var(--font-display)', color: attendance?.pct == null ? 'var(--text-muted)' : attendance.pct >= 75 ? 'var(--green-ink)' : attendance.pct >= 50 ? 'var(--amber-ink)' : 'var(--red-ink)' }}>
                 {attendance?.pct == null ? '—' : `${attendance.pct}%`}
               </div>
-              <div style={{ fontSize:11.5, color:'var(--text-muted)' }}>{attendance ? `${attendance.present}/${attendance.total} classes present` : 'No attendance recorded'}</div>
+              <div style={{ display:'flex', gap:8, marginTop:4 }}>
+                <span className="badge badge-green">{attendance?.present || 0} present</span>
+                <span className="badge badge-red">{absent} absent</span>
+              </div>
+              <div style={{ fontSize:11, color:'var(--text-muted)', marginTop:4 }}>{attendance ? `across ${attendance.total} classes` : 'No attendance recorded'}</div>
             </div>
             <div className="card" style={{ padding:'14px 16px' }}>
               <div style={{ fontSize:11, color:'var(--text-muted)', fontWeight:600, textTransform:'uppercase', letterSpacing:'.04em' }}>Class Reports</div>
@@ -682,56 +699,45 @@ export default function StudentProfile() {
               <div style={{ fontSize:11.5, color:'var(--text-muted)' }}>from faculty across classes</div>
             </div>
             <div className="card" style={{ padding:'14px 16px' }}>
+              <div style={{ fontSize:11, color:'var(--text-muted)', fontWeight:600, textTransform:'uppercase', letterSpacing:'.04em' }}>Assignments Done</div>
+              <div style={{ fontSize:26, fontWeight:700, fontFamily:'var(--font-display)', color:'var(--pos)' }}>
+                {batchTasks.filter(t => t.submittedBy?.some(x => x.studentId === id)).length}/{batchTasks.length}
+              </div>
+              <div style={{ fontSize:11.5, color:'var(--text-muted)' }}>submitted</div>
+            </div>
+            <div className="card" style={{ padding:'14px 16px' }}>
               <div style={{ fontSize:11, color:'var(--text-muted)', fontWeight:600, textTransform:'uppercase', letterSpacing:'.04em' }}>Avg Assessment</div>
               <div style={{ fontSize:26, fontWeight:700, fontFamily:'var(--font-display)', color:'var(--violet-ink)' }}>
-                {assessments.length ? `${Math.round(assessments.reduce((s,a)=>s+(a.percentage||0),0)/assessments.length)}%` : '—'}
+                {assessments.filter(a=>a.percentage!=null).length ? `${Math.round(assessments.filter(a=>a.percentage!=null).reduce((s,a)=>s+a.percentage,0)/assessments.filter(a=>a.percentage!=null).length)}%` : '—'}
               </div>
               <div style={{ fontSize:11.5, color:'var(--text-muted)' }}>{assessments.length} assessments</div>
             </div>
           </div>
 
-          {/* Assignments / activity submission tracker */}
-          <div className="card" style={{ padding:'16px 20px', marginBottom:16 }}>
-            <div style={{ fontSize:14, fontWeight:700, marginBottom:12 }}>Assignments &amp; Activities ({batchTasks.filter(t => t.submittedBy?.some(x => x.studentId === id)).length}/{batchTasks.length} done)</div>
-            {batchTasks.length === 0 ? (
-              <div style={{ fontSize:13, color:'var(--text-muted)', padding:'16px 0', textAlign:'center' }}>No assignments for this student yet.</div>
-            ) : (
-              <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-                {batchTasks.map(t => {
-                  const sub = t.submittedBy?.find(x => x.studentId === id);
-                  const overdue = !sub && t.dueDate && new Date(t.dueDate) < new Date();
-                  return (
-                    <div key={t.id} style={{ display:'flex', alignItems:'center', gap:10, padding:'9px 12px', borderRadius:9, border:'1px solid var(--border)' }}>
-                      {sub
-                        ? <CheckCircle size={16} style={{ color:'var(--green-ink)', flexShrink:0 }}/>
-                        : <Circle size={16} style={{ color: overdue ? 'var(--red-ink)' : 'var(--text-muted)', flexShrink:0 }}/>}
-                      <div style={{ flex:1, minWidth:0 }}>
-                        <div style={{ fontSize:13, fontWeight:500 }}>{t.title}</div>
-                        <div style={{ fontSize:11, color:'var(--text-muted)' }}>
-                          {t.subject ? `${t.subject} · ` : ''}{t.dueDate ? `Due ${t.dueDate}` : 'No due date'}
-                          {t.assignedType === 'specific' ? ' · Individually assigned' : ''}
-                        </div>
-                      </div>
-                      <span className={`badge ${sub ? 'badge-green' : overdue ? 'badge-red' : 'badge-amber'}`}>
-                        {sub ? 'Submitted' : overdue ? 'Overdue' : 'Pending'}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
+          {/* Date filter — applies to reports & assignments below */}
+          <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:16, flexWrap:'wrap' }}>
+            <span style={{ fontSize:12, color:'var(--text-muted)', fontWeight:600 }}>Filter by date</span>
+            <input type="date" className="form-input" style={{ width:'auto', height:34 }} value={perfFrom} onChange={e => setPerfFrom(e.target.value)}/>
+            <span style={{ color:'var(--text-muted)' }}>→</span>
+            <input type="date" className="form-input" style={{ width:'auto', height:34 }} value={perfTo} onChange={e => setPerfTo(e.target.value)}/>
+            <button className="btn btn-ghost btn-sm" onClick={() => {
+              const now = new Date(); const from = new Date(now); from.setDate(now.getDate() - 7);
+              const f = (d) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+              setPerfFrom(f(from)); setPerfTo(f(now));
+            }}>Last 7 days</button>
+            {(perfFrom || perfTo) && <button className="btn btn-ghost btn-sm" onClick={() => { setPerfFrom(''); setPerfTo(''); }}>Clear</button>}
           </div>
 
-          {/* Class progress reports timeline */}
-          <div className="card" style={{ padding:'16px 20px' }}>
-            <div style={{ fontSize:14, fontWeight:700, marginBottom:12 }}>Progress Reports from Faculty</div>
-            {classReports.length === 0 ? (
+          {/* Class progress reports timeline — ABOVE assignments */}
+          <div className="card" style={{ padding:'16px 20px', marginBottom:16 }}>
+            <div style={{ fontSize:14, fontWeight:700, marginBottom:12 }}>Progress Reports from Faculty ({shownReports.length})</div>
+            {shownReports.length === 0 ? (
               <div style={{ fontSize:13, color:'var(--text-muted)', padding:'20px 0', textAlign:'center' }}>
-                No class reports yet. Faculty add these from the Schedule → Progress Reports after a class.
+                {classReports.length === 0 ? 'No class reports yet. Faculty add these from the Schedule → Progress Reports after a class.' : 'No reports in the selected date range.'}
               </div>
             ) : (
               <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
-                {classReports.map(r => (
+                {shownReports.map(r => (
                   <div key={r.id} style={{ borderLeft:'3px solid var(--brand)', paddingLeft:12 }}>
                     <div style={{ display:'flex', gap:8, alignItems:'center', flexWrap:'wrap', marginBottom:2 }}>
                       <span style={{ fontSize:13, fontWeight:600 }}>{r.sessionTitle || 'Class'}</span>
@@ -745,8 +751,42 @@ export default function StudentProfile() {
               </div>
             )}
           </div>
+
+          {/* Assignments / activity submission tracker */}
+          <div className="card" style={{ padding:'16px 20px' }}>
+            <div style={{ fontSize:14, fontWeight:700, marginBottom:12 }}>Assignments &amp; Activities ({shownTasks.filter(t => t.submittedBy?.some(x => x.studentId === id)).length}/{shownTasks.length} done)</div>
+            {shownTasks.length === 0 ? (
+              <div style={{ fontSize:13, color:'var(--text-muted)', padding:'16px 0', textAlign:'center' }}>{batchTasks.length === 0 ? 'No assignments for this student yet.' : 'No assignments in the selected date range.'}</div>
+            ) : (
+              <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                {shownTasks.map(t => {
+                  const sub = t.submittedBy?.find(x => x.studentId === id);
+                  const overdue = !sub && t.dueDate && new Date(t.dueDate) < new Date();
+                  return (
+                    <div key={t.id} style={{ display:'flex', alignItems:'center', gap:10, padding:'9px 12px', borderRadius:9, border:'1px solid var(--border)' }}>
+                      {sub
+                        ? <CheckCircle size={16} style={{ color:'var(--green-ink)', flexShrink:0 }}/>
+                        : <Circle size={16} style={{ color: overdue ? 'var(--red-ink)' : 'var(--text-muted)', flexShrink:0 }}/>}
+                      <div style={{ flex:1, minWidth:0 }}>
+                        <div style={{ fontSize:13, fontWeight:500 }}>{t.title}</div>
+                        <div style={{ fontSize:11, color:'var(--text-muted)' }}>
+                          {t.subject ? `${t.subject} · ` : ''}{t.dueDate ? `Due ${t.dueDate}` : 'No due date'}
+                          {t.assignedType === 'specific' ? ' · Individually assigned' : ''}
+                          {t.assignedFaculty ? ` · by ${t.assignedFaculty}` : ''}
+                        </div>
+                      </div>
+                      <span className={`badge ${sub ? 'badge-green' : overdue ? 'badge-red' : 'badge-amber'}`}>
+                        {sub ? 'Submitted' : overdue ? 'Overdue' : 'Pending'}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </div>
-      )}
+        );
+      })()}
 
       {/* ══ FOLLOW-UPS TAB ══ */}
       {activeTab === 'followups' && (

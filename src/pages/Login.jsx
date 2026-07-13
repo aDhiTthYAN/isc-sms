@@ -105,8 +105,10 @@ export default function LoginPage() {
 
           {/* Logo */}
           <div style={{ display:'flex', alignItems:'center', gap:12, position:'relative' }}>
-            <div style={{ width:42, height:42, borderRadius:11, background:'#fff', display:'flex', alignItems:'center', justifyContent:'center', boxShadow:'0 8px 22px -8px rgba(0,0,0,.4)', flexShrink:0 }}>
-              <span style={{ fontFamily:'var(--font-display)', fontWeight:800, fontSize:15, color:'var(--accent-700)', letterSpacing:'-.03em' }}>ISC</span>
+            <div style={{ width:42, height:42, borderRadius:11, background:'#fff', display:'flex', alignItems:'center', justifyContent:'center', boxShadow:'0 8px 22px -8px rgba(0,0,0,.4)', flexShrink:0, overflow:'hidden' }}>
+              <img src="/logo.png" alt="ISC" style={{ width:'100%', height:'100%', objectFit:'contain' }}
+                onError={e => { e.currentTarget.style.display='none'; e.currentTarget.nextSibling.style.display='inline'; }} />
+              <span style={{ display:'none', fontFamily:'var(--font-display)', fontWeight:800, fontSize:15, color:'var(--accent-700)', letterSpacing:'-.03em' }}>ISC</span>
             </div>
             <div style={{ fontFamily:'var(--font-display)', fontWeight:700, fontSize:15.5, lineHeight:1.15 }}>International<br/>Skills Club</div>
           </div>

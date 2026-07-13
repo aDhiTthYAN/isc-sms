@@ -57,10 +57,13 @@ export default function Sidebar({ navItems = [] }) {
       {/* Logo */}
       <div style={{ padding: '18px 18px 16px', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          {/* Company logo — drop your file at public/logo.png; falls back to the ISC badge */}
+          <img src="/logo.png" alt="ISC" style={{ width: 36, height: 36, borderRadius: 10, objectFit: 'contain', flexShrink: 0 }}
+            onError={e => { e.currentTarget.style.display = 'none'; e.currentTarget.nextSibling.style.display = 'flex'; }} />
           <div style={{
             width: 36, height: 36, borderRadius: 10, flexShrink: 0,
             background: 'linear-gradient(140deg, #13B19E 0%, #0C7E72 100%)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            display: 'none', alignItems: 'center', justifyContent: 'center',
             color: '#fff', fontWeight: 800, fontSize: 13, fontFamily: 'var(--font-display)',
           }}>ISC</div>
           <div>

@@ -422,6 +422,8 @@ export default function Batches() {
   const [editingTask, setEditingTask]       = useState(null); // { id, title }
   const [taskKpiFilter, setTaskKpiFilter]   = useState('all'); // 'all'|'pending'|'submitted'
   const [taskSearch, setTaskSearch]         = useState('');
+  const [taskListSearch, setTaskListSearch] = useState('');   // filter assignments by title/subject
+  const [taskStaffFilter, setTaskStaffFilter] = useState(''); // CEO: filter assignments by assigned faculty
 
   // Overdue class confirmation dialog
   const [overdueConfirm, setOverdueConfirm] = useState(null);
@@ -1589,12 +1591,36 @@ export default function Batches() {
                 );
               })()}
 
+              {/* Search + staff filter */}
+              {batchTasks.length > 0 && (
+                <div style={{ display:'flex', flexDirection:'column', gap:6, marginBottom:2 }}>
+                  <input className="form-input" style={{ fontSize:12.5, height:34 }} placeholder="Search assignments…"
+                    value={taskListSearch} onChange={e => setTaskListSearch(e.target.value)}/>
+                  {isCEOorAdmin && (
+                    <select className="form-input" style={{ fontSize:12.5, height:34 }} value={taskStaffFilter} onChange={e => setTaskStaffFilter(e.target.value)}>
+                      <option value="">All staff</option>
+                      {[...new Set(batchTasks.map(t => t.assignedFaculty).filter(Boolean))].map(name => (
+                        <option key={name} value={name}>{name}</option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+              )}
               {batchTasks.length === 0 && (
                 <div style={{ background:'var(--surface)', borderRadius:12, border:'1px solid var(--border)', padding:32, textAlign:'center', color:'var(--text-muted)', fontSize:13 }}>
                   No assignments yet. Click "Add Task".
                 </div>
               )}
               {batchTasks.filter(task => {
+                // Staff see only assignments assigned to them; CEO/admin see all.
+                if (!isCEOorAdmin && task.assignedFaculty && task.assignedFaculty !== profile?.name) return false;
+                // CEO staff filter
+                if (taskStaffFilter && task.assignedFaculty !== taskStaffFilter) return false;
+                // text search
+                if (taskListSearch) {
+                  const q = taskListSearch.toLowerCase();
+                  if (!task.title?.toLowerCase().includes(q) && !task.subject?.toLowerCase().includes(q) && !task.assignedFaculty?.toLowerCase().includes(q)) return false;
+                }
                 if (taskKpiFilter === 'all') return true;
                 if (taskKpiFilter === 'completed') return (task.submittedBy?.length||0) >= assignedStudentsFor(task).length;
                 if (taskKpiFilter === 'pending')   return (task.submittedBy?.length||0) < assignedStudentsFor(task).length;

@@ -24,6 +24,7 @@ import Trash           from './pages/Trash';
 import Requests        from './pages/Requests';
 import Schedule        from './pages/Schedule';
 import PublicSchedule  from './pages/PublicSchedule';
+import ErrorBoundary   from './components/ErrorBoundary';
 
 const NAV_BY_ROLE = {
   ceo: [
@@ -96,7 +97,9 @@ function AppShell() {
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
           <Topbar />
           <main style={{ flex: 1, overflowY: 'auto', padding: 'var(--page-pad)' }}>
-            <Outlet />
+            <ErrorBoundary>
+              <Outlet />
+            </ErrorBoundary>
           </main>
         </div>
       </div>

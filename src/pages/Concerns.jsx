@@ -24,12 +24,14 @@ const TYPE_COLORS = {
 
 export default function Concerns() {
   const { profile, user } = useAuth();
+  const isCeo = profile?.role === 'ceo' || profile?.role === 'admin';
   const [concerns, setConcerns]   = useState([]);
   const [students, setStudents]   = useState([]);
   const [staffList, setStaffList] = useState([]);
   const [loading, setLoading]     = useState(true);
   const [search, setSearch]       = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  const [staffFilter, setStaffFilter]   = useState(''); // CEO: filter by raised-by / assigned staff
   const [showModal, setShowModal] = useState(false);
   const [toast, setToast]         = useState(null);
   const [saving, setSaving]       = useState(false);
@@ -50,14 +52,23 @@ export default function Concerns() {
 
   useEffect(() => { load(); }, []);
 
-  const filtered = concerns.filter(c => {
+  // Visibility: CEO/admin see everything. Staff see only concerns they raised
+  // or that are assigned to them.
+  const myEmail = user?.email;
+  const myName  = profile?.name;
+  const visible = concerns.filter(c => isCeo
+    || c.raisedByEmail === myEmail || c.raisedBy === myName
+    || c.assignedToEmail === myEmail || c.assignedTo === myName);
+
+  const filtered = visible.filter(c => {
     const q = search.toLowerCase();
     const matchQ = !q ||
       c.studentName?.toLowerCase().includes(q) ||
       c.type?.toLowerCase().includes(q) ||
       c.description?.toLowerCase().includes(q);
     const matchS = !statusFilter || c.status === statusFilter;
-    return matchQ && matchS;
+    const matchStaff = !staffFilter || c.assignedTo === staffFilter || c.raisedBy === staffFilter;
+    return matchQ && matchS && matchStaff;
   });
 
   const handleAdd = async (e) => {
@@ -133,10 +144,10 @@ export default function Concerns() {
   };
   const statusOf = (c) => c.status || 'open';
   const counts = {
-    all:           concerns.length,
-    open:          concerns.filter(c => statusOf(c) === 'open').length,
-    'in-progress': concerns.filter(c => statusOf(c) === 'in-progress').length,
-    resolved:      concerns.filter(c => statusOf(c) === 'resolved').length,
+    all:           visible.length,
+    open:          visible.filter(c => statusOf(c) === 'open').length,
+    'in-progress': visible.filter(c => statusOf(c) === 'in-progress').length,
+    resolved:      visible.filter(c => statusOf(c) === 'resolved').length,
   };
   const TABS = [
     { key:'open',        label:'Open'        },
@@ -174,6 +185,14 @@ export default function Concerns() {
           <input placeholder="Search concern, student or category…"
             value={search} onChange={e => setSearch(e.target.value)} />
         </div>
+        {isCeo && (
+          <select className="form-input" style={{ width:'auto', height:38 }} value={staffFilter} onChange={e => setStaffFilter(e.target.value)}>
+            <option value="">All staff</option>
+            {[...new Set(concerns.flatMap(c => [c.assignedTo, c.raisedBy]).filter(Boolean))].sort().map(n => (
+              <option key={n} value={n}>{n}</option>
+            ))}
+          </select>
+        )}
         <div style={{ flex:1 }} />
         <div className="segmented">
           {TABS.map(t => (

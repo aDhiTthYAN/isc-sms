@@ -43,35 +43,48 @@ export default function Documents() {
   const [form, setForm] = useState({ studentId: '', docType: '', file: null });
   const fileRef = useRef();
 
+  const [loadError, setLoadError] = useState('');
+
   const loadDocs = async () => {
     try {
       const listRef = ref(storage, 'documents/');
-      const res = await listAll(listRef);
+      // Guard against a Storage call that never resolves (bucket not set up etc.)
+      const res = await Promise.race([
+        listAll(listRef),
+        new Promise((_, rej) => setTimeout(() => rej(new Error('Storage timed out — is Firebase Storage enabled?')), 8000)),
+      ]);
       const items = await Promise.all(res.items.map(async item => {
-        const url = await getDownloadURL(item);
-        const meta = item.name;
-        const parts = meta.split('__');
+        const url = await getDownloadURL(item).catch(() => '');
+        const parts = item.name.split('__');
         return {
-          fullPath: item.fullPath,
-          name: item.name,
-          url,
-          studentId: parts[0] || '',
-          docType: parts[1] || 'Document',
-          fileName: parts[2] || item.name,
+          fullPath: item.fullPath, name: item.name, url,
+          studentId: parts[0] || '', docType: parts[1] || 'Document', fileName: parts[2] || item.name,
         };
       }));
       setDocs(items);
-    } catch {
+      setLoadError('');
+    } catch (err) {
+      console.error('Documents load failed:', err);
       setDocs([]);
+      setLoadError(err?.message || 'Could not load documents. Check that Firebase Storage is enabled and its rules allow access.');
     }
-    setLoading(false);
   };
 
   useEffect(() => {
-    Promise.all([getStudents()]).then(([s]) => {
-      setStudents(s);
-      loadDocs();
-    });
+    let done = false;
+    // Never let the page hang on the spinner — always resolve loading.
+    (async () => {
+      try {
+        const s = await getStudents().catch(() => []);
+        setStudents(s);
+        await loadDocs();
+      } finally {
+        if (!done) setLoading(false);
+      }
+    })();
+    // hard fallback in case something above never returns
+    const t = setTimeout(() => { done = true; setLoading(false); }, 9000);
+    return () => clearTimeout(t);
   }, []);
 
   const studentName = (id) => students.find(s => s.id === id)?.name || id || 'Unknown';
@@ -138,6 +151,12 @@ export default function Documents() {
         </div>
         <button className="btn btn-primary" onClick={() => setShowModal(true)}><Upload size={16} /> Upload</button>
       </div>
+
+      {loadError && (
+        <div style={{ padding:'12px 16px', borderRadius:10, background:'var(--amber-soft)', color:'var(--amber-ink)', fontSize:13, marginBottom:16 }}>
+          {loadError}
+        </div>
+      )}
 
       {folders.length > 0 && (
         <>

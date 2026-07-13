@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import {
   getBatches, getStaffBatches, getBatchSchedules, getAllSchedules, addBatchSchedule,
-  deleteBatchSchedule, updateScheduleStatus, saveAttendance,
+  deleteBatchSchedule, updateScheduleStatus, updateBatchSchedule, saveAttendance,
   getSessionAttendance, getBatchStudents, getStaffProfiles,
   saveClassReport, updateClassReport, getSessionReports, getStudentReports,
   getAllAssessments,
@@ -44,10 +44,10 @@ function getMonthDates(anchor) {
   return cells;
 }
 
-function getSlotsForDate(date, calendarSlots) {
+function getSlotsForDate(date, calendarSlots = []) {
   const dateStr = date.toISOString().slice(0, 10);
   const dayName = date.toLocaleDateString('default', { weekday: 'long' });
-  return schedules.filter(s => {
+  return calendarSlots.filter(s => {
     if (s.scheduledDate) return s.scheduledDate === dateStr;
     return s.day === dayName;
   });
@@ -78,8 +78,55 @@ const TYPE_COLORS = {
 };
 const typeColor = (t) => TYPE_COLORS[t] || TYPE_COLORS.other;
 
+// Visual treatment per lifecycle status so completed/cancelled/rescheduled are obvious.
+const STATUS_META = {
+  completed:   { label: 'Completed',   bg: 'var(--pos-50)',  bar: 'var(--pos)',  ink: 'var(--green-ink)' },
+  cancelled:   { label: 'Cancelled',   bg: 'var(--neg-50)',  bar: 'var(--neg)',  ink: 'var(--red-ink)' },
+  rescheduled: { label: 'Rescheduled', bg: 'var(--warn-50)', bar: 'var(--warn)', ink: 'var(--amber-ink)' },
+  pending:     { label: 'Scheduled',   bg: null,             bar: null,          ink: 'var(--sub)' },
+};
+const statusMeta = (s) => STATUS_META[s] || STATUS_META.pending;
+
 const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
 const ALL = '__all__';
+
+const pad2 = (n) => String(n).padStart(2, '0');
+const localDateStr = (d) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+
+// Lay out overlapping slots side-by-side so same-time classes don't hide each other.
+// Returns { [slotId]: { col, cols } }.
+function computeDayLayout(slots) {
+  const items = slots.map(s => {
+    const [h = '8', m = '0'] = (s.time || '08:00').split(':');
+    const start = parseInt(h) * 60 + parseInt(m || '0');
+    const end = start + (parseInt(s.duration) || 60);
+    return { id: s.id, start, end };
+  }).sort((a, b) => a.start - b.start || a.end - b.end);
+
+  const layout = {};
+  let i = 0;
+  while (i < items.length) {
+    let j = i + 1;
+    let clusterEnd = items[i].end;
+    const cluster = [items[i]];
+    while (j < items.length && items[j].start < clusterEnd) {
+      cluster.push(items[j]);
+      clusterEnd = Math.max(clusterEnd, items[j].end);
+      j++;
+    }
+    const colEnds = [];
+    cluster.forEach(it => {
+      let col = colEnds.findIndex(e => e <= it.start);
+      if (col === -1) { col = colEnds.length; colEnds.push(it.end); }
+      else colEnds[col] = it.end;
+      it.col = col;
+    });
+    const cols = colEnds.length;
+    cluster.forEach(it => { layout[it.id] = { col: it.col, cols }; });
+    i = j;
+  }
+  return layout;
+}
 
 // ── Component ───────────────────────────────────────────────────
 export default function Schedule() {
@@ -102,6 +149,7 @@ export default function Schedule() {
   const [view,          setView]          = useState('week'); // 'week' | 'month'
   const [calDate,       setCalDate]       = useState(new Date());
   const [slotDetail,    setSlotDetail]    = useState(null);
+  const [reschedule,    setReschedule]    = useState(null); // { slot, date, time }
   const [activeTab,     setActiveTab]     = useState('calendar'); // 'calendar' | 'attendance'
 
   // Add class modal
@@ -130,6 +178,8 @@ export default function Schedule() {
   // Attendance report (tab)
   const [attReport,     setAttReport]     = useState([]);
   const [reportLoading, setReportLoading] = useState(false);
+  const [attDateFilter, setAttDateFilter] = useState(localDateStr(new Date())); // default: today
+  const [attStaffFilter, setAttStaffFilter] = useState('');
 
   function blankForm() {
     return { title: '', batchId: '', day: 'Monday', scheduledDate: '', recurring: false, time: '', duration: '60', type: 'live-class', facultyName: '', meetLink: '', notes: '', participantType: 'all', participantIds: [] };
@@ -152,29 +202,37 @@ export default function Schedule() {
 
   // ── Load batches + all schedules ──────────────────────────────
   const reloadSchedules = async (batchList) => {
-    if (selectedBatch === ALL) {
-      // Everyone (incl. staff) sees every batch's schedule so they can see
-      // what other staff have planned.
-      setSchedules(await getAllSchedules());
-    } else {
-      setSchedules(await getBatchSchedules(selectedBatch));
+    try {
+      if (selectedBatch === ALL) {
+        setSchedules(await getAllSchedules());
+      } else {
+        setSchedules(await getBatchSchedules(selectedBatch));
+      }
+    } catch (err) {
+      console.error('Schedule load failed:', err);
+      setSchedules([]);
     }
   };
 
   useEffect(() => {
     const load = async () => {
       setLoading(true);
-      const [bList, sList, asmts] = await Promise.all([
-        getBatches(),          // all batches so staff can see every batch's schedule
-        getStaffProfiles(),
-        getAllAssessments().catch(() => []),
-      ]);
-      setBatches(bList);
-      setStaffList(sList);
-      setAssessments(asmts);
-      // preload everything so the schedule shows immediately, no selection needed
-      setSchedules(await getAllSchedules());
-      setLoading(false);
+      try {
+        const [bList, sList, asmts, sch] = await Promise.all([
+          getBatches().catch(() => []),
+          getStaffProfiles().catch(() => []),
+          getAllAssessments().catch(() => []),
+          getAllSchedules().catch(() => []),
+        ]);
+        setBatches(bList);
+        setStaffList(sList);
+        setAssessments(asmts);
+        setSchedules(sch);
+      } catch (err) {
+        console.error('Schedule initial load failed:', err);
+      } finally {
+        setLoading(false);   // always render, never hang on a blank spinner
+      }
     };
     load();
   }, []);  // eslint-disable-line
@@ -221,9 +279,11 @@ export default function Schedule() {
         ...form,
         batchId: targetBatch,
         batchName: batchName(targetBatch),
-        participantStudents: form.participantType === 'all'
-          ? modalStudents.map(s => ({ id: s.id, name: s.name }))
-          : modalStudents.filter(s => form.participantIds.includes(s.id)).map(s => ({ id: s.id, name: s.name })),
+        participantStudents: form.type === 'meeting'
+          ? []   // meetings are staff-only, no students
+          : form.participantType === 'all'
+            ? modalStudents.map(s => ({ id: s.id, name: s.name }))
+            : modalStudents.filter(s => form.participantIds.includes(s.id)).map(s => ({ id: s.id, name: s.name })),
       });
       setToast({ message: 'Added to schedule!', type: 'success' });
       setShowAdd(false);
@@ -377,11 +437,21 @@ export default function Schedule() {
 
   const SlotPill = ({ slot, compact }) => {
     const pc = typeColor(slot.type);
+    const sm = statusMeta(slot.status);
+    const cancelled = slot.status === 'cancelled';
+    const bg  = sm.bg || pc.bg;
+    const col = sm.bar || pc.col;
+    const faculty = slot.facultyName || batchName(slot.batchId);
     return (
       <div onClick={() => setSlotDetail(slot)}
-        style={{ padding: compact ? '2px 5px' : '4px 8px', borderRadius: 5, marginBottom: 2, cursor: 'pointer', background: pc.bg, color: pc.col, fontSize: compact ? 10 : 11, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', border: `1px solid ${pc.col}30` }}
-        title={`${slot.title} · ${slot.batchName || batchName(slot.batchId)}`}>
-        {slot.time && `${slot.time} `}{slot.title}
+        style={{ padding: compact ? '3px 6px' : '4px 8px', borderRadius: 5, marginBottom: 3, cursor: 'pointer', background: bg, color: col, fontSize: compact ? 10 : 11, fontWeight: 600, overflow: 'hidden', border: `1px solid ${col}30`, borderLeft: `3px solid ${col}` }}
+        title={`${slot.title} · ${slot.batchName || batchName(slot.batchId)}${faculty ? ` · ${faculty}` : ''} · ${sm.label}`}>
+        <div style={{ display:'flex', alignItems:'center', gap:3, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', textDecoration: cancelled ? 'line-through' : 'none' }}>
+          {slot.status === 'completed' && <CheckCircle size={9} style={{ flexShrink:0 }} />}
+          {slot.time && `${slot.time} `}{slot.title}
+        </div>
+        {faculty && <div style={{ fontSize:9, fontWeight:500, opacity:.8, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{faculty}</div>}
+        {slot.status && <div style={{ fontSize:8.5, fontWeight:700, textTransform:'uppercase', letterSpacing:'.03em', marginTop:1 }}>{sm.label}</div>}
       </div>
     );
   };
@@ -471,6 +541,10 @@ export default function Schedule() {
               <span style={{ display:'flex', alignItems:'center', gap:6 }}><span style={{ width:9, height:9, borderRadius:3, background:'var(--pos)', display:'inline-block' }}/> Live class</span>
               <span style={{ display:'flex', alignItems:'center', gap:6 }}><span style={{ width:9, height:9, borderRadius:3, background:'var(--info)', display:'inline-block' }}/> Meeting</span>
               <span style={{ display:'flex', alignItems:'center', gap:6 }}><span style={{ width:9, height:9, borderRadius:3, background:'var(--neg)', display:'inline-block' }}/> Assessment</span>
+              <span style={{ width:1, height:14, background:'var(--border)' }}/>
+              <span style={{ color:'var(--green-ink)', fontWeight:600 }}>✓ Completed</span>
+              <span style={{ color:'var(--amber-ink)', fontWeight:600 }}>Rescheduled</span>
+              <span style={{ color:'var(--red-ink)', fontWeight:600, textDecoration:'line-through' }}>Cancelled</span>
             </div>
           </div>
 
@@ -498,20 +572,24 @@ export default function Schedule() {
                 {weekDates.map((date, idx) => {
                   const isToday = date.toDateString() === today.toDateString();
                   const slots = getSlotsForDate(date, calendarSlots);
+                  const layout = computeDayLayout(slots);
                   return (
                     <div key={idx} style={{ position:'relative', height: HOURS.length * HOUR_PX, borderRight:'1px solid var(--border-soft)', background: isToday ? 'rgba(15,158,142,.04)' : 'transparent', backgroundImage:`repeating-linear-gradient(var(--border-soft) 0 1px, transparent 1px ${HOUR_PX}px)` }}>
                       {slots.map(slot => {
                         const pc = typeColor(slot.type);
+                        const sm = statusMeta(slot.status);
                         const { top, height } = slotPos(slot);
-                        const isLive = slot.type === 'live-class' || slot.status === 'completed';
-                        const slotBg  = slot.status === 'cancelled' ? 'var(--neg-50)' : pc.bg;
-                        const slotBar = slot.status === 'cancelled' ? 'var(--neg)' : pc.bar;
+                        const slotBg  = sm.bg || pc.bg;
+                        const slotBar = sm.bar || pc.bar;
+                        const { col = 0, cols = 1 } = layout[slot.id] || {};
                         return (
                           <div key={slot.id} onClick={() => setSlotDetail(slot)}
-                            style={{ position:'absolute', left:4, right:4, top, height, background:slotBg, borderLeft:`3px solid ${slotBar}`, borderRadius:7, padding:'5px 8px', overflow:'hidden', cursor:'pointer' }}>
-                            <div style={{ fontSize:11.5, fontWeight:700, color:'var(--ink)', lineHeight:1.2, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{slot.title}</div>
-                            <div style={{ fontSize:9.5, color:slotBar, fontWeight:700, marginTop:1, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{slot.batchName || batchName(slot.batchId)}</div>
-                            <div style={{ fontSize:9.5, color:'var(--sub)', marginTop:1 }}>{slot.time ? `${slot.time} ` : ''}{slot.facultyName ? `· ${slot.facultyName}` : ''}</div>
+                            style={{ position:'absolute', left:`calc(${(col/cols)*100}% + 2px)`, width:`calc(${(1/cols)*100}% - 4px)`, top, height, background:slotBg, borderLeft:`3px solid ${slotBar}`, borderRadius:7, padding:'4px 6px', overflow:'hidden', cursor:'pointer' }}>
+                            <div style={{ fontSize: cols>1?10.5:11.5, fontWeight:700, color:'var(--ink)', lineHeight:1.2, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', textDecoration: slot.status==='cancelled'?'line-through':'none' }}>{slot.status==='completed' && '✓ '}{slot.title}</div>
+                            <div style={{ fontSize:9, color:slotBar, fontWeight:700, marginTop:1, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{slot.facultyName || slot.batchName || batchName(slot.batchId)}</div>
+                            {slot.status
+                              ? <div style={{ fontSize:8.5, fontWeight:700, color:sm.ink, textTransform:'uppercase', letterSpacing:'.03em', marginTop:1 }}>{sm.label}</div>
+                              : (cols === 1 && <div style={{ fontSize:9.5, color:'var(--sub)', marginTop:1 }}>{slot.time ? `${slot.time} ` : ''}{slot.batchName || batchName(slot.batchId)}</div>)}
                           </div>
                         );
                       })}
@@ -526,6 +604,7 @@ export default function Schedule() {
           {view === 'day' && (() => {
             const isToday = calDate.toDateString() === today.toDateString();
             const slots = getSlotsForDate(calDate, calendarSlots);
+            const layout = computeDayLayout(slots);
             return (
               <div style={{ background:'var(--surface)', border:'1px solid var(--border)', borderRadius:'var(--r-card)', boxShadow:'var(--sh-sm)', overflow:'hidden' }}>
                 <div style={{ padding:'12px 16px', borderBottom:'1px solid var(--border)', display:'flex', alignItems:'center', gap:10 }}>
@@ -545,14 +624,19 @@ export default function Schedule() {
                     {slots.map(slot => {
                       const pc = typeColor(slot.type);
                       const { top, height } = slotPos(slot);
-                      const slotBg  = slot.status === 'cancelled' ? 'var(--neg-50)' : pc.bg;
-                      const slotBar = slot.status === 'cancelled' ? 'var(--neg)' : pc.bar;
+                      const sm = statusMeta(slot.status);
+                      const slotBg  = sm.bg || pc.bg;
+                      const slotBar = sm.bar || pc.bar;
+                      const { col = 0, cols = 1 } = layout[slot.id] || {};
                       return (
                         <div key={slot.id} onClick={() => setSlotDetail(slot)}
-                          style={{ position:'absolute', left:8, right:8, top, height, background:slotBg, borderLeft:`3px solid ${slotBar}`, borderRadius:7, padding:'6px 10px', overflow:'hidden', cursor:'pointer' }}>
-                          <div style={{ fontSize:12.5, fontWeight:700, color:'var(--ink)' }}>{slot.title}</div>
-                          <div style={{ fontSize:10.5, color:slotBar, fontWeight:700 }}>{slot.batchName || batchName(slot.batchId)}{slot._assessment ? ' · Assessment' : ''}</div>
-                          <div style={{ fontSize:10.5, color:'var(--sub)' }}>{slot.time ? `${slot.time} ` : ''}{slot.facultyName ? `· ${slot.facultyName}` : ''}</div>
+                          style={{ position:'absolute', left:`calc(${(col/cols)*100}% + 6px)`, width:`calc(${(1/cols)*100}% - 10px)`, top, height, background:slotBg, borderLeft:`3px solid ${slotBar}`, borderRadius:7, padding:'6px 10px', overflow:'hidden', cursor:'pointer' }}>
+                          <div style={{ display:'flex', alignItems:'center', gap:6, flexWrap:'wrap' }}>
+                            <span style={{ fontSize:12.5, fontWeight:700, color:'var(--ink)', textDecoration: slot.status==='cancelled'?'line-through':'none' }}>{slot.status==='completed' && '✓ '}{slot.title}</span>
+                            {slot.status && <span style={{ fontSize:9, fontWeight:700, color:sm.ink, background:'#fff', borderRadius:20, padding:'1px 7px' }}>{sm.label}</span>}
+                          </div>
+                          <div style={{ fontSize:10.5, color:slotBar, fontWeight:700, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{slot.facultyName || slot.batchName || batchName(slot.batchId)}{slot._assessment ? ' · Assessment' : ''}</div>
+                          <div style={{ fontSize:10.5, color:'var(--sub)', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{slot.time ? `${slot.time} ` : ''}{slot.batchName || batchName(slot.batchId)}</div>
                         </div>
                       );
                     })}
@@ -668,7 +752,11 @@ export default function Schedule() {
                   <MessageSquare size={13}/> Progress Reports
                 </button>
                 <select className="form-input" style={{ height:32, fontSize:12, flex:'0 0 auto', width:'auto' }} value={slotDetail.status || ''}
-                  onChange={async e => { const ns = e.target.value; if (!ns) return; await updateScheduleStatus(slotDetail.id, ns); await reloadSchedules(); setSlotDetail({ ...slotDetail, status: ns }); }}>
+                  onChange={async e => {
+                    const ns = e.target.value; if (!ns) return;
+                    if (ns === 'rescheduled') { setReschedule({ slot: slotDetail, date: slotDetail.scheduledDate || '', time: slotDetail.time || '' }); return; }
+                    await updateScheduleStatus(slotDetail.id, ns); await reloadSchedules(); setSlotDetail({ ...slotDetail, status: ns });
+                  }}>
                   <option value="">Update status…</option>
                   <option value="completed">Completed</option>
                   <option value="cancelled">Cancelled</option>
@@ -686,44 +774,73 @@ export default function Schedule() {
       })()}
 
       {/* ── ATTENDANCE REPORT TAB ── */}
-      {activeTab === 'attendance' && (
-        <div>
-          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:14, flexWrap:'wrap', gap:10 }}>
-            <div style={{ fontSize:13, color:'var(--muted)' }}>{reportLoading ? 'Loading report…' : `${attReport.length} sessions with attendance`}</div>
-            <button className="btn btn-secondary btn-sm" onClick={exportAttendance} disabled={attReport.length === 0}><Download size={13}/> Export CSV</button>
-          </div>
-          {reportLoading && <Loading/>}
-          {!reportLoading && attReport.length === 0 && (
-            <div className="card" style={{ textAlign:'center', padding:48, color:'var(--muted)' }}>No attendance data yet. Mark attendance on sessions from the Calendar tab.</div>
-          )}
-          {!reportLoading && attReport.map(({ session, attendance }) => {
-            const stored = attendance?.attendance || attendance?.records;
-            if (!stored) return null;
-            const entries = Object.entries(stored);
-            const presentN = entries.filter(([, v]) => v.present).length;
-            const absentN = entries.length - presentN;
-            return (
-              <div key={session.id} className="card" style={{ padding:'14px 18px', marginBottom:10 }}>
-                <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:10 }}>
-                  <div style={{ flex:1 }}>
-                    <div style={{ fontSize:14, fontWeight:600 }}>{session.title}</div>
-                    <div style={{ fontSize:12, color:'var(--muted)' }}>{session.batchName || batchName(session.batchId)} · {session.scheduledDate || session.day} {session.time && `· ${session.time}`}</div>
-                  </div>
-                  <span className="badge badge-green">{presentN} present</span>
-                  <span className="badge badge-red">{absentN} absent</span>
-                </div>
-                <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
-                  {entries.map(([sid, v]) => (
-                    <div key={sid} style={{ display:'flex', alignItems:'center', gap:5, padding:'4px 10px', borderRadius:20, fontSize:11, fontWeight:500, background: v.present ? 'var(--pos-50)' : 'var(--neg-50)', color: v.present ? 'var(--green-ink)' : 'var(--red-ink)' }}>
-                      {v.present ? <CheckCircle size={11}/> : <XCircle size={11}/>}{v.name}
-                    </div>
-                  ))}
-                </div>
+      {activeTab === 'attendance' && (() => {
+        const dateOf = (r) => {
+          const ts = r.attendance?.createdAt || r.attendance?.savedAt;
+          if (ts?.seconds) return localDateStr(new Date(ts.seconds * 1000));
+          return r.session?.scheduledDate || '';
+        };
+        const facultyNames = [...new Set(attReport.map(r => r.session?.facultyName).filter(Boolean))];
+        const shown = attReport.filter(r => {
+          if (attStaffFilter && r.session?.facultyName !== attStaffFilter) return false;
+          if (attDateFilter && dateOf(r) !== attDateFilter) return false;
+          return true;
+        });
+        return (
+          <div>
+            {/* Filters — default to today */}
+            <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:14, flexWrap:'wrap' }}>
+              <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                <span style={{ fontSize:12, color:'var(--muted)', fontWeight:600 }}>Date</span>
+                <input type="date" className="form-input" style={{ height:36, width:'auto' }} value={attDateFilter} onChange={e => setAttDateFilter(e.target.value)}/>
+                <button className="btn btn-ghost btn-sm" onClick={() => setAttDateFilter(localDateStr(new Date()))}>Today</button>
+                {attDateFilter && <button className="btn btn-ghost btn-sm" onClick={() => setAttDateFilter('')}>All dates</button>}
               </div>
-            );
-          }).filter(Boolean)}
-        </div>
-      )}
+              <select className="form-input" style={{ height:36, width:'auto' }} value={attStaffFilter} onChange={e => setAttStaffFilter(e.target.value)}>
+                <option value="">All staff / faculty</option>
+                {facultyNames.map(n => <option key={n} value={n}>{n}</option>)}
+              </select>
+              <div style={{ flex:1 }}/>
+              <div style={{ fontSize:13, color:'var(--muted)' }}>{reportLoading ? 'Loading…' : `${shown.length} of ${attReport.length} sessions`}</div>
+              <button className="btn btn-secondary btn-sm" onClick={exportAttendance} disabled={attReport.length === 0}><Download size={13}/> Export CSV</button>
+            </div>
+            {reportLoading && <Loading/>}
+            {!reportLoading && shown.length === 0 && (
+              <div className="card" style={{ textAlign:'center', padding:48, color:'var(--muted)' }}>
+                {attReport.length === 0 ? 'No attendance data yet. Mark attendance on sessions from the Calendar tab.'
+                  : `No attendance for ${attDateFilter || 'the selected filters'}${attStaffFilter ? ` · ${attStaffFilter}` : ''}. Try “All dates” or another staff.`}
+              </div>
+            )}
+            {!reportLoading && shown.map(({ session, attendance }) => {
+              const stored = attendance?.attendance || attendance?.records;
+              if (!stored) return null;
+              const entries = Object.entries(stored);
+              const presentN = entries.filter(([, v]) => v.present).length;
+              const absentN = entries.length - presentN;
+              return (
+                <div key={session.id} className="card" style={{ padding:'14px 18px', marginBottom:10 }}>
+                  <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:10, flexWrap:'wrap' }}>
+                    <div style={{ flex:1, minWidth:180 }}>
+                      <div style={{ fontSize:14, fontWeight:600 }}>{session.title}</div>
+                      <div style={{ fontSize:12, color:'var(--muted)' }}>{session.batchName || batchName(session.batchId)} · {dateOf({ session, attendance }) || session.scheduledDate || session.day} {session.time && `· ${session.time}`}</div>
+                    </div>
+                    {session.facultyName && <span className="badge badge-blue">Marked by {session.facultyName}</span>}
+                    <span className="badge badge-green">{presentN} present</span>
+                    <span className="badge badge-red">{absentN} absent</span>
+                  </div>
+                  <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
+                    {entries.map(([sid, v]) => (
+                      <div key={sid} style={{ display:'flex', alignItems:'center', gap:5, padding:'4px 10px', borderRadius:20, fontSize:11, fontWeight:500, background: v.present ? 'var(--pos-50)' : 'var(--neg-50)', color: v.present ? 'var(--green-ink)' : 'var(--red-ink)' }}>
+                        {v.present ? <CheckCircle size={11}/> : <XCircle size={11}/>}{v.name}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            }).filter(Boolean)}
+          </div>
+        );
+      })()}
 
       {/* ── Add Modal ── */}
       {showAdd && (
@@ -792,7 +909,12 @@ export default function Schedule() {
                 <input className="form-input" placeholder="https://meet.google.com/..." value={form.meetLink} onChange={e => setForm({ ...form, meetLink: e.target.value })}/>
               </div>
             </div>
-            {/* Participant selection */}
+            {/* Participant selection — not shown for meetings (staff-only) */}
+            {form.type === 'meeting' ? (
+              <div style={{ fontSize:12.5, color:'var(--text-sub)', background:'var(--info-50)', color:'var(--info)', padding:'9px 12px', borderRadius:8 }}>
+                This is a staff meeting — no student selection needed. Set the organizer above.
+              </div>
+            ) : (
             <div className="form-group">
               <label className="form-label">Participants</label>
               <div className="segmented" style={{ marginBottom:10 }}>
@@ -825,6 +947,7 @@ export default function Schedule() {
                 <div style={{ fontSize:12, color:'var(--muted)', marginTop:6 }}>{form.participantIds.length} student{form.participantIds.length !== 1 ? 's' : ''} selected</div>
               )}
             </div>
+            )}
             <div className="form-group">
               <label className="form-label">Notes (optional)</label>
               <textarea className="form-input" rows={2} placeholder="Any notes for this entry…" value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })}/>
@@ -936,6 +1059,33 @@ export default function Schedule() {
               </div>
             </>
           )}
+        </Modal>
+      )}
+
+      {/* ── Reschedule modal ── */}
+      {reschedule && (
+        <Modal title={`Reschedule — ${reschedule.slot.title}`} onClose={() => setReschedule(null)}>
+          <div style={{ fontSize:12.5, color:'var(--text-sub)', marginBottom:14 }}>Pick the new date and time for this class.</div>
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+            <div className="form-group"><label className="form-label">New Date *</label>
+              <input type="date" className="form-input" value={reschedule.date} onChange={e => setReschedule(r => ({ ...r, date: e.target.value }))}/></div>
+            <div className="form-group"><label className="form-label">New Time *</label>
+              <input type="time" className="form-input" value={reschedule.time} onChange={e => setReschedule(r => ({ ...r, time: e.target.value }))}/></div>
+          </div>
+          <div style={{ display:'flex', gap:10, justifyContent:'flex-end', marginTop:14 }}>
+            <button className="btn btn-ghost" onClick={() => setReschedule(null)}>Cancel</button>
+            <button className="btn btn-primary" disabled={saving || !reschedule.date || !reschedule.time}
+              onClick={async () => {
+                setSaving(true);
+                try {
+                  await updateBatchSchedule(reschedule.slot.id, { status:'rescheduled', scheduledDate: reschedule.date, time: reschedule.time });
+                  setToast({ message:'Class rescheduled.', type:'success' });
+                  const ns = { ...reschedule.slot, status:'rescheduled', scheduledDate: reschedule.date, time: reschedule.time };
+                  setReschedule(null); setSlotDetail(ns); await reloadSchedules();
+                } catch (err) { setToast({ message:'Error: ' + err.message, type:'error' }); }
+                setSaving(false);
+              }}>Save New Time</button>
+          </div>
         </Modal>
       )}
 
