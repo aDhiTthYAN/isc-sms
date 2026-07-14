@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import {
   getBatches, getStaffBatches, getBatchSchedules, getAllSchedules, addBatchSchedule,
   deleteBatchSchedule, updateScheduleStatus, updateBatchSchedule, saveAttendance,
-  getSessionAttendance, getBatchStudents, getStaffProfiles,
+  getSessionAttendance, deleteSessionAttendance, getBatchStudents, getStaffProfiles,
   saveClassReport, updateClassReport, getSessionReports, getStudentReports,
   getAllAssessments,
 } from '../firebase/services';
@@ -150,6 +150,7 @@ export default function Schedule() {
   const [calDate,       setCalDate]       = useState(new Date());
   const [slotDetail,    setSlotDetail]    = useState(null);
   const [reschedule,    setReschedule]    = useState(null); // { slot, date, time }
+  const [reportOnlyUnmarked, setReportOnlyUnmarked] = useState(false);
   const [activeTab,     setActiveTab]     = useState('calendar'); // 'calendar' | 'attendance'
 
   // Add class modal
@@ -333,6 +334,25 @@ export default function Schedule() {
       await saveAttendance(attSession.id, attSession.batchId, attData);
       setSavedAtt(prev => ({ ...prev, [attSession.id]: true }));
       setToast({ message: 'Attendance saved!', type: 'success' });
+      setAttSession(null);
+      if (activeTab === 'attendance') loadAttReport();
+    } catch (err) {
+      setToast({ message: 'Error: ' + err.message, type: 'error' });
+    }
+    setSaving(false);
+  };
+
+  const handleClearAttendance = async () => {
+    if (!attSession) return;
+    if (!window.confirm('Clear all saved attendance for this class? This cannot be undone.')) return;
+    setSaving(true);
+    try {
+      await deleteSessionAttendance(attSession.id);
+      const blank = {};
+      attParticipants.forEach(s => { blank[s.id] = { name: s.name, present: false }; });
+      setAttData(blank);
+      setSavedAtt(prev => { const n = { ...prev }; delete n[attSession.id]; return n; });
+      setToast({ message: 'Attendance cleared.', type: 'info' });
       setAttSession(null);
       if (activeTab === 'attendance') loadAttReport();
     } catch (err) {
@@ -782,6 +802,7 @@ export default function Schedule() {
         };
         const facultyNames = [...new Set(attReport.map(r => r.session?.facultyName).filter(Boolean))];
         const shown = attReport.filter(r => {
+          if (r.session?.status === 'cancelled') return false; // cancelled classes don't count
           if (attStaffFilter && r.session?.facultyName !== attStaffFilter) return false;
           if (attDateFilter && dateOf(r) !== attDateFilter) return false;
           return true;
@@ -973,7 +994,9 @@ export default function Schedule() {
                 </div>
                 <span className="badge badge-green"><CheckCircle size={11}/> {presentCount} present</span>
                 <span className="badge badge-red"><XCircle size={11}/> {absentCount} absent</span>
-                <button className="btn btn-ghost btn-sm" onClick={() => { const all = {}; attParticipants.forEach(s => { all[s.id] = { name: s.name, present: true }; }); setAttData(all); }}>Mark All Present</button>
+                <button className="btn btn-ghost btn-sm" onClick={() => { const all = {}; attParticipants.forEach(s => { all[s.id] = { name: s.name, present: true }; }); setAttData(all); }}>All Present</button>
+                <button className="btn btn-ghost btn-sm" onClick={() => { const all = {}; attParticipants.forEach(s => { all[s.id] = { name: s.name, present: false }; }); setAttData(all); }}>All Absent</button>
+                <button className="btn btn-ghost btn-sm" style={{ color:'var(--red-ink)' }} onClick={handleClearAttendance}>Clear / Undo</button>
               </div>
               <div style={{ display:'flex', flexDirection:'column', gap:4, maxHeight:380, overflowY:'auto' }}>
                 {filteredParticipants.map(s => {
@@ -1004,12 +1027,29 @@ export default function Schedule() {
           {reportModalLoading ? <Loading/> : (
             <>
               <div style={{ fontSize:12, color:'var(--muted)', marginBottom:6 }}>{reportSession.batchName || batchName(reportSession.batchId)} · {reportSession.scheduledDate || reportSession.day} {reportSession.time && `· ${reportSession.time}`}</div>
-              <div style={{ fontSize:12.5, color:'var(--sub)', marginBottom:14, background:'var(--accent-50)', color:'var(--accent-ink)', padding:'8px 12px', borderRadius:8 }}>
+              <div style={{ fontSize:12.5, color:'var(--sub)', marginBottom:12, background:'var(--accent-50)', color:'var(--accent-ink)', padding:'8px 12px', borderRadius:8 }}>
                 Write a short progress note per student for this class. Notes from every faculty are kept together — expand a student to see previous reports.
               </div>
-              <div style={{ display:'flex', flexDirection:'column', gap:8, maxHeight:440, overflowY:'auto' }}>
+              {(() => {
+                const isMarked = (s) => !!(reportNotes[s.id]?.existingId) || (prevReports[s.id] || []).some(r => r.scheduleId === reportSession.id);
+                const missing = reportParts.filter(s => !isMarked(s)).length;
+                return (
+                  <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:10, flexWrap:'wrap' }}>
+                    <span className={`badge ${missing ? 'badge-amber' : 'badge-green'}`}>{missing} not yet marked</span>
+                    <label style={{ display:'flex', alignItems:'center', gap:6, fontSize:12.5, cursor:'pointer' }}>
+                      <input type="checkbox" checked={reportOnlyUnmarked} onChange={e => setReportOnlyUnmarked(e.target.checked)}/>
+                      Show only unmarked students
+                    </label>
+                  </div>
+                );
+              })()}
+              <div style={{ display:'flex', flexDirection:'column', gap:8, maxHeight:420, overflowY:'auto' }}>
                 {reportParts.length === 0 && <div style={{ fontSize:13, color:'var(--muted)', textAlign:'center', padding:20 }}>No participants found for this session.</div>}
-                {reportParts.map(s => {
+                {reportParts.filter(s => {
+                  if (!reportOnlyUnmarked) return true;
+                  const marked = !!(reportNotes[s.id]?.existingId) || (prevReports[s.id] || []).some(r => r.scheduleId === reportSession.id);
+                  return !marked;
+                }).map(s => {
                   const n = reportNotes[s.id] || { text:'', rating:'', existingId:null };
                   const history = (prevReports[s.id] || []).filter(r => r.scheduleId !== reportSession.id || r.facultyUid !== profile?.uid);
                   const isOpen = expanded[s.id];

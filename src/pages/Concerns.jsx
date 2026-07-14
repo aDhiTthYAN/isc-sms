@@ -268,10 +268,14 @@ export default function Concerns() {
                 </select>
               </div>
               <div className="form-group">
-                <label className="form-label">Assign To (Staff)</label>
+                <label className="form-label">Assign / Raise To</label>
                 <select className="form-input" value={form.assignedTo}
                   onChange={e => setForm({...form, assignedTo:e.target.value})}>
                   <option value="">No assignment</option>
+                  {/* CEOs first so staff can raise a concern directly to the CEO */}
+                  {staffList.filter(s => s.role === 'ceo' && s.active !== false).map(s => (
+                    <option key={s.id} value={s.id}>⭐ {s.name} (CEO)</option>
+                  ))}
                   {staffList.filter(s => s.role !== 'ceo' && s.active !== false).map(s => (
                     <option key={s.id} value={s.id}>{s.name} ({s.role})</option>
                   ))}

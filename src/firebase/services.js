@@ -430,12 +430,26 @@ export const getStaffBySubject = async (subject) => {
 export const updateScheduleStatus = async (scheduleId, status, note = '') =>
   updateDoc(doc(db,'schedules', scheduleId), { status, statusNote: note, statusUpdatedAt: new Date().toISOString() });
 
-export const saveAttendance = async (scheduleId, batchId, attendanceData) =>
-  addDoc(collection(db,'attendance'), {
-    scheduleId, batchId,
-    records: attendanceData,
-    createdAt: serverTimestamp(),
-  });
+// Upsert attendance for a session: overwrite the existing record instead of
+// stacking duplicate docs on every save.
+export const saveAttendance = async (scheduleId, batchId, attendanceData) => {
+  const q = query(collection(db,'attendance'), where('scheduleId','==',scheduleId));
+  const snap = await getDocs(q);
+  if (!snap.empty) {
+    const [first, ...rest] = snap.docs;
+    await updateDoc(doc(db,'attendance', first.id), { batchId, records: attendanceData, updatedAt: serverTimestamp() });
+    await Promise.all(rest.map(d => deleteDoc(doc(db,'attendance', d.id)))); // clean up any old duplicates
+    return;
+  }
+  await addDoc(collection(db,'attendance'), { scheduleId, batchId, records: attendanceData, createdAt: serverTimestamp() });
+};
+
+// Remove all attendance for a session (used to undo / clear).
+export const deleteSessionAttendance = async (scheduleId) => {
+  const q = query(collection(db,'attendance'), where('scheduleId','==',scheduleId));
+  const snap = await getDocs(q);
+  await Promise.all(snap.docs.map(d => deleteDoc(doc(db,'attendance', d.id))));
+};
 
 export const getSessionAttendance = async (scheduleId) => {
   const q = query(collection(db,'attendance'), where('scheduleId','==',scheduleId));

@@ -59,6 +59,8 @@ export default function StudentProfile() {
   const [batchTasks,  setBatchTasks]  = useState([]);
   const [perfFrom,    setPerfFrom]    = useState('');
   const [perfTo,      setPerfTo]      = useState('');
+  const [asgStatus,   setAsgStatus]   = useState(''); // '', 'done', 'pending', 'overdue'
+  const [asgStaff,    setAsgStaff]    = useState('');
   const [staffList,   setStaffList]   = useState([]);
   const [loading,     setLoading]     = useState(true);
   const [activeTab,   setActiveTab]   = useState('overview');
@@ -676,7 +678,16 @@ export default function StudentProfile() {
           return true;
         };
         const shownReports = classReports.filter(r => inRange(r.sessionDate));
-        const shownTasks   = batchTasks.filter(t => inRange(t.dueDate) || (!t.dueDate && !perfFrom && !perfTo));
+        const taskState = (t) => {
+          if (t.submittedBy?.some(x => x.studentId === id)) return 'done';
+          if (t.dueDate && new Date(t.dueDate) < new Date()) return 'overdue';
+          return 'pending';
+        };
+        const shownTasks = batchTasks
+          .filter(t => inRange(t.dueDate) || (!t.dueDate && !perfFrom && !perfTo))
+          .filter(t => !asgStatus || taskState(t) === asgStatus)
+          .filter(t => !asgStaff || t.assignedFaculty === asgStaff);
+        const asgStaffNames = [...new Set(batchTasks.map(t => t.assignedFaculty).filter(Boolean))];
         const absent = attendance ? attendance.total - attendance.present : 0;
         return (
         <div>
@@ -754,7 +765,20 @@ export default function StudentProfile() {
 
           {/* Assignments / activity submission tracker */}
           <div className="card" style={{ padding:'16px 20px' }}>
-            <div style={{ fontSize:14, fontWeight:700, marginBottom:12 }}>Assignments &amp; Activities ({shownTasks.filter(t => t.submittedBy?.some(x => x.studentId === id)).length}/{shownTasks.length} done)</div>
+            <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:12, flexWrap:'wrap' }}>
+              <div style={{ fontSize:14, fontWeight:700 }}>Assignments &amp; Activities ({shownTasks.filter(t => t.submittedBy?.some(x => x.studentId === id)).length}/{shownTasks.length} done)</div>
+              <div style={{ flex:1 }}/>
+              <select className="form-input" style={{ width:'auto', height:32, fontSize:12 }} value={asgStatus} onChange={e => setAsgStatus(e.target.value)}>
+                <option value="">All status</option>
+                <option value="done">Done</option>
+                <option value="pending">Pending</option>
+                <option value="overdue">Overdue</option>
+              </select>
+              <select className="form-input" style={{ width:'auto', height:32, fontSize:12 }} value={asgStaff} onChange={e => setAsgStaff(e.target.value)}>
+                <option value="">All staff</option>
+                {asgStaffNames.map(n => <option key={n} value={n}>{n}</option>)}
+              </select>
+            </div>
             {shownTasks.length === 0 ? (
               <div style={{ fontSize:13, color:'var(--text-muted)', padding:'16px 0', textAlign:'center' }}>{batchTasks.length === 0 ? 'No assignments for this student yet.' : 'No assignments in the selected date range.'}</div>
             ) : (
