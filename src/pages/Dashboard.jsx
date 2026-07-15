@@ -247,7 +247,7 @@ export default function Dashboard() {
         setPendingRequests(reqs);
         setNotifications(notifs);
       } catch (err) {
-        console.error('Dashboard load error:', err);
+        import.meta.env.DEV && console.error('Dashboard load error:', err);
       } finally {
         setLoading(false);
       }

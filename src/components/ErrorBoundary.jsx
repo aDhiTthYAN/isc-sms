@@ -12,7 +12,7 @@ export default class ErrorBoundary extends Component {
   }
 
   componentDidCatch(error, info) {
-    console.error('Page crashed:', error, info);
+    if (import.meta.env.DEV) console.error('Page crashed:', error, info);
   }
 
   render() {
