@@ -210,7 +210,7 @@ export default function Schedule() {
         setSchedules(await getBatchSchedules(selectedBatch));
       }
     } catch (err) {
-      console.error('Schedule load failed:', err);
+      import.meta.env.DEV && console.error('Schedule load failed:', err);
       setSchedules([]);
     }
   };
@@ -230,7 +230,7 @@ export default function Schedule() {
         setAssessments(asmts);
         setSchedules(sch);
       } catch (err) {
-        console.error('Schedule initial load failed:', err);
+        import.meta.env.DEV && console.error('Schedule initial load failed:', err);
       } finally {
         setLoading(false);   // always render, never hang on a blank spinner
       }

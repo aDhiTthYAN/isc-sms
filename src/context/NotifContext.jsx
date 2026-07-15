@@ -50,7 +50,7 @@ export function NotifProvider({ children }) {
       setNotifications(notifs);
       setUnreadCount(notifs.filter(n => !n.read).length);
     }, (err) => {
-      console.warn('Notifications listener error:', err.message);
+      import.meta.env.DEV && console.warn('Notifications listener error:', err.message);
     });
 
     return unsubFirestore;

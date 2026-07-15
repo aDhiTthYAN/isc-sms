@@ -510,7 +510,7 @@ export default function Batches() {
       setBatchTasks(tasks || []);
       setBatchAssessments(asmts || []);
     } catch (err) {
-      console.error('loadBatchDetail error:', err);
+      import.meta.env.DEV && console.error('loadBatchDetail error:', err);
       setBatchStudents([]); setSchedules([]); setBatchTasks([]); setBatchAssessments([]);
     }
   };

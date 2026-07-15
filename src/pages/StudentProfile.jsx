@@ -122,7 +122,7 @@ export default function StudentProfile() {
       const flow = batchDoc?.courseFlow || DEFAULT_batchCourseFlow;
       setBatchCourseFlow(flow);
     } catch (err) {
-      console.error('StudentProfile load error:', err);
+      import.meta.env.DEV && console.error('StudentProfile load error:', err);
     } finally {
       setLoading(false);
     }

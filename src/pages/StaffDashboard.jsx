@@ -81,7 +81,7 @@ export default function StaffDashboard() {
         setNotifications(n);
         setMyRequests(r);
       } catch (err) {
-        console.error(err);
+        import.meta.env.DEV && console.error(err);
       } finally {
         setLoading(false);
       }

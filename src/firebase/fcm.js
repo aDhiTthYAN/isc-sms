@@ -25,7 +25,7 @@ export const registerFCMToken = async (userId) => {
 
     return token;
   } catch (err) {
-    console.warn('FCM registration failed:', err.message);
+    import.meta.env.DEV && console.warn('FCM registration failed:', err.message);
     return null;
   }
 };

@@ -66,7 +66,7 @@ export default function Documents() {
       setDocs(items);
       setLoadError('');
     } catch (err) {
-      console.error('Documents load failed:', err);
+      import.meta.env.DEV && console.error('Documents load failed:', err);
       setDocs([]);
       setLoadError(err?.message || 'Could not load documents. Check that Firebase Storage is enabled and its rules allow access.');
     }

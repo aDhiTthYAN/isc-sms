@@ -85,19 +85,30 @@ export const createStaffAccount = async ({ name, email, role, subjects }) => {
   }
 };
 
+// Cryptographically-secure random index in [0, max).
+function randInt(max) {
+  const buf = new Uint32Array(1);
+  crypto.getRandomValues(buf);
+  return buf[0] % max;
+}
+
 function generatePassword() {
   const upper = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
   const lower = 'abcdefghjkmnpqrstuvwxyz';
   const nums  = '23456789';
   const syms  = '@#$!';
   const all   = upper + lower + nums + syms;
-  let pass = '';
-  pass += upper[Math.floor(Math.random() * upper.length)];
-  pass += lower[Math.floor(Math.random() * lower.length)];
-  pass += nums[Math.floor(Math.random() * nums.length)];
-  pass += syms[Math.floor(Math.random() * syms.length)];
-  for (let i = 0; i < 8; i++) {
-    pass += all[Math.floor(Math.random() * all.length)];
+  const chars = [
+    upper[randInt(upper.length)],
+    lower[randInt(lower.length)],
+    nums[randInt(nums.length)],
+    syms[randInt(syms.length)],
+  ];
+  for (let i = 0; i < 8; i++) chars.push(all[randInt(all.length)]);
+  // Fisher–Yates shuffle with CSPRNG (no Math.random anywhere).
+  for (let i = chars.length - 1; i > 0; i--) {
+    const j = randInt(i + 1);
+    [chars[i], chars[j]] = [chars[j], chars[i]];
   }
-  return pass.split('').sort(() => Math.random() - 0.5).join('');
+  return chars.join('');
 }
