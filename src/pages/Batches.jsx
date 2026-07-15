@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
   getBatches, addBatch, updateBatch,
-  getBatchStudents, addStudent, bulkAddStudents, getBatchStudentCount, updateStudent,
+  getBatchStudents, addStudent, bulkAddStudents, getBatchStudentCount, updateStudent, syncBatchStaffToStudents,
   getStaffProfiles, getBatchSchedules, addBatchSchedule, deleteBatchSchedule,
   getBatchTasks, addBatchTask, markTaskSubmitted, updateBatchTask, deleteBatchTask,
   updateScheduleStatus, saveAttendance, getSessionAttendance,
@@ -367,7 +367,9 @@ export default function Batches() {
   const { profile } = useAuth();
   const navigate    = useNavigate();
   const location    = useLocation();
-  const isCEOorAdmin = profile?.role === 'ceo' || profile?.role === 'admin';
+  const isCEOorAdmin = profile?.role === 'ceo';
+  // Access scope for rules-compliant queries (staff must carry staffIds clause)
+  const scope = { role: profile?.role, uid: profile?.uid, email: profile?.email };
 
   const [batches, setBatches]           = useState([]);
   const [staffList, setStaffList]       = useState([]);
@@ -490,7 +492,7 @@ export default function Batches() {
     setBatches(filtered);
     setStaffList(s.filter(x => x.active !== false));
     const counts = {};
-    await Promise.all(filtered.map(async batch => { counts[batch.id] = await getBatchStudentCount(batch.id); }));
+    await Promise.all(filtered.map(async batch => { counts[batch.id] = await getBatchStudentCount(batch.id, scope); }));
     setBatchCounts(counts);
     setLoading(false);
   };
@@ -498,7 +500,7 @@ export default function Batches() {
   const loadBatchDetail = async (batch) => {
     try {
       const [res, sch, tasks, asmts] = await Promise.all([
-        getBatchStudents(batch.id).catch(() => ({ students: [] })),
+        getBatchStudents(batch.id, scope).catch(() => ({ students: [] })),
         getBatchSchedules(batch.id).catch(() => []),
         getBatchTasks(batch.id).catch(() => []),
         getAssessments(batch.id).catch(() => []),
@@ -576,7 +578,7 @@ export default function Batches() {
     initForm.staffAssigned = ''; initForm.joinDate = ''; initForm.status = 'active';
     setStudentForm(initForm);
     await loadBatchDetail(selectedBatch);
-    const c = await getBatchStudentCount(selectedBatch.id);
+    const c = await getBatchStudentCount(selectedBatch.id, scope);
     setBatchCounts(prev => ({ ...prev, [selectedBatch.id]: c }));
     setSaving(false);
   };
@@ -601,7 +603,7 @@ export default function Batches() {
     setToast({ message:`Imported ${res.success} students!`, type:'success' });
     setShowBulk(false); setCsvPreview(null); setImporting(false);
     await loadBatchDetail(selectedBatch);
-    const c = await getBatchStudentCount(selectedBatch.id);
+    const c = await getBatchStudentCount(selectedBatch.id, scope);
     setBatchCounts(prev => ({ ...prev, [selectedBatch.id]: c }));
   };
 
@@ -678,7 +680,7 @@ export default function Batches() {
       setToast({ message:`${student.name} moved to trash.`, type:'success' });
       setDeleteStudentConfirm(null);
       await loadBatchDetail(selectedBatch);
-      const c = await getBatchStudentCount(selectedBatch.id);
+      const c = await getBatchStudentCount(selectedBatch.id, scope);
       setBatchCounts(prev => ({ ...prev, [selectedBatch.id]: c }));
     } catch (err) {
       setToast({ message:'Error: ' + err.message, type:'error' });
@@ -698,6 +700,9 @@ export default function Batches() {
         uid: s.id, name: s.name, phone: s.phone || '', email: s.email || '', subjects: s.subjects || [],
       }))];
       await updateBatch(selectedBatch.id, { staffIds: updatedStaffIds, staffDetails: updatedStaffDetails });
+      // Denormalization sync: students carry staffIds for access rules —
+      // keep every student in this batch aligned with the new staffing.
+      await syncBatchStaffToStudents(selectedBatch.id, { ...selectedBatch, staffIds: updatedStaffIds });
       // Send notifications
       for (const staff of newStaffToAdd) {
         if (staff.email) {
@@ -736,6 +741,8 @@ export default function Batches() {
       // batch keeps showing in their assigned list (getStaffBatches matches mentorId).
       if (selectedBatch.mentorId === staffUid) { patch.mentorId = ''; patch.mentorName = ''; }
       await updateBatch(selectedBatch.id, patch);
+      // Denormalization sync: revoke this staff's access to the batch's students.
+      await syncBatchStaffToStudents(selectedBatch.id, { ...selectedBatch, ...patch });
       const updated = { ...selectedBatch, ...patch };
       setSelectedBatch(updated);
       setBatches(prev => prev.map(b => b.id === selectedBatch.id ? updated : b));
@@ -1205,7 +1212,7 @@ export default function Batches() {
                         }
                         setToast({ message:`${batchStudents.length} students moved to trash.`, type:'success' });
                         await loadBatchDetail(selectedBatch);
-                        const c = await getBatchStudentCount(selectedBatch.id);
+                        const c = await getBatchStudentCount(selectedBatch.id, scope);
                         setBatchCounts(prev => ({ ...prev, [selectedBatch.id]: c }));
                       } catch (err) {
                         setToast({ message:'Error: ' + err.message, type:'error' });
@@ -1403,7 +1410,7 @@ export default function Batches() {
                           </td>
                           <td style={{ display:'flex', gap:4, alignItems:'center' }}>
                             <button className="btn btn-ghost btn-sm" onClick={() => navigate(`/students/${s.id}`)}>View <ChevronRight size={12}/></button>
-                            {(profile?.role === 'ceo' || profile?.role === 'staff') && (
+                            {profile?.role === 'ceo' && (
                               <button className="btn btn-sm" style={{ background:'#FEE2E2', color:'#EF4444', border:'none', padding:'4px 8px' }}
                                 onClick={() => setDeleteStudentConfirm(s)}><Trash2 size={12}/></button>
                             )}

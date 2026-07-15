@@ -46,15 +46,14 @@ export default function Tasks() {
   const [assigneeFilter, setAssigneeFilter] = useState('');
   const [view, setView]               = useState('board');
 
-  const isCEOorAdmin = profile?.role === 'ceo' || profile?.role === 'admin';
+  const isCEOorAdmin = profile?.role === 'ceo';
 
   const load = async () => {
-    const [allTasks, allStaff] = await Promise.all([getTasks(), getStaffProfiles()]);
-    if (!isCEOorAdmin) {
-      setTasks(allTasks.filter(t => t.assignedToEmail === user?.email));
-    } else {
-      setTasks(allTasks);
-    }
+    // Server-side scoping: staff query only their own tasks (rules
+    // reject an unscoped read for them).
+    const scope = { role: profile?.role, uid: profile?.uid, email: user?.email };
+    const [allTasks, allStaff] = await Promise.all([getTasks(scope), getStaffProfiles()]);
+    setTasks(allTasks);
     setStaff(allStaff.filter(s => s.active !== false && s.role !== 'ceo'));
     setLoading(false);
   };
@@ -98,7 +97,7 @@ export default function Tasks() {
         priority:   form.priority,
         assignedBy: profile?.name,
       });
-      setToast({ message:`Task assigned to ${selectedStaff.name}! Email sent to ${selectedStaff.email}`, type:'success' });
+      setToast({ message:`Task assigned to ${selectedStaff.name}!`, type:'success' });
       setShowModal(false);
       setForm({ title:'', staffId:'', dueDate:'', priority:'normal', notes:'', label:'' });
       load();

@@ -24,12 +24,14 @@ export default function FollowUps() {
     note: '', nextAction: '', priority: 'normal'
   });
 
-  const isCEOorAdmin = profile?.role === 'ceo' || profile?.role === 'admin';
+  const isCEOorAdmin = profile?.role === 'ceo';
+  const scope = { role: profile?.role, uid: profile?.uid, email: user?.email };
 
   const load = async () => {
-    const [f, s, st] = await Promise.all([getAllFollowUps(), getStudents(), getStaffProfiles()]);
-    // Staff see only their assigned follow-ups
-    setFollowups(isCEOorAdmin ? f : f.filter(fu => fu.assignedToEmail === user?.email));
+    // Queries are scoped server-side: staff receive only their own
+    // follow-ups / students (rules reject unscoped queries).
+    const [f, s, st] = await Promise.all([getAllFollowUps(scope), getStudents(scope), getStaffProfiles()]);
+    setFollowups(f);
     setStudents(s);
     setStaff(st.filter(s => s.active !== false && s.role !== 'ceo'));
     setLoading(false);
@@ -89,7 +91,7 @@ export default function FollowUps() {
         assignedBy:  profile?.name,
       });
 
-      setToast({ message: `Follow-up assigned to ${selectedStaff.name}! Notified via email.`, type: 'success' });
+      setToast({ message: `Follow-up assigned to ${selectedStaff.name}!`, type: 'success' });
       setShowModal(false);
       setForm({ studentId: '', studentName: '', staffId: '', note: '', nextAction: '', priority: 'normal' });
       load();

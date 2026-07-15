@@ -5,6 +5,7 @@ import {
 } from 'firebase/storage';
 import { storage } from '../firebase/config';
 import { Modal, Toast, Loading, Confirm } from '../components/ui';
+import { useAuth } from '../context/AuthContext';
 import { Upload, Download, Trash2, Search } from 'lucide-react';
 
 const DOC_TYPES = ['Admission Form', 'ID Proof', 'Certificate', 'Test Report', 'Assessment PDF', 'Internal Document', 'Other'];
@@ -30,6 +31,7 @@ function formatBytes(bytes) {
 }
 
 export default function Documents() {
+  const { profile } = useAuth();
   const [students, setStudents] = useState([]);
   const [docs, setDocs] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -75,7 +77,7 @@ export default function Documents() {
     // Never let the page hang on the spinner — always resolve loading.
     (async () => {
       try {
-        const s = await getStudents().catch(() => []);
+        const s = await getStudents({ role: profile?.role, uid: profile?.uid, email: profile?.email }).catch(() => []);
         setStudents(s);
         await loadDocs();
       } finally {

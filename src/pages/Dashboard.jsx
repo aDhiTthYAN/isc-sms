@@ -187,7 +187,7 @@ export default function Dashboard() {
   const [notifications, setNotifications] = useState([]);
   const [processingReq, setProcessingReq] = useState(null);
 
-  const isCEOorAdmin = profile?.role === 'ceo' || profile?.role === 'admin';
+  const isCEOorAdmin = profile?.role === 'ceo';
 
   useEffect(() => {
     const load = async () => {

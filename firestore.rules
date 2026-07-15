@@ -1,106 +1,202 @@
 rules_version = '2';
+
+// ─────────────────────────────────────────────────────────────────
+// ISC SMS — hardened rules (Phase 1 security remediation)
+//
+// Authorization source of truth: /roles/{uid} → { role, active }
+//   - role: 'ceo' | 'staff'   (admin role removed by decision)
+//   - Writable ONLY by an existing CEO. Bootstrap the first CEO doc
+//     once via the Firebase console (see SECURITY_SETUP.md).
+//   - This closes the privilege-escalation hole: staff docs no
+//     longer confer any authority, so writing role:'ceo' to your
+//     own staff profile does nothing.
+//
+// Student scoping: students carry a denormalized staffIds[] array
+// (uids of batch staff + mentor). Staff access requires membership.
+// ─────────────────────────────────────────────────────────────────
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    function isAuth() {
+    // ── helpers ──────────────────────────────────────────────────
+    function signedIn() {
       return request.auth != null;
     }
-
+    // One get() per request; Firestore dedupes identical get() calls
+    // within a single evaluation, so cost stays at 1 read.
+    function roleDoc() {
+      return get(/databases/$(database)/documents/roles/$(request.auth.uid)).data;
+    }
+    function isActiveStaff() {
+      return signedIn() && roleDoc().active == true;
+    }
     function isCEO() {
-      return isAuth() &&
-        get(/databases/$(database)/documents/staff/$(request.auth.uid)).data.role == 'ceo';
+      return isActiveStaff() && roleDoc().role == 'ceo';
+    }
+    function myEmail() {
+      return request.auth.token.email;
+    }
+    // Fields untouched by this update (request.resource.data is the
+    // full post-write state, so equality means "not changed").
+    function onlyChanges(allowed) {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(allowed);
     }
 
-    function isCEOorAdmin() {
-      return isAuth() && (
-        get(/databases/$(database)/documents/staff/$(request.auth.uid)).data.role == 'ceo' ||
-        get(/databases/$(database)/documents/staff/$(request.auth.uid)).data.role == 'admin'
-      );
+    // ── roles — authorization source of truth ────────────────────
+    match /roles/{uid} {
+      allow read: if isCEO() || (signedIn() && request.auth.uid == uid);
+      allow create, update, delete: if isCEO();
     }
 
+    // ── staff (full profiles: email, fcmToken — own + CEO only) ──
     match /staff/{uid} {
-      allow read: if isAuth();
+      allow read: if isCEO() || (signedIn() && request.auth.uid == uid);
       allow create, delete: if isCEO();
-      allow update: if isAuth() && (request.auth.uid == uid || isCEO());
+      // Staff may update only benign fields on their own doc.
+      // role/active/email are CEO-only — and carry no authority anyway.
+      allow update: if isCEO()
+        || (isActiveStaff() && request.auth.uid == uid
+            && onlyChanges(['fcmToken', 'subjects', 'updatedAt']));
     }
 
-    match /students/{doc} {
-      allow read, write: if isAuth();
+    // ── staffDirectory — safe subset for pickers/dropdowns ───────
+    // { name, role, subjects, active, email } — no fcmToken.
+    match /staffDirectory/{uid} {
+      allow read: if isActiveStaff();
+      allow create, update, delete: if isCEO();
     }
 
-    match /followups/{doc} {
-      allow read, write: if isAuth();
+    // ── students — batch-scoped via denormalized staffIds[] ──────
+    match /students/{id} {
+      allow read: if isCEO()
+        || (isActiveStaff() && request.auth.uid in resource.data.staffIds);
+      // Staff may create students only into a batch they belong to.
+      allow create: if isCEO()
+        || (isActiveStaff() && request.auth.uid in request.resource.data.staffIds);
+      // Staff may edit their students but cannot reassign scope.
+      allow update: if isCEO()
+        || (isActiveStaff()
+            && request.auth.uid in resource.data.staffIds
+            && request.resource.data.staffIds == resource.data.staffIds
+            && request.resource.data.batchId == resource.data.batchId);
+      allow delete: if isCEO();
     }
 
-    match /assessments/{doc} {
-      allow read, write: if isAuth();
+    // ── batches — staff read (pickers/schedule), CEO writes ──────
+    match /batches/{id} {
+      allow read: if isActiveStaff();
+      allow create, update, delete: if isCEO();
     }
 
-    match /batches/{doc} {
-      allow read, write: if isAuth();
+    // ── schedules — shared calendar, all active staff by design ──
+    match /schedules/{id} {
+      allow read, create, update: if isActiveStaff();
+      allow delete: if isActiveStaff();
     }
 
-    match /schedules/{doc} {
-      allow read, write: if isAuth();
+    // ── attendance ────────────────────────────────────────────────
+    match /attendance/{id} {
+      allow read, create, update, delete: if isActiveStaff();
     }
 
-    match /batchTasks/{doc} {
-      allow read, write: if isAuth();
+    // ── classReports — cross-faculty visible; author-owned writes ─
+    match /classReports/{id} {
+      allow read: if isActiveStaff();
+      allow create: if isActiveStaff()
+        && request.resource.data.facultyUid == request.auth.uid;
+      allow update, delete: if isCEO()
+        || (isActiveStaff() && resource.data.facultyUid == request.auth.uid);
     }
 
-    match /notifications/{doc} {
-      allow read: if isAuth();
-      allow create: if isAuth();
-      allow update: if isAuth();
-      allow delete: if isAuth();
+    // ── batchTasks (assignments) & assessments ───────────────────
+    match /batchTasks/{id} {
+      allow read, create, update: if isActiveStaff();
+      allow delete: if isCEO();
+    }
+    match /assessments/{id} {
+      allow read, create, update: if isActiveStaff();
+      allow delete: if isCEO();
+    }
+    match /assessmentResults/{id} {
+      allow read, create, update: if isActiveStaff();
+      allow delete: if isCEO();
     }
 
-    match /documents/{doc} {
-      allow read, write: if isAuth();
-    }
-
-    match /tasks/{doc} {
-      allow read: if isAuth();
+    // ── tasks (staff to-dos) — assignee-scoped ───────────────────
+    match /tasks/{id} {
+      allow read: if isCEO()
+        || (isActiveStaff() && resource.data.assignedToEmail == myEmail());
       allow create, delete: if isCEO();
-      allow update: if isAuth();
+      allow update: if isCEO()
+        || (isActiveStaff()
+            && resource.data.assignedToEmail == myEmail()
+            && onlyChanges(['status', 'completionNote', 'completedBy', 'completedAt']));
     }
 
-    match /reports/{doc} {
-      allow read, write: if isAuth();
+    // ── followups — assignee-scoped ──────────────────────────────
+    match /followups/{id} {
+      allow read: if isCEO()
+        || (isActiveStaff() && resource.data.assignedToEmail == myEmail());
+      allow create: if isActiveStaff();
+      allow update: if isCEO()
+        || (isActiveStaff() && resource.data.assignedToEmail == myEmail());
+      allow delete: if isCEO();
     }
 
-    match /concerns/{doc} {
-      allow read, write: if isAuth();
+    // ── concerns — visible to raiser + assignee ──────────────────
+    match /concerns/{id} {
+      allow read: if isCEO()
+        || (isActiveStaff()
+            && (resource.data.raisedByEmail == myEmail()
+                || resource.data.assignedToEmail == myEmail()));
+      allow create: if isActiveStaff()
+        && request.resource.data.raisedByEmail == myEmail();
+      allow update: if isCEO()
+        || (isActiveStaff()
+            && (resource.data.raisedByEmail == myEmail()
+                || resource.data.assignedToEmail == myEmail()));
+      allow delete: if isCEO();
     }
 
-    match /leads/{doc} {
-      allow read, write: if isAuth();
+    // ── notifications — recipient-scoped ─────────────────────────
+    match /notifications/{id} {
+      allow read, update, delete: if isActiveStaff()
+        && resource.data.toEmail == myEmail();
+      allow create: if isActiveStaff();
     }
 
-    match /attendance/{doc} {
-      allow read, write: if isAuth();
+    // ── daily reports — author-scoped ────────────────────────────
+    match /reports/{id} {
+      allow read: if isCEO()
+        || (isActiveStaff() && resource.data.staffEmail == myEmail());
+      allow create: if isActiveStaff()
+        && request.resource.data.staffEmail == myEmail();
+      allow update: if isCEO()
+        || (isActiveStaff() && resource.data.staffEmail == myEmail());
+      allow delete: if isCEO();
     }
 
-    match /classReports/{doc} {
-      allow read, write: if isAuth();
+    // ── leads — CEO only (sales pipeline) ────────────────────────
+    match /leads/{id} {
+      allow read, create, update, delete: if isCEO();
     }
 
-    match /trash/{doc} {
-      allow read, write: if isCEO();
+    // ── requests — own + CEO ─────────────────────────────────────
+    match /requests/{id} {
+      allow read: if isCEO()
+        || (isActiveStaff() && resource.data.requestedBy == request.auth.uid);
+      allow create: if isActiveStaff()
+        && request.resource.data.requestedBy == request.auth.uid;
+      allow update, delete: if isCEO();
     }
 
-    match /requests/{doc} {
-      allow read: if isAuth();
-      allow create: if isAuth();
-      allow update: if isCEO();
+    // ── trash — CEO only ─────────────────────────────────────────
+    match /trash/{id} {
+      allow read, create, update, delete: if isCEO();
     }
 
-    match /assessmentResults/{doc} {
-      allow read, write: if isAuth();
-    }
-
-    match /topAssessments/{doc} {
-      allow read, write: if isAuth();
+    // ── default deny: anything not matched above is blocked ──────
+    match /{document=**} {
+      allow read, write: if false;
     }
   }
 }

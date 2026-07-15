@@ -84,7 +84,7 @@ export default function Assessments({ filterBatchId = null }) {
   // load students whenever the create-form batch changes (for specific selection)
   useEffect(() => {
     if (!showCreate || !createForm.batchId) { setCreateStudents([]); return; }
-    getBatchStudents(createForm.batchId)
+    getBatchStudents(createForm.batchId, { role: profile?.role, uid: profile?.uid })
       .then(res => setCreateStudents(res.students || []))
       .catch(() => setCreateStudents([]));
   }, [createForm.batchId, showCreate]);
@@ -220,7 +220,7 @@ export default function Assessments({ filterBatchId = null }) {
     setManualSearch('');
     if (assessment.batchId) {
       try {
-        const res = await getBatchStudents(assessment.batchId);
+        const res = await getBatchStudents(assessment.batchId, { role: profile?.role, uid: profile?.uid });
         // if the assessment targeted specific students, restrict to those
         const all = res.students || [];
         const scoped = assessment.participantType === 'specific' && assessment.participantStudents?.length
