@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="_ds/isc-design-system-44b9e318-905b-4330-a4ea-d1d6b542217b/tokens/fonts.css">
+  <link rel="stylesheet" href="_ds/isc-design-system-44b9e318-905b-4330-a4ea-d1d6b542217b/tokens/colors.css">
+  <link rel="stylesheet" href="_ds/isc-design-system-44b9e318-905b-4330-a4ea-d1d6b542217b/tokens/typography.css">
+  <link rel="stylesheet" href="_ds/isc-design-system-44b9e318-905b-4330-a4ea-d1d6b542217b/tokens/spacing.css">
+  <link rel="stylesheet" href="_ds/isc-design-system-44b9e318-905b-4330-a4ea-d1d6b542217b/base.css">
+  <link rel="stylesheet" href="_ds/isc-design-system-44b9e318-905b-4330-a4ea-d1d6b542217b/styles.css">
+  <link rel="stylesheet" href="theme.css">
+  <style>
+    html,body{background:var(--canvas);}
+    .srow:hover{ background: var(--surface-hover); }
+    .fcard{ transition: box-shadow .15s var(--ease), transform .12s var(--ease); cursor:pointer; }
+    .fcard:hover{ box-shadow: var(--shadow-md); transform: translateY(-1px); }
+    ::-webkit-scrollbar{ width:9px; height:9px; }
+  </style>
+</helmet>
+
+<div style="display:flex; height:100vh; overflow:hidden; background:var(--canvas); font-family:var(--font-body); color:var(--text);">
+
+  <dc-import name="Sidebar" active="documents" hint-size="230px,100%"></dc-import>
+
+  <div style="flex:1; display:flex; flex-direction:column; min-width:0; height:100vh;">
+
+    <header style="background:var(--surface); border-bottom:1px solid var(--border); padding:0 26px; height:56px; display:flex; align-items:center; justify-content:space-between; gap:16px; flex-shrink:0;">
+      <div style="display:flex; align-items:center; gap:8px; font-size:12.5px; color:var(--text-muted);">
+        <span>Operations</span>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+        <span style="color:var(--text); font-weight:600;">Documents</span>
+      </div>
+      <div style="display:flex; align-items:center; gap:9px;">
+        <div style="width:32px; height:32px; border-radius:50%; background:var(--grad-brand); display:flex; align-items:center; justify-content:center; font-family:var(--font-display); font-weight:700; font-size:12px; color:#fff;">AD</div>
+        <div><div style="font-size:13px; font-weight:600; line-height:1.2;">Adithyan R</div><div style="font-size:11px; color:var(--text-muted);">CEO</div></div>
+      </div>
+    </header>
+
+    <main style="flex:1; overflow-y:auto; padding:24px 26px 32px;">
+
+      <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:16px; flex-wrap:wrap; margin-bottom:18px;">
+        <div>
+          <h2 style="font-size:24px; font-weight:700;">Documents</h2>
+          <div style="font-size:13px; color:var(--text-muted); margin-top:3px;">Shared templates, student records, and operational files.</div>
+        </div>
+        <button class="btn btn-primary">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          Upload
+        </button>
+      </div>
+
+      <!-- folders -->
+      <div style="font-size:11px; font-weight:700; letter-spacing:.1em; color:var(--text-muted); margin-bottom:10px;">FOLDERS</div>
+      <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-bottom:24px;">
+        <sc-for list="{{ folders }}" as="f" hint-placeholder-count="4">
+          <div class="fcard" style="background:var(--surface); border:1px solid var(--border); border-radius:14px; box-shadow:var(--shadow-sm); padding:16px 18px; display:flex; align-items:center; gap:13px;">
+            <div style="width:42px; height:42px; border-radius:11px; background:{{ f.tint }}; display:flex; align-items:center; justify-content:center; color:{{ f.ink }}; flex-shrink:0;">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg>
+            </div>
+            <div style="min-width:0;">
+              <div style="font-size:14px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{{ f.name }}</div>
+              <div style="font-size:11.5px; color:var(--text-muted); margin-top:2px;">{{ f.count }} files · {{ f.size }}</div>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+
+      <!-- toolbar -->
+      <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:14px;">
+        <div style="font-size:11px; font-weight:700; letter-spacing:.1em; color:var(--text-muted);">RECENT FILES</div>
+        <div style="flex:1;"></div>
+        <div class="search-bar" style="width:280px;">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+          <input value="{{ query }}" onInput="{{ onQuery }}" placeholder="Search files…" />
+        </div>
+      </div>
+
+      <div class="table-container">
+        <div class="table-scroll">
+          <table>
+            <thead>
+              <tr><th>Name</th><th style="width:120px;">Type</th><th style="width:150px;">Folder</th><th style="width:140px;">Owner</th><th style="width:100px;">Size</th><th style="width:130px;">Modified</th><th style="width:60px;"></th></tr>
+            </thead>
+            <tbody>
+              <sc-for list="{{ rows }}" as="d" hint-placeholder-count="8">
+                <tr class="srow" style="cursor:pointer;">
+                  <td>
+                    <div style="display:flex; align-items:center; gap:11px;">
+                      <div style="width:32px; height:32px; border-radius:8px; background:{{ d.tint }}; display:flex; align-items:center; justify-content:center; color:{{ d.ink }}; flex-shrink:0; font-family:var(--font-display); font-weight:700; font-size:10px;">{{ d.ext }}</div>
+                      <span style="font-size:13px; font-weight:600;">{{ d.name }}</span>
+                    </div>
+                  </td>
+                  <td><span class="badge {{ d.typeCls }}" style="font-size:10.5px;">{{ d.type }}</span></td>
+                  <td style="font-size:12.5px; color:var(--text-sub);">{{ d.folder }}</td>
+                  <td>
+                    <span style="display:inline-flex; align-items:center; gap:8px;">
+                      <span style="width:22px; height:22px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-family:var(--font-display); font-weight:700; font-size:9px; color:#fff; background:{{ d.color }};">{{ d.initials }}</span>
+                      <span style="font-size:12.5px; color:var(--text-sub);">{{ d.owner }}</span>
+                    </span>
+                  </td>
+                  <td style="font-size:12.5px; color:var(--text-sub);">{{ d.size }}</td>
+                  <td style="font-size:12.5px; color:var(--text-muted);">{{ d.modified }}</td>
+                  <td>
+                    <span style="display:flex; color:var(--text-muted);"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></span>
+                  </td>
+                </tr>
+              </sc-for>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </main>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1320,&quot;height&quot;:850}}">
+class Component extends DCLogic {
+  ACCENTS = ['#E81620','#F4683B','#F5A623','#16A974','#11B4C6','#3B6EF6','#6366F1','#8B5CF6','#EC4899','#6E7488'];
+
+  FOLDERS = [
+    { name:'Student Records', count:248, size:'1.2 GB', tint:'var(--blue-soft)',   ink:'var(--blue-ink)' },
+    { name:'Templates',       count:18,  size:'42 MB',  tint:'var(--violet-soft)', ink:'var(--violet-ink)' },
+    { name:'Fee Receipts',    count:96,  size:'310 MB', tint:'var(--green-soft)',  ink:'var(--green-ink)' },
+    { name:'Marketing',       count:34,  size:'880 MB', tint:'var(--amber-soft)',  ink:'var(--amber-ink)' },
+  ];
+
+  TYPES = { PDF:{cls:'badge-red',tint:'var(--red-soft)',ink:'var(--red-ink)'}, DOC:{cls:'badge-blue',tint:'var(--blue-soft)',ink:'var(--blue-ink)'}, XLS:{cls:'badge-green',tint:'var(--green-soft)',ink:'var(--green-ink)'}, IMG:{cls:'badge-violet',tint:'var(--violet-soft)',ink:'var(--violet-ink)'}, CSV:{cls:'badge-teal',tint:'var(--teal-soft)',ink:'var(--teal-ink)'} };
+
+  DOCS = [
+    { name:'Student Onboarding Checklist', type:'PDF', folder:'Templates',       owner:'Adithyan R',   size:'240 KB', modified:'Today, 2:14 PM' },
+    { name:'June Fee Collection Report',    type:'XLS', folder:'Fee Receipts',    owner:'Aisha Khan',   size:'1.1 MB', modified:'Today, 11:02 AM' },
+    { name:'B-12 Attendance Sheet',         type:'CSV', folder:'Student Records', owner:'Priya Sharma', size:'88 KB',  modified:'Yesterday' },
+    { name:'IELTS Curriculum Guide',        type:'DOC', folder:'Templates',       owner:'Rahul Verma',  size:'620 KB', modified:'Yesterday' },
+    { name:'Welcome Kit Artwork',           type:'IMG', folder:'Marketing',       owner:'Sneha Patel',  size:'4.3 MB', modified:'Jun 19' },
+    { name:'Parent Consent Form',           type:'PDF', folder:'Templates',       owner:'Adithyan R',   size:'180 KB', modified:'Jun 18' },
+    { name:'July Intake — Lead List',       type:'CSV', folder:'Student Records', owner:'Rahul Verma',  size:'210 KB', modified:'Jun 17' },
+    { name:'Q2 Performance Deck',           type:'PDF', folder:'Marketing',       owner:'Vikram Nair',  size:'5.8 MB', modified:'Jun 15' },
+  ];
+
+  initials(name){ const p=name.trim().split(/\s+/); return ((p[0]||'')[0]+((p[1]||'')[0]||'')).toUpperCase(); }
+  color(name){ let h=0; for(const c of name) h=(h*31+c.charCodeAt(0))>>>0; return this.ACCENTS[h%this.ACCENTS.length]; }
+
+  state = { query:'' };
+
+  renderVals(){
+    const q = this.state.query.trim().toLowerCase();
+    const rows = this.DOCS.filter(d => !q || d.name.toLowerCase().includes(q) || d.folder.toLowerCase().includes(q) || d.owner.toLowerCase().includes(q)).map(d => {
+      const t = this.TYPES[d.type] || this.TYPES.PDF;
+      return { ...d, ext:d.type, typeCls:t.cls, tint:t.tint, ink:t.ink, initials:this.initials(d.owner), color:this.color(d.owner) };
+    });
+    return {
+      folders: this.FOLDERS, rows,
+      query:this.state.query, onQuery:(e)=>this.setState({query:e.target.value}),
+    };
+  }
+}
+</script>
+</body>
+</html>

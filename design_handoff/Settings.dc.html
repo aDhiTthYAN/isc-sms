@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="_ds/isc-design-system-44b9e318-905b-4330-a4ea-d1d6b542217b/tokens/fonts.css">
+  <link rel="stylesheet" href="_ds/isc-design-system-44b9e318-905b-4330-a4ea-d1d6b542217b/tokens/colors.css">
+  <link rel="stylesheet" href="_ds/isc-design-system-44b9e318-905b-4330-a4ea-d1d6b542217b/tokens/typography.css">
+  <link rel="stylesheet" href="_ds/isc-design-system-44b9e318-905b-4330-a4ea-d1d6b542217b/tokens/spacing.css">
+  <link rel="stylesheet" href="_ds/isc-design-system-44b9e318-905b-4330-a4ea-d1d6b542217b/base.css">
+  <link rel="stylesheet" href="_ds/isc-design-system-44b9e318-905b-4330-a4ea-d1d6b542217b/styles.css">
+  <link rel="stylesheet" href="theme.css">
+  <style>
+    html,body{background:var(--canvas);}
+    .subnav:hover{ background: var(--surface-hover); }
+    ::-webkit-scrollbar{ width:9px; height:9px; }
+  </style>
+</helmet>
+
+<div style="display:flex; height:100vh; overflow:hidden; background:var(--canvas); font-family:var(--font-body); color:var(--text);">
+
+  <dc-import name="Sidebar" active="settings" hint-size="230px,100%"></dc-import>
+
+  <div style="flex:1; display:flex; flex-direction:column; min-width:0; height:100vh;">
+
+    <header style="background:var(--surface); border-bottom:1px solid var(--border); padding:0 26px; height:56px; display:flex; align-items:center; justify-content:space-between; gap:16px; flex-shrink:0;">
+      <div style="display:flex; align-items:center; gap:8px; font-size:12.5px; color:var(--text-muted);">
+        <span>Management</span>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+        <span style="color:var(--text); font-weight:600;">Settings</span>
+      </div>
+      <div style="display:flex; align-items:center; gap:9px;">
+        <div style="width:32px; height:32px; border-radius:50%; background:var(--grad-brand); display:flex; align-items:center; justify-content:center; font-family:var(--font-display); font-weight:700; font-size:12px; color:#fff;">AD</div>
+        <div>
+          <div style="font-size:13px; font-weight:600; line-height:1.2;">Adithyan R</div>
+          <div style="font-size:11px; color:var(--text-muted);">CEO</div>
+        </div>
+      </div>
+    </header>
+
+    <main style="flex:1; overflow-y:auto; padding:24px 26px 32px;">
+
+      <div style="margin-bottom:20px;">
+        <h2 style="font-size:24px; font-weight:700;">Settings</h2>
+        <div style="font-size:13px; color:var(--text-muted); margin-top:3px;">Manage your organization profile, notifications and access.</div>
+      </div>
+
+      <div style="display:grid; grid-template-columns:220px 1fr; gap:24px; max-width:980px; align-items:start;">
+
+        <!-- sub nav -->
+        <div style="display:flex; flex-direction:column; gap:2px; position:sticky; top:0;">
+          <sc-for list="{{ sections }}" as="s" hint-placeholder-count="4">
+            <button onClick="{{ s.onClick }}" class="subnav" style="display:flex; align-items:center; gap:10px; padding:9px 12px; border:none; border-radius:10px; font-size:13px; font-weight:{{ s.weight }}; cursor:pointer; text-align:left; background:{{ s.bg }}; color:{{ s.color }};">
+              <span style="display:flex; color:{{ s.ic }};">{{ s.icon }}</span>
+              {{ s.label }}
+            </button>
+          </sc-for>
+        </div>
+
+        <!-- content -->
+        <div>
+          <!-- ORGANIZATION -->
+          <sc-if value="{{ isOrg }}" hint-placeholder-val="{{ true }}">
+            <div style="background:var(--surface); border:1px solid var(--border); border-radius:16px; box-shadow:var(--shadow-sm); padding:24px;">
+              <h3 style="font-size:16px; font-weight:700; margin-bottom:4px;">Organization</h3>
+              <div style="font-size:12.5px; color:var(--text-muted); margin-bottom:20px;">This information appears across the SMS and in student communications.</div>
+              <div style="display:flex; align-items:center; gap:14px; padding-bottom:20px; margin-bottom:20px; border-bottom:1px solid var(--border);">
+                <div style="width:56px; height:56px; border-radius:14px; background:var(--grad-brand); display:flex; align-items:center; justify-content:center; box-shadow:var(--shadow-brand);"><span style="font-family:var(--font-display); font-weight:700; font-size:20px; color:#fff;">ISC</span></div>
+                <div>
+                  <div style="font-size:14px; font-weight:600;">International Skills Club</div>
+                  <div style="font-size:12px; color:var(--text-muted); margin-top:2px;">Brand mark · PNG, SVG</div>
+                  <button class="btn btn-secondary btn-sm" style="margin-top:8px;">Change logo</button>
+                </div>
+              </div>
+              <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+                <div class="form-group"><label class="form-label">Organization name</label><input class="form-input" value="International Skills Club" /></div>
+                <div class="form-group"><label class="form-label">Short name</label><input class="form-input" value="ISC" /></div>
+                <div class="form-group"><label class="form-label">Support email</label><input class="form-input" value="help@internationalskillsclub.com" /></div>
+                <div class="form-group"><label class="form-label">Contact number</label><input class="form-input" value="+91 98470 00000" /></div>
+                <div class="form-group" style="grid-column:1 / -1;"><label class="form-label">Address</label><input class="form-input" value="2nd Floor, Skyline Plaza, Kochi, Kerala 682024" /></div>
+              </div>
+              <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:22px;">
+                <button class="btn btn-ghost">Cancel</button>
+                <button class="btn btn-primary">Save changes</button>
+              </div>
+            </div>
+          </sc-if>
+
+          <!-- NOTIFICATIONS -->
+          <sc-if value="{{ isNotif }}" hint-placeholder-val="{{ false }}">
+            <div style="background:var(--surface); border:1px solid var(--border); border-radius:16px; box-shadow:var(--shadow-sm); padding:24px;">
+              <h3 style="font-size:16px; font-weight:700; margin-bottom:4px;">Notifications</h3>
+              <div style="font-size:12.5px; color:var(--text-muted); margin-bottom:14px;">Choose what your team is notified about — in-app and by email.</div>
+              <div style="display:flex; flex-direction:column;">
+                <sc-for list="{{ toggles }}" as="t" hint-placeholder-count="5">
+                  <div style="display:flex; align-items:center; justify-content:space-between; gap:16px; padding:15px 0; border-bottom:1px solid var(--border);">
+                    <div style="min-width:0;">
+                      <div style="font-size:13.5px; font-weight:600;">{{ t.label }}</div>
+                      <div style="font-size:12px; color:var(--text-muted); margin-top:2px;">{{ t.desc }}</div>
+                    </div>
+                    <button onClick="{{ t.onToggle }}" style="position:relative; width:42px; height:24px; border-radius:9999px; border:none; cursor:pointer; flex-shrink:0; background:{{ t.track }}; transition:background .18s;">
+                      <span style="position:absolute; top:3px; left:{{ t.knobLeft }}; width:18px; height:18px; border-radius:50%; background:#fff; box-shadow:var(--shadow-xs); transition:left .18s;"></span>
+                    </button>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+          </sc-if>
+
+          <!-- PROFILE -->
+          <sc-if value="{{ isProfile }}" hint-placeholder-val="{{ false }}">
+            <div style="background:var(--surface); border:1px solid var(--border); border-radius:16px; box-shadow:var(--shadow-sm); padding:24px;">
+              <h3 style="font-size:16px; font-weight:700; margin-bottom:20px;">Your Profile</h3>
+              <div style="display:flex; align-items:center; gap:14px; padding-bottom:20px; margin-bottom:20px; border-bottom:1px solid var(--border);">
+                <div style="width:56px; height:56px; border-radius:50%; background:var(--grad-brand); display:flex; align-items:center; justify-content:center; font-family:var(--font-display); font-weight:700; font-size:18px; color:#fff;">AD</div>
+                <div>
+                  <div style="font-size:14px; font-weight:600;">Adithyan R</div>
+                  <div style="font-size:12px; color:var(--text-muted); margin-top:2px;">CEO · Full access</div>
+                </div>
+              </div>
+              <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+                <div class="form-group"><label class="form-label">Full name</label><input class="form-input" value="Adithyan R" /></div>
+                <div class="form-group"><label class="form-label">Email</label><input class="form-input" value="adithyan@internationalskillsclub.com" /></div>
+                <div class="form-group"><label class="form-label">Phone</label><input class="form-input" value="+91 98470 12000" /></div>
+                <div class="form-group"><label class="form-label">Role</label><input class="form-input" value="CEO" disabled style="background:var(--surface-sunken); color:var(--text-muted);" /></div>
+              </div>
+              <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:22px;">
+                <button class="btn btn-ghost">Cancel</button>
+                <button class="btn btn-primary">Save changes</button>
+              </div>
+            </div>
+          </sc-if>
+
+          <!-- SECURITY -->
+          <sc-if value="{{ isSecurity }}" hint-placeholder-val="{{ false }}">
+            <div style="background:var(--surface); border:1px solid var(--border); border-radius:16px; box-shadow:var(--shadow-sm); padding:24px;">
+              <h3 style="font-size:16px; font-weight:700; margin-bottom:20px;">Security</h3>
+              <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+                <div class="form-group" style="grid-column:1 / -1;"><label class="form-label">Current password</label><input class="form-input" type="password" value="********" /></div>
+                <div class="form-group"><label class="form-label">New password</label><input class="form-input" type="password" placeholder="••••••••" /></div>
+                <div class="form-group"><label class="form-label">Confirm new password</label><input class="form-input" type="password" placeholder="••••••••" /></div>
+              </div>
+              <div style="display:flex; align-items:center; justify-content:space-between; gap:16px; padding:16px; margin-top:20px; background:var(--surface-sunken); border-radius:12px;">
+                <div>
+                  <div style="font-size:13.5px; font-weight:600;">Two-factor authentication</div>
+                  <div style="font-size:12px; color:var(--text-muted); margin-top:2px;">Require a one-time code at sign-in.</div>
+                </div>
+                <span class="badge badge-green"><span class="dot"></span>Enabled</span>
+              </div>
+              <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:22px;">
+                <button class="btn btn-primary">Update password</button>
+              </div>
+            </div>
+          </sc-if>
+        </div>
+      </div>
+
+    </main>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1320,&quot;height&quot;:850}}">
+class Component extends DCLogic {
+  state = {
+    section:'org',
+    notif: { task:true, followup:true, request:true, weekly:false, marketing:false },
+  };
+
+  seg(active){ return { bg:active?'var(--brand-50)':'transparent', color:active?'var(--brand-ink)':'var(--text-sub)', weight:active?600:500, ic:active?'var(--brand)':'var(--text-muted)' }; }
+
+  secIcon(key){
+    const map = {
+      profile:[['path',{d:'M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2'}],['circle',{cx:12,cy:7,r:4}]],
+      org:[['path',{d:'M3 21h18'}],['path',{d:'M5 21V7l8-4v18'}],['path',{d:'M19 21V11l-6-4'}]],
+      notif:[['path',{d:'M10.268 21a2 2 0 0 0 3.464 0'}],['path',{d:'M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326'}]],
+      security:[['rect',{x:3,y:11,width:18,height:11,rx:2}],['path',{d:'M7 11V7a5 5 0 0 1 10 0v4'}]],
+    };
+    const els = (map[key]||[]).map(([t,p],i)=>React.createElement(t,{key:i,...p}));
+    return React.createElement('svg',{width:16,height:16,viewBox:'0 0 24 24',fill:'none',stroke:'currentColor',strokeWidth:2,strokeLinecap:'round',strokeLinejoin:'round'}, ...els);
+  }
+
+  renderVals(){
+    const sec = this.state.section;
+    const mk = (key,label) => { const s=this.seg(sec===key); return { label, icon:this.secIcon(key), bg:s.bg, color:s.color, weight:s.weight, ic:s.ic, onClick:()=>this.setState({section:key}) }; };
+    const sections = [ mk('profile','Profile'), mk('org','Organization'), mk('notif','Notifications'), mk('security','Security') ];
+
+    const N = this.state.notif;
+    const tdef = [
+      { key:'task',     label:'Task assignments',   desc:'When a task is assigned to a staff member.' },
+      { key:'followup', label:'Follow-up reminders',desc:'Daily digest of pending and overdue follow-ups.' },
+      { key:'request',  label:'Staff requests',     desc:'When a staff member raises a request for approval.' },
+      { key:'weekly',   label:'Weekly summary',     desc:'A Monday morning recap of batch and student activity.' },
+      { key:'marketing',label:'Product updates',    desc:'News about new SMS features and improvements.' },
+    ];
+    const toggles = tdef.map(t => {
+      const on = N[t.key];
+      return { ...t, track: on?'var(--brand)':'var(--n-200)', knobLeft: on?'21px':'3px', onToggle: () => this.setState(s => ({ notif:{ ...s.notif, [t.key]:!s.notif[t.key] } })) };
+    });
+
+    return {
+      sections, toggles,
+      isProfile: sec==='profile', isOrg: sec==='org', isNotif: sec==='notif', isSecurity: sec==='security',
+    };
+  }
+}
+</script>
+</body>
+</html>

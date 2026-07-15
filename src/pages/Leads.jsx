@@ -5,8 +5,19 @@ import { Plus, Search, ArrowRight } from 'lucide-react';
 
 const STAGES = ['lead', 'counselling', 'demo', 'enrolled', 'active'];
 const STAGE_LABELS = { lead: 'Lead', counselling: 'Counselling', demo: 'Demo Class', enrolled: 'Enrolled', active: 'Active Student' };
-const STAGE_COLORS = { lead: '#1A1A2E', counselling: '#374151', demo: '#E53935', enrolled: '#B71C1C', active: '#7B0000' };
 const COURSES = ['Python', 'Data Science', 'Web Development', 'Machine Learning', 'Digital Marketing', 'Other'];
+
+const STAGE_STYLE = {
+  lead:        { bg: 'var(--slate-soft)',  ink: 'var(--slate-ink)',  headerBg: 'var(--slate-soft)',  bar: 'var(--slate-soft)',  badgeClass: 'badge-gray'   },
+  counselling: { bg: 'var(--blue-soft)',   ink: 'var(--blue-ink)',   headerBg: 'var(--blue-soft)',   bar: 'var(--blue-soft)',   badgeClass: 'badge-blue'   },
+  demo:        { bg: 'var(--amber-soft)',  ink: 'var(--amber-ink)',  headerBg: 'var(--amber-soft)',  bar: 'var(--amber-soft)',  badgeClass: 'badge-amber'  },
+  enrolled:    { bg: 'var(--violet-soft)', ink: 'var(--violet-ink)', headerBg: 'var(--violet-soft)', bar: 'var(--violet-soft)', badgeClass: 'badge-violet' },
+  active:      { bg: 'var(--green-soft)',  ink: 'var(--green-ink)',  headerBg: 'var(--green-soft)',  bar: 'var(--green-soft)',  badgeClass: 'badge-green'  },
+};
+
+const STAGE_BAR_COLOR = {
+  lead: '#94A3B8', counselling: '#3B82F6', demo: '#F59E0B', enrolled: '#8B5CF6', active: '#10B981',
+};
 
 export default function Leads() {
   const [leads, setLeads] = useState([]);
@@ -17,6 +28,7 @@ export default function Leads() {
   const [toast, setToast] = useState(null);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({ name: '', phone: '', email: '', course: '', source: '', notes: '' });
+  const [view, setView] = useState('kanban');
 
   const load = async () => {
     const l = await getLeads();
@@ -67,92 +79,220 @@ export default function Leads() {
 
   return (
     <div>
+      {/* Page Header */}
       <div className="page-header">
-        <h2>Lead Pipeline</h2>
-        <button className="btn btn-primary" onClick={() => setShowModal(true)}><Plus size={16} /> Add Lead</button>
+        <div>
+          <h2 style={{ margin: 0 }}>Lead Pipeline</h2>
+          <p style={{ margin: '2px 0 0', fontSize: 13, color: 'var(--text-muted)' }}>
+            Track prospects from first contact to active student.
+          </p>
+        </div>
+        <button className="btn btn-primary" onClick={() => setShowModal(true)}>
+          <Plus size={16} /> Add Lead
+        </button>
       </div>
 
-      {/* Funnel */}
-      <div className="card" style={{ marginBottom: 20 }}>
-        <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 16 }}>Conversion Funnel</h3>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      {/* Funnel KPI Row */}
+      <div style={{ display: 'flex', gap: 10, marginBottom: 20, flexWrap: 'wrap' }}>
+        {STAGES.map(stage => {
+          const s = STAGE_STYLE[stage];
+          return (
+            <div key={stage} style={{
+              flex: '1 1 120px',
+              background: s.bg,
+              color: s.ink,
+              borderRadius: 12,
+              padding: '14px 16px',
+              display: 'flex',
+              flexDirection: 'column',
+              minWidth: 100,
+              marginBottom: 0,
+            }}>
+              <div style={{ fontSize: 22, fontWeight: 700, lineHeight: 1 }}>{stageCounts[stage]}</div>
+              <div style={{ fontSize: 12, marginTop: 4 }}>{STAGE_LABELS[stage]}</div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Filter Bar + Board/List Toggle */}
+      <div style={{ display: 'flex', gap: 10, marginBottom: 16, alignItems: 'center', flexWrap: 'wrap' }}>
+        <div className="search-bar" style={{ flex: 1, minWidth: 200 }}>
+          <Search size={16} style={{ color: 'var(--text-muted)' }} />
+          <input
+            placeholder="Search name, phone, course..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+          />
+        </div>
+        <select
+          className="form-input"
+          style={{ width: 180 }}
+          value={stageFilter}
+          onChange={e => setStageFilter(e.target.value)}
+        >
+          <option value="">All Stages</option>
+          {STAGES.map(s => <option key={s} value={s}>{STAGE_LABELS[s]}</option>)}
+        </select>
+
+        {/* Board / List Toggle */}
+        <div style={{
+          display: 'flex',
+          border: '1px solid var(--border)',
+          borderRadius: 8,
+          overflow: 'hidden',
+          flexShrink: 0,
+        }}>
+          {['kanban', 'list'].map(v => (
+            <button
+              key={v}
+              onClick={() => setView(v)}
+              style={{
+                padding: '7px 14px',
+                fontSize: 13,
+                fontWeight: 500,
+                border: 'none',
+                cursor: 'pointer',
+                background: view === v ? 'var(--brand)' : 'transparent',
+                color: view === v ? '#fff' : 'var(--text-muted)',
+                transition: 'all 0.15s',
+              }}
+            >
+              {v === 'kanban' ? 'Board' : 'List'}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Kanban View */}
+      {view === 'kanban' && (
+        <div style={{ display: 'flex', gap: 12, overflowX: 'auto', alignItems: 'flex-start', paddingBottom: 8 }}>
           {STAGES.map(stage => {
-            const count = stageCounts[stage];
-            const pct = Math.max(5, Math.round(count / totalLeads * 100));
+            const s = STAGE_STYLE[stage];
+            const colLeads = filtered.filter(l => l.stage === stage);
+            const stageIdx = STAGES.indexOf(stage);
             return (
-              <div key={stage} className="funnel-stage">
-                <div className="funnel-label">{STAGE_LABELS[stage]}</div>
-                <div className="funnel-track">
-                  <div className="funnel-bar" style={{ width: `${pct}%`, background: STAGE_COLORS[stage] }}>
-                    {count > 0 && `${count} ${count === 1 ? 'person' : 'people'}`}
-                  </div>
+              <div key={stage} style={{
+                width: 240, flexShrink: 0,
+                background: 'var(--surface)',
+                borderRadius: 12,
+                border: '1px solid var(--border)',
+                overflow: 'hidden',
+              }}>
+                {/* Column Header */}
+                <div style={{
+                  background: s.headerBg,
+                  borderLeft: `3px solid ${STAGE_BAR_COLOR[stage]}`,
+                  padding: '10px 12px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                }}>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: s.ink, flex: 1 }}>
+                    {STAGE_LABELS[stage]}
+                  </span>
+                  <span className={`badge ${s.badgeClass}`}>{colLeads.length}</span>
                 </div>
-                <div className="funnel-count">{count}</div>
+
+                {/* Cards */}
+                <div style={{ padding: 8, minHeight: 100 }}>
+                  {colLeads.length === 0 && (
+                    <div style={{ fontSize: 12, color: 'var(--text-muted)', textAlign: 'center', padding: '20px 0' }}>
+                      No leads
+                    </div>
+                  )}
+                  {colLeads.map(lead => (
+                    <div key={lead.id} style={{
+                      background: 'var(--surface)',
+                      borderRadius: 10,
+                      border: '1px solid var(--border)',
+                      padding: 12,
+                      marginBottom: 8,
+                      cursor: 'pointer',
+                      transition: 'background 0.15s',
+                    }}
+                      onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-hover)'}
+                      onMouseLeave={e => e.currentTarget.style.background = 'var(--surface)'}
+                    >
+                      <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', marginBottom: 3 }}>
+                        {lead.name}
+                      </div>
+                      <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 6 }}>
+                        {lead.phone || '—'}
+                      </div>
+                      {lead.course && (
+                        <div style={{ marginBottom: 6 }}>
+                          <span className="badge badge-indigo">{lead.course}</span>
+                        </div>
+                      )}
+                      <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: stageIdx < STAGES.length - 1 ? 8 : 0 }}>
+                        {formatDate(lead.createdAt)}
+                      </div>
+                      {stageIdx < STAGES.length - 1 && (
+                        <button
+                          className="btn btn-ghost btn-sm"
+                          style={{ fontSize: 11, display: 'flex', alignItems: 'center', gap: 4, width: '100%', justifyContent: 'center' }}
+                          onClick={() => advanceStage(lead)}
+                        >
+                          {STAGE_LABELS[STAGES[stageIdx + 1]]} <ArrowRight size={12} />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
               </div>
             );
           })}
         </div>
-        {leads.length > 0 && (
-          <div style={{ marginTop: 14, padding: '10px 14px', background: '#FEE2E2', borderRadius: 8, fontSize: 13, color: '#991B1B' }}>
-            <strong>{Math.round(stageCounts['active'] / totalLeads * 100)}% conversion rate</strong> — {stageCounts['active']} out of {leads.length} leads became active students.
-          </div>
-        )}
-      </div>
+      )}
 
-      {/* Filters */}
-      <div style={{ display: 'flex', gap: 10, marginBottom: 16 }}>
-        <div className="search-bar" style={{ flex: 1 }}>
-          <Search size={16} style={{ color: '#6B7280' }} />
-          <input placeholder="Search name, phone, course..." value={search} onChange={e => setSearch(e.target.value)} />
+      {/* List/Table View */}
+      {view === 'list' && (
+        <div className="table-container">
+          <table>
+            <thead>
+              <tr><th>Name</th><th>Phone</th><th>Course</th><th>Source</th><th>Stage</th><th>Added</th><th></th></tr>
+            </thead>
+            <tbody>
+              {filtered.length === 0 && (
+                <tr><td colSpan={7} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 40 }}>No leads found.</td></tr>
+              )}
+              {filtered.map(lead => {
+                const stageIdx = STAGES.indexOf(lead.stage);
+                const s = STAGE_STYLE[lead.stage] || STAGE_STYLE.lead;
+                return (
+                  <tr key={lead.id}>
+                    <td>
+                      <div style={{ fontWeight: 500, fontSize: 13 }}>{lead.name}</div>
+                      {lead.email && <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{lead.email}</div>}
+                    </td>
+                    <td style={{ fontSize: 13 }}>{lead.phone || '—'}</td>
+                    <td style={{ fontSize: 13 }}>{lead.course || '—'}</td>
+                    <td style={{ fontSize: 13, color: 'var(--text-muted)' }}>{lead.source || '—'}</td>
+                    <td>
+                      <span className={`badge ${s.badgeClass}`}>{STAGE_LABELS[lead.stage]}</span>
+                    </td>
+                    <td style={{ fontSize: 12, color: 'var(--text-muted)' }}>{formatDate(lead.createdAt)}</td>
+                    <td>
+                      {stageIdx < STAGES.length - 1 && (
+                        <button
+                          className="btn btn-ghost btn-sm"
+                          onClick={() => advanceStage(lead)}
+                          style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12 }}
+                        >
+                          {STAGE_LABELS[STAGES[stageIdx + 1]]} <ArrowRight size={12} />
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
-        <select className="form-input" style={{ width: 180 }} value={stageFilter} onChange={e => setStageFilter(e.target.value)}>
-          <option value="">All Stages</option>
-          {STAGES.map(s => <option key={s} value={s}>{STAGE_LABELS[s]}</option>)}
-        </select>
-      </div>
+      )}
 
-      {/* Table */}
-      <div className="table-container">
-        <table>
-          <thead>
-            <tr><th>Name</th><th>Phone</th><th>Course</th><th>Source</th><th>Stage</th><th>Added</th><th></th></tr>
-          </thead>
-          <tbody>
-            {filtered.length === 0 && (
-              <tr><td colSpan={7} style={{ textAlign: 'center', color: '#6B7280', padding: 40 }}>No leads found.</td></tr>
-            )}
-            {filtered.map(lead => {
-              const stageIdx = STAGES.indexOf(lead.stage);
-              return (
-                <tr key={lead.id}>
-                  <td>
-                    <div style={{ fontWeight: 500, fontSize: 13 }}>{lead.name}</div>
-                    {lead.email && <div style={{ fontSize: 11, color: '#6B7280' }}>{lead.email}</div>}
-                  </td>
-                  <td style={{ fontSize: 13 }}>{lead.phone || '—'}</td>
-                  <td style={{ fontSize: 13 }}>{lead.course || '—'}</td>
-                  <td style={{ fontSize: 13, color: '#6B7280' }}>{lead.source || '—'}</td>
-                  <td>
-                    <span style={{
-                      padding: '4px 10px', borderRadius: 20, fontSize: 11, fontWeight: 600,
-                      background: STAGE_COLORS[lead.stage], color: '#fff'
-                    }}>{STAGE_LABELS[lead.stage]}</span>
-                  </td>
-                  <td style={{ fontSize: 12, color: '#6B7280' }}>{formatDate(lead.createdAt)}</td>
-                  <td>
-                    {stageIdx < STAGES.length - 1 && (
-                      <button className="btn btn-ghost btn-sm" onClick={() => advanceStage(lead)} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12 }}>
-                        {STAGE_LABELS[STAGES[stageIdx + 1]]} <ArrowRight size={12} />
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-
+      {/* Modal: Add Lead */}
       {showModal && (
         <Modal title="Add New Lead" onClose={() => setShowModal(false)}>
           <form onSubmit={handleAdd} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>

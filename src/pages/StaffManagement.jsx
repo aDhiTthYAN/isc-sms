@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
-import { collection, getDocs, doc, updateDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import { createStaffAccount } from '../firebase/adminAuth';
 import { Modal, Toast, Loading, Confirm, FormRow } from '../components/ui';
 import {
   Plus, ShieldOff, RefreshCw, Shield,
-  BookOpen, Edit, CheckCircle, Mail, Key
+  BookOpen, Edit, CheckCircle, Mail, Key, Trash2
 } from 'lucide-react';
 
 const ALL_SUBJECTS = [
@@ -37,6 +37,7 @@ export default function StaffManagement() {
   const [showSuccess, setShowSuccess] = useState(null);
   const [showSubjectModal, setShowSubjectModal] = useState(null);
   const [revoking, setRevoking]       = useState(null);
+  const [deleting, setDeleting]       = useState(null);
   const [toast, setToast]             = useState(null);
   const [saving, setSaving]           = useState(false);
   const [editingSubjects, setEditingSubjects] = useState([]);
@@ -91,6 +92,19 @@ export default function StaffManagement() {
     load();
   };
 
+  // ── Permanent delete (revoked staff only) ──────────────────
+  const handlePermanentDelete = async () => {
+    if (!deleting) return;
+    try {
+      await deleteDoc(doc(db, 'staff', deleting.id));
+      setToast({ message: `${deleting.name} permanently deleted.`, type:'success' });
+    } catch (err) {
+      setToast({ message: 'Error: ' + err.message, type:'error' });
+    }
+    setDeleting(null);
+    load();
+  };
+
   // ── Subject assignment ─────────────────────────────────────
   const handleSaveSubjects = async () => {
     await updateDoc(doc(db, 'staff', showSubjectModal.id), { subjects: editingSubjects });
@@ -113,11 +127,31 @@ export default function StaffManagement() {
   return (
     <div>
       <div className="page-header">
-        <h2>Staff Management</h2>
+        <div>
+          <h2 style={{ margin:0 }}>Staff Management</h2>
+          <p style={{ fontSize:13, color:'var(--text-muted)', margin:'4px 0 0' }}>Manage your teaching and administrative team.</p>
+        </div>
         <button className="btn btn-primary" onClick={() => setShowModal(true)}>
           <Plus size={16} /> Add Staff Member
         </button>
       </div>
+
+      {/* KPI stat tiles */}
+      {staffList.length > 0 && (
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:12, marginBottom:20 }}>
+          {[
+            { label:'Total Staff', value: staffList.length, color:'var(--brand)' },
+            { label:'Active', value: active.length, color:'var(--green)' },
+            { label:'CEO / Admin', value: staffList.filter(s=>s.role==='ceo'||s.role==='admin').length, color:'#7C3AED' },
+            { label:'Teaching Staff', value: staffList.filter(s=>s.role==='staff').length, color:'#2563EB' },
+          ].map(tile => (
+            <div key={tile.label} style={{ background:'var(--surface)', borderRadius:12, border:'1px solid var(--border)', padding:'14px 18px', boxShadow:'var(--shadow-xs)' }}>
+              <div style={{ fontSize:11, textTransform:'uppercase', letterSpacing:'0.06em', color:'var(--text-muted)', marginBottom:6 }}>{tile.label}</div>
+              <div style={{ fontSize:24, fontWeight:700, fontFamily:'var(--font-display)', color:tile.color }}>{tile.value}</div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Role explanation cards */}
       <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:12, marginBottom:20 }}>
@@ -147,11 +181,11 @@ export default function StaffManagement() {
             Staff accounts created directly from this dashboard
           </div>
           <div style={{ fontSize:12, color:'#374151', lineHeight:1.7 }}>
-            Enter staff name, email and role → click Add. The system automatically:
-            <br/>✅ Creates their login account
-            <br/>✅ Saves their profile with correct role
-            <br/>✅ Sends them a password setup email
-            <br/>Staff clicks the email link → sets their own password → logs in. Done.
+            Enter staff name, email and role click Add. The system automatically:
+            <br/>Creates their login account
+            <br/>Saves their profile with correct role
+            <br/>Sends them a password setup email
+            <br/>Staff clicks the email link sets their own password logs in. Done.
             <br/><strong>No Firebase Console needed ever again.</strong>
           </div>
         </div>
@@ -283,9 +317,13 @@ export default function StaffManagement() {
                       {member.role}
                     </span>
                   </td>
-                  <td>
+                  <td style={{ display:'flex', gap:6 }}>
                     <button className="btn btn-ghost btn-sm" onClick={() => handleRestore(member)}>
-                      <RefreshCw size={13}/> Restore Access
+                      <RefreshCw size={13}/> Restore
+                    </button>
+                    <button className="btn btn-sm" style={{ background:'var(--red-soft)', color:'var(--red-ink)', border:'none' }}
+                      onClick={() => setDeleting(member)}>
+                      <Trash2 size={13}/> Delete
                     </button>
                   </td>
                 </tr>
@@ -377,17 +415,16 @@ export default function StaffManagement() {
                 </span>
               </div>
               <div style={{ fontSize:13, color:'#374151', lineHeight:1.8 }}>
-                ✅ Login account created in Firebase<br/>
-                ✅ Profile saved with <strong>{showSuccess.role}</strong> role<br/>
-                ✅ Password setup email sent to <strong>{showSuccess.email}</strong><br/>
+                Login account created in Firebase<br/>
+                Profile saved with <strong>{showSuccess.role}</strong> role<br/>
+                Password setup email sent to <strong>{showSuccess.email}</strong><br/>
                 <br/>
                 <strong>What happens next:</strong><br/>
-                The staff member opens their email → clicks "Reset Password" →
-                sets their own password → logs in to the app with their email.
+                The staff member opens their email clicks "Reset Password"                 sets their own password logs in to the app with their email.
                 <br/><br/>
                 <strong>If they don't receive the email:</strong><br/>
                 Ask them to check spam folder. Or go to Staff Management and
-                you can resend from Firebase Console → Authentication → their account → Reset password.
+                you can resend from Firebase Console Authentication their account Reset password.
               </div>
             </div>
             <button className="btn btn-primary" onClick={() => setShowSuccess(null)}>
@@ -420,7 +457,7 @@ export default function StaffManagement() {
                   border:     `1px solid ${editingSubjects.includes(sub) ? '#3B82F6' : 'var(--border)'}`,
                 }}
               >
-                {editingSubjects.includes(sub) ? '✓ ' : ''}{sub}
+                {editingSubjects.includes(sub) ? '' : ''}{sub}
               </div>
             ))}
           </div>
@@ -455,6 +492,22 @@ export default function StaffManagement() {
             <div style={{ display:'flex', gap:10, justifyContent:'flex-end' }}>
               <button className="btn btn-ghost" onClick={() => setRevoking(null)}>Cancel</button>
               <button className="btn btn-danger" onClick={handleRevoke}>Revoke Access</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {deleting && (
+        <div className="modal-overlay">
+          <div className="modal" style={{ maxWidth:400 }}>
+            <p style={{ marginBottom:16, fontSize:14, lineHeight:1.6 }}>
+              Permanently delete <strong>{deleting.name}</strong>?
+              This removes the staff profile for good and cannot be undone.
+              (Their login account in Firebase Auth is not affected.)
+            </p>
+            <div style={{ display:'flex', gap:10, justifyContent:'flex-end' }}>
+              <button className="btn btn-ghost" onClick={() => setDeleting(null)}>Cancel</button>
+              <button className="btn btn-danger" onClick={handlePermanentDelete}>Delete Permanently</button>
             </div>
           </div>
         </div>

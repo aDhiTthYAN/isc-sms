@@ -133,22 +133,40 @@ export default function StudentsPage() {
         </div>
       )}
 
-      {/* Filters */}
-      <div style={{ display: 'flex', gap: 10, marginBottom: 14, flexWrap: 'wrap' }}>
+      {/* Search + batch filter row */}
+      <div style={{ display: 'flex', gap: 10, marginBottom: 12, flexWrap: 'wrap', alignItems: 'center' }}>
         <div className="search-bar" style={{ flex: 1, minWidth: 220 }}>
-          <Search size={15} style={{ color: 'var(--muted)', flexShrink: 0 }} />
+          <Search size={15} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
           <input placeholder="Search name, phone, ClassPlus ID, email..."
             value={search} onChange={e => setSearch(e.target.value)} />
-          {searching && <span style={{ fontSize: 11, color: 'var(--muted)', whiteSpace: 'nowrap' }}>Searching...</span>}
+          {searching && <span style={{ fontSize: 11, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>Searching...</span>}
         </div>
         <select className="form-input" style={{ width: 180 }} value={batchFilter} onChange={e => { setBatchFilter(e.target.value); setSearch(''); }}>
           <option value="">All Batches</option>
           {batches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
         </select>
-        <select className="form-input" style={{ width: 150 }} value={statusFilter} onChange={e => { setStatusFilter(e.target.value); setSearch(''); }}>
-          <option value="">All Status</option>
-          {STATUSES.map(s => <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>)}
-        </select>
+      </div>
+
+      {/* Status filter chips */}
+      <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginBottom:14 }}>
+        {[
+          { key:'', label:'All', dot:'var(--n-400)' },
+          { key:'active', label:'Active', dot:'var(--green)' },
+          { key:'moderate', label:'Moderate', dot:'var(--amber)' },
+          { key:'at-risk', label:'At Risk', dot:'var(--red)' },
+          { key:'dropped', label:'Dropped', dot:'var(--slate)' },
+        ].map(chip => {
+          const count = chip.key ? students.filter(s=>s.status===chip.key).length : students.length;
+          const active = statusFilter === chip.key;
+          return (
+            <button key={chip.key} onClick={() => { setStatusFilter(chip.key); setSearch(''); }}
+              style={{ display:'flex', alignItems:'center', gap:6, padding:'6px 14px', borderRadius:'var(--radius-pill)', border:`1px solid ${active?'var(--brand)':'var(--border)'}`, background:active?'var(--brand-50)':'var(--surface)', cursor:'pointer', fontSize:12, fontWeight:600, color:active?'var(--brand-ink)':'var(--text-sub)', transition:'all 0.12s' }}>
+              <span style={{ width:7, height:7, borderRadius:'50%', background:chip.dot, flexShrink:0 }} />
+              {chip.label}
+              <span style={{ fontSize:11, color:active?'var(--brand)':'var(--text-muted)', fontWeight:500 }}>{count}</span>
+            </button>
+          );
+        })}
       </div>
 
       <div className="table-container">
@@ -247,7 +265,7 @@ export default function StudentsPage() {
               <div className="form-group"><label className="form-label">Location</label><input className="form-input" value={form.location} onChange={e => setForm({...form, location: e.target.value})} /></div>
               <div className="form-group"><label className="form-label">Staff Assigned</label>
                 <select className="form-input" value={form.staffAssigned} onChange={e => setForm({...form, staffAssigned: e.target.value})}>
-                  <option value="">Select staff</option>{staffList.map(s=><option key={s.id}>{s.name}</option>)}
+                  <option value="">Select staff</option>{staffList.filter(s=>s.active!==false).map(s=><option key={s.id}>{s.name}</option>)}
                 </select>
               </div>
             </FormRow>

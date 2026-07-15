@@ -1,811 +1,774 @@
-import { useEffect, useState, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
 import {
-  getBatches, addBatch, updateBatch,
-  getStudentsPaged, addStudent, bulkAddStudents, getBatchStudentCount,
-  getStaffProfiles, getBatchSchedules, addBatchSchedule, deleteBatchSchedule,
-  getBatchTasks, addBatchTask, markTaskSubmitted
+  getMyStudents, getMyTasks, getMyFollowUps, getStaffBatches,
+  getMyNotifications, markNotificationRead, getMyRequests, updateRequest, addNotification, createRequest,
+  getBatchSchedules, getBatchTasks, getAssessments,
 } from '../firebase/services';
-import { Modal, Toast, Loading, FormRow, Avatar, StatusBadge } from '../components/ui';
+import { collection, getDocs, query, where } from 'firebase/firestore';
+import { db } from '../firebase/config';
+import { Loading } from '../components/ui';
 import { useAuth } from '../context/AuthContext';
 import {
-  Plus, Upload, UserPlus, ChevronRight, ArrowLeft,
-  Download, Calendar, CheckSquare, Users, Clock, Trash2
+  Users, CheckSquare, PhoneCall, School,
+  ChevronRight, AlertTriangle, Activity, Bell, Inbox, X, Phone
 } from 'lucide-react';
 
-const COURSES = ['Python','Data Science','Web Development','Machine Learning','Digital Marketing','UI/UX Design','Cyber Security','Other'];
-const DAYS    = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+const CARD = {
+  background: '#fff',
+  borderRadius: 14,
+  border: '1px solid #E5E7EB',
+  padding: '20px 22px',
+  boxShadow: '0 1px 3px rgba(0,0,0,0.08), 0 4px 12px rgba(0,0,0,0.04)',
+};
 
-function parseCSV(text) {
-  const lines = text.trim().split('\n');
-  const headers = lines[0].split(',').map(h => h.trim().toLowerCase().replace(/\s+/g,''));
-  const rows = [];
-  for (let i = 1; i < lines.length; i++) {
-    const vals = lines[i].split(',').map(v => v.trim().replace(/^"|"$/g,''));
-    if (vals.every(v => !v)) continue;
-    const obj = {};
-    headers.forEach((h, idx) => { obj[h] = vals[idx] || ''; });
-    rows.push(obj);
-  }
-  return rows;
+const ACCENTS = ['#E81620','#F4683B','#F5A623','#16A974','#11B4C6','#3B6EF6','#6366F1','#8B5CF6','#EC4899','#6E7488'];
+function avatarColor(name = '') { let h = 0; for (const c of name) h = (h * 31 + c.charCodeAt(0)) >>> 0; return ACCENTS[h % ACCENTS.length]; }
+function initials(name = '') { const p = name.trim().split(/\s+/); return ((p[0]?.[0] || '') + (p[1]?.[0] || '')).toUpperCase() || '?'; }
+function timeAgo(ts) {
+  if (!ts) return '';
+  const d = ts.toDate ? ts.toDate() : new Date(ts);
+  if (isNaN(d)) return '';
+  const diff = Math.floor((Date.now() - d) / 1000);
+  if (diff < 60)    return 'just now';
+  if (diff < 3600)  return `${Math.floor(diff / 60)}m ago`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+  return `${Math.floor(diff / 86400)}d ago`;
 }
 
-function downloadTemplate(batchName) {
-  const headers = ['name','phone','parentName','parentPhone','email','classStd','education','location','staffAssigned','classplusId','status'];
-  const ex = ['Fathima Aysha','+91 98432 11234','Abdul Raheem','+91 94432 98765','fathima@email.com','Class 10','B.Sc CS','Kochi','Priya S.','CP-2401','active'];
-  const blob = new Blob([headers.join(',')+'\n'+ex.join(',')], { type:'text/csv' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = `${batchName||'batch'}_template.csv`;
-  a.click();
-}
-
-export default function Batches() {
+export default function StaffDashboard() {
   const { profile } = useAuth();
   const navigate    = useNavigate();
-  const isCEOorAdmin = profile?.role === 'ceo' || profile?.role === 'admin';
+  const [students,        setStudents]        = useState([]);
+  const [tasks,           setTasks]           = useState([]);
+  const [followups,       setFollowups]       = useState([]);
+  const [myBatches,       setMyBatches]       = useState([]);
+  const [loading,         setLoading]         = useState(true);
+  const [notifications,   setNotifications]   = useState([]);
+  const [myRequests,      setMyRequests]      = useState([]);
+  const [showSidebar,     setShowSidebar]     = useState(false);
+  const [sidebarTab,      setSidebarTab]      = useState('notif'); // 'notif' | 'requests'
+  const [reminding,       setReminding]       = useState({});
+  const [actFilter,       setActFilter]       = useState('all'); // 'all' | 'followup' | 'task'
 
-  const [batches, setBatches]           = useState([]);
-  const [staffList, setStaffList]       = useState([]);
-  const [batchCounts, setBatchCounts]   = useState({});
-  const [loading, setLoading]           = useState(true);
-  const [selectedBatch, setSelectedBatch] = useState(null);
-  const [batchStudents, setBatchStudents] = useState([]);
-  const [schedules, setSchedules]       = useState([]);
-  const [batchTasks, setBatchTasks]     = useState([]);
-  const [activeTab, setActiveTab]       = useState('students'); // students | schedule | tasks
-  const [toast, setToast]               = useState(null);
-  const [saving, setSaving]             = useState(false);
-  const [csvPreview, setCsvPreview]     = useState(null);
-  const [importing, setImporting]       = useState(false);
-  const fileRef = useRef();
+  // Batch Activity Hub
+  const [hubBatch,      setHubBatch]      = useState('');
+  const [hubItems,      setHubItems]      = useState([]);
+  const [hubLoading,    setHubLoading]    = useState(false);
+  const [hubFilter,     setHubFilter]     = useState('all');
+  const [hubSearch,     setHubSearch]     = useState('');
+  const [hubTypeFilter, setHubTypeFilter] = useState('');
+  const [hubCourse,     setHubCourse]     = useState('');
+  const [hubTimeFilter, setHubTimeFilter] = useState('active'); // 'active'|'upcoming'|'past'|'all'
+  const HUB_PAGE = 20;
+  const [hubPage, setHubPage] = useState(0);
 
-  // Modals
-  const [showCreate,      setShowCreate]      = useState(false);
-  const [showAddStudent,  setShowAddStudent]  = useState(false);
-  const [showBulk,        setShowBulk]        = useState(false);
-  const [showSchedule,    setShowSchedule]    = useState(false);
-  const [showTask,        setShowTask]        = useState(false);
-  const [showTaskDetail,  setShowTaskDetail]  = useState(null);
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const [s, t, f, b, n, r] = await Promise.all([
+          getMyStudents(profile?.name, profile?.uid).catch(() => []),
+          getMyTasks(profile?.email).catch(() => []),
+          getMyFollowUps(profile?.email).catch(() => []),
+          getStaffBatches(profile?.uid).catch(() => []),
+          getMyNotifications(profile?.email).catch(() => []),
+          getMyRequests(profile?.uid).catch(() => []),
+        ]);
+        setStudents(s);
+        setTasks(t);
+        setFollowups(f);
+        setMyBatches(b);
+        setNotifications(n);
+        setMyRequests(r);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    if (profile?.uid) load();
+  }, [profile?.uid]);
 
-  // Forms
-  const [createForm, setCreateForm] = useState({
-    name:'', course:'', mentor:'', faculties:[], startDate:'', endDate:'',
-    status:'upcoming', maxSeats:'', courseDurationMonths:''
-  });
-  const [studentForm, setStudentForm] = useState({
-    name:'', phone:'', parentName:'', parentPhone:'', email:'',
-    classStd:'', education:'', location:'', staffAssigned:'', classplusId:'', status:'active',
-  });
-  const [scheduleForm, setScheduleForm] = useState({
-    title:'', day:'Monday', time:'', duration:'60', type:'live-class',
-    facultyName:'', meetLink:'', notes:''
-  });
-  const [taskForm, setTaskForm] = useState({
-    title:'', subject:'', description:'', dueDate:'', assignedFaculty:''
-  });
+  // ── Due-today & 1-hour-before reminders ──────────────────────────────────
+  useEffect(() => {
+    if (!myBatches.length || !profile?.email) return;
 
-  const loadBatches = async () => {
-    const [b, s] = await Promise.all([getBatches(), getStaffProfiles()]);
-    setBatches(b);
-    setStaffList(s.filter(x => x.active !== false));
-    const counts = {};
-    await Promise.all(b.map(async batch => { counts[batch.id] = await getBatchStudentCount(batch.id); }));
-    setBatchCounts(counts);
-    setLoading(false);
-  };
+    const parseMinutes = (timeStr) => {
+      if (!timeStr) return null;
+      // handles "10:30 AM", "14:30", "2:30 PM"
+      const clean = timeStr.trim();
+      const match = clean.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)?$/i);
+      if (!match) return null;
+      let h = parseInt(match[1], 10);
+      const m = parseInt(match[2], 10);
+      const meridiem = (match[3] || '').toUpperCase();
+      if (meridiem === 'PM' && h !== 12) h += 12;
+      if (meridiem === 'AM' && h === 12) h = 0;
+      return h * 60 + m;
+    };
 
-  const loadBatchDetail = async (batch) => {
-    const [res, sch, tasks] = await Promise.all([
-      getStudentsPaged({ batchId: batch.id }),
-      getBatchSchedules(batch.id),
-      getBatchTasks(batch.id),
-    ]);
-    setBatchStudents(res.students || []);
-    setSchedules(sch || []);
-    setBatchTasks(tasks || []);
-  };
+    const DAYS = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
 
-  useEffect(() => { loadBatches(); }, []);
+    const runChecks = async () => {
+      const now      = new Date();
+      const todayStr = now.toISOString().slice(0, 10);
+      const dayName  = DAYS[now.getDay()];
+      const nowMins  = now.getHours() * 60 + now.getMinutes();
 
-  const openBatch = async (batch) => {
-    setSelectedBatch(batch);
-    setActiveTab('students');
-    await loadBatchDetail(batch);
-  };
+      for (const batch of myBatches) {
+        const [scheds, asmts, bTasks] = await Promise.all([
+          getBatchSchedules(batch.id).catch(() => []),
+          getAssessments(batch.id).catch(() => []),
+          getBatchTasks(batch.id).catch(() => []),
+        ]);
 
-  // ── Create batch ──────────────────────────────────────────────
-  const handleCreateBatch = async (e) => {
-    e.preventDefault();
-    setSaving(true);
-    await addBatch(createForm);
-    setToast({ message: `Batch "${createForm.name}" created!`, type:'success' });
-    setShowCreate(false);
-    setCreateForm({ name:'', course:'', mentor:'', faculties:[], startDate:'', endDate:'', status:'upcoming', maxSeats:'', courseDurationMonths:'' });
-    await loadBatches();
-    setSaving(false);
-  };
+        // 1-hour-before schedule reminder
+        for (const s of scheds) {
+          const key = `rem_sched_${s.id}_${todayStr}`;
+          if (localStorage.getItem(key)) continue;
+          const isToday =
+            (s.recurring && s.day === dayName) ||
+            (!s.recurring && s.scheduledDate === todayStr);
+          if (!isToday) continue;
+          const schedMins = parseMinutes(s.time);
+          if (schedMins === null) continue;
+          const diff = schedMins - nowMins;
+          if (diff >= 0 && diff <= 60) {
+            await addNotification({
+              toEmail: profile.email,
+              title: 'Class Starting Soon',
+              message: `"${s.title || 'Class'}" starts at ${s.time} in ${batch.name || 'your batch'}`,
+              type: 'followup',
+              fromName: 'Reminder',
+              read: false,
+              createdAt: new Date(),
+            }).catch(() => {});
+            localStorage.setItem(key, '1');
+          }
+        }
 
-  // ── Toggle faculty in createForm ──────────────────────────────
-  const toggleFaculty = (name) => {
-    setCreateForm(prev => ({
-      ...prev,
-      faculties: prev.faculties.includes(name)
-        ? prev.faculties.filter(f => f !== name)
-        : [...prev.faculties, name]
-    }));
-  };
+        // Assessment due today
+        for (const a of asmts) {
+          if (a.status === 'completed') continue;
+          if (a.date !== todayStr) continue;
+          const key = `rem_asmt_${a.id}_${todayStr}`;
+          if (localStorage.getItem(key)) continue;
+          await addNotification({
+            toEmail: profile.email,
+            title: 'Assessment Due Today',
+            message: `"${a.title || 'Assessment'}" is due today in ${batch.name || 'your batch'}`,
+            type: 'concern',
+            fromName: 'Reminder',
+            read: false,
+            createdAt: new Date(),
+          }).catch(() => {});
+          localStorage.setItem(key, '1');
+        }
 
-  // ── Add single student ────────────────────────────────────────
-  const handleAddStudent = async (e) => {
-    e.preventDefault();
-    setSaving(true);
-    await addStudent({
-      ...studentForm,
-      batchId:             selectedBatch.id,
-      batchName:           selectedBatch.name,
-      course:              selectedBatch.course,
-      courseDurationMonths:selectedBatch.courseDurationMonths || '',
+        // Task/assignment due today
+        for (const t of bTasks) {
+          if (t.status === 'completed' || t.status === 'submitted') continue;
+          if (t.dueDate !== todayStr) continue;
+          const key = `rem_task_${t.id}_${todayStr}`;
+          if (localStorage.getItem(key)) continue;
+          await addNotification({
+            toEmail: profile.email,
+            title: 'Assignment Due Today',
+            message: `"${t.title || 'Assignment'}" is due today in ${batch.name || 'your batch'}`,
+            type: 'task',
+            fromName: 'Reminder',
+            read: false,
+            createdAt: new Date(),
+          }).catch(() => {});
+          localStorage.setItem(key, '1');
+        }
+      }
+    };
+
+    runChecks();
+    const interval = setInterval(runChecks, 5 * 60 * 1000); // recheck every 5 min
+    return () => clearInterval(interval);
+  }, [myBatches, profile?.email]);
+
+  // Auto-select first batch when myBatches loads
+  useEffect(() => {
+    if (myBatches.length > 0 && !hubBatch) setHubBatch(myBatches[0].id);
+  }, [myBatches]);
+
+  // Load hub items whenever selected batch changes
+  useEffect(() => {
+    if (!hubBatch) return setHubItems([]);
+    setHubLoading(true);
+    const today = new Date().toISOString().slice(0, 10);
+    Promise.all([
+      getBatchSchedules(hubBatch).catch(() => []),
+      getAssessments(hubBatch).catch(() => []),
+      getBatchTasks(hubBatch).catch(() => []),
+    ]).then(([scheds, asmts, bTasks]) => {
+      setHubItems([
+        ...scheds.map(s => {
+          const _timeStatus = s.recurring ? 'active'
+            : !s.scheduledDate ? 'active'
+            : s.scheduledDate > today ? 'upcoming'
+            : s.scheduledDate < today ? 'past' : 'active';
+          return { ...s, _kind: 'schedule', _timeStatus,
+            _label: s.title || 'Class',
+            _sub: s.recurring ? `Every ${s.day} at ${s.time}` : `${s.scheduledDate || ''} at ${s.time}`,
+            _type: s.type || 'live-class', _course: s.course || '' };
+        }),
+        ...asmts.map(a => {
+          const _timeStatus = a.status === 'completed' ? 'completed'
+            : a.date > today ? 'upcoming' : a.date < today ? 'past' : 'active';
+          return { ...a, _kind: 'assessment', _timeStatus,
+            _label: a.title || 'Assessment',
+            _sub: `${a.date || '—'} · ${a.totalMarks || ''} marks`,
+            _type: a.subject || '', _course: a.course || '' };
+        }),
+        ...bTasks.map(t => {
+          const _timeStatus = (t.status === 'completed' || t.status === 'submitted') ? 'completed'
+            : t.dueDate > today ? 'upcoming' : t.dueDate < today ? 'past' : 'active';
+          return { ...t, _kind: 'task', _timeStatus,
+            _label: t.title || 'Task',
+            _sub: `${t.subject || ''} · Due: ${t.dueDate || '—'}`,
+            _type: t.subject || '', _course: t.course || '' };
+        }),
+      ]);
+      setHubPage(0);
+      setHubLoading(false);
     });
-    setToast({ message:'Student added to batch!', type:'success' });
-    setShowAddStudent(false);
-    setStudentForm({ name:'', phone:'', parentName:'', parentPhone:'', email:'', classStd:'', education:'', location:'', staffAssigned:'', classplusId:'', status:'active' });
-    await loadBatchDetail(selectedBatch);
-    const c = await getBatchStudentCount(selectedBatch.id);
-    setBatchCounts(prev => ({ ...prev, [selectedBatch.id]: c }));
-    setSaving(false);
-  };
+  }, [hubBatch]);
 
-  // ── Bulk import ───────────────────────────────────────────────
-  const handleBulkImport = async () => {
-    if (!csvPreview) return;
-    setImporting(true);
-    const students = csvPreview.map(row => ({
-      name:             row.name||'',
-      phone:            row.phone||'',
-      parentName:       row.parentname||'',
-      parentPhone:      row.parentphone||'',
-      email:            row.email||'',
-      classStd:         row.classstd||row.class||'',
-      education:        row.education||'',
-      location:         row.location||'',
-      staffAssigned:    row.staffassigned||'',
-      classplusId:      row.classplusid||'',
-      status:           row.status||'active',
-      batchId:          selectedBatch.id,
-      batchName:        selectedBatch.name,
-      course:           selectedBatch.course,
-      courseDurationMonths: selectedBatch.courseDurationMonths||'',
-    }));
-    const res = await bulkAddStudents(students);
-    setToast({ message:`Imported ${res.success} students into ${selectedBatch.name}!`, type:'success' });
-    setShowBulk(false);
-    setCsvPreview(null);
-    setImporting(false);
-    await loadBatchDetail(selectedBatch);
-    const c = await getBatchStudentCount(selectedBatch.id);
-    setBatchCounts(prev => ({ ...prev, [selectedBatch.id]: c }));
-  };
+  if (loading) return <Loading text="Loading your dashboard..." />;
 
-  // ── Add schedule slot ─────────────────────────────────────────
-  const handleAddSchedule = async (e) => {
-    e.preventDefault();
-    setSaving(true);
-    await addBatchSchedule({ ...scheduleForm, batchId: selectedBatch.id, batchName: selectedBatch.name });
-    setToast({ message:'Schedule added!', type:'success' });
-    setShowSchedule(false);
-    setScheduleForm({ title:'', day:'Monday', time:'', duration:'60', type:'live-class', facultyName:'', meetLink:'', notes:'' });
-    const sch = await getBatchSchedules(selectedBatch.id);
-    setSchedules(sch);
-    setSaving(false);
-  };
+  const pendingTasks    = tasks.filter(t => t.status !== 'completed');
+  const pendingFollowups = followups.filter(f => !f.completed);
+  const atRisk          = students.filter(s => s.status === 'at-risk');
 
-  // ── Add batch task ────────────────────────────────────────────
-  const handleAddTask = async (e) => {
-    e.preventDefault();
-    setSaving(true);
-    await addBatchTask({
-      ...taskForm,
-      batchId:   selectedBatch.id,
-      batchName: selectedBatch.name,
-      createdBy: profile?.name,
-    });
-    setToast({ message:'Task created for batch!', type:'success' });
-    setShowTask(false);
-    setTaskForm({ title:'', subject:'', description:'', dueDate:'', assignedFaculty:'' });
-    const tasks = await getBatchTasks(selectedBatch.id);
-    setBatchTasks(tasks);
-    setSaving(false);
-  };
+  const statCards = [
+    { label: 'My Students',     value: students.length,         color: 'var(--blue-ink)', bg: 'var(--blue-soft)', icon: Users,          link: '/students'  },
+    { label: 'Pending Tasks',   value: pendingTasks.length,     color: '#F59E0B', bg: '#FEF3C7', icon: CheckSquare,    link: '/tasks'     },
+    { label: 'Open Follow-Ups', value: pendingFollowups.length, color: '#10B981', bg: '#D1FAE5', icon: PhoneCall,      link: '/followups' },
+    { label: 'At-Risk Students',value: atRisk.length,           color: '#EF4444', bg: '#FEE2E2', icon: AlertTriangle,  link: '/students'  },
+  ];
 
-  const progress = (batch) => {
-    const s = batch.startDate ? new Date(batch.startDate) : null;
-    const e = batch.endDate   ? new Date(batch.endDate)   : null;
-    if (!s || !e) return 0;
-    return Math.min(100, Math.max(0, Math.round((Date.now()-s)/(e-s)*100)));
-  };
+  const sHead = (title, to, label = 'View all') => (
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+      <h3 style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>{title}</h3>
+      {to && (
+        <Link to={to} style={{ fontSize: 12, color: 'var(--brand)', display: 'flex', alignItems: 'center', gap: 3, fontWeight: 500 }}>
+          {label} <ChevronRight size={13} />
+        </Link>
+      )}
+    </div>
+  );
 
-  const typeColor = (t) => {
-    if (t==='live-class') return { bg:'#DBEAFE', col:'#1E40AF', label:'🔴 Live Class' };
-    if (t==='recorded')   return { bg:'#D1FAE5', col:'#065F46', label:'📹 Recorded' };
-    if (t==='assignment') return { bg:'#FEF3C7', col:'#92400E', label:'📝 Assignment' };
-    return { bg:'#F3F4F6', col:'#374151', label: t };
-  };
+  const unreadNotifs = notifications.filter(n => !n.read).length;
+  const pendingReqs  = myRequests.filter(r => r.status === 'pending').length;
 
-  if (loading) return <Loading/>;
+  // ── Recent Activity (merged tasks + follow-ups, newest first) ──
+  const recentActivity = [
+    ...tasks.map(t => ({ ...t, _type: 'task' })),
+    ...followups.map(f => ({ ...f, _type: 'followup' })),
+  ].sort((a, b) => {
+    const ta = a.createdAt?.toDate ? a.createdAt.toDate().getTime() : new Date(a.createdAt || 0).getTime();
+    const tb = b.createdAt?.toDate ? b.createdAt.toDate().getTime() : new Date(b.createdAt || 0).getTime();
+    return tb - ta;
+  });
+  // Keep only recent activity (last ~36h) so the dashboard stays relevant at scale.
+  const RECENT_WINDOW_MS = 36 * 60 * 60 * 1000;
+  const nowMs = Date.now();
+  const filteredActivity = recentActivity.filter(item => {
+    if (actFilter === 'followup' && item._type !== 'followup') return false;
+    if (actFilter === 'task'     && item._type !== 'task')     return false;
+    const ts = item.createdAt?.toDate ? item.createdAt.toDate().getTime() : (item.createdAt ? new Date(item.createdAt).getTime() : null);
+    if (!ts) return true;
+    return (nowMs - ts) <= RECENT_WINDOW_MS;
+  }).slice(0, 6);
 
-  // ════════════════════════════════════════════════════════════
-  // BATCH DETAIL VIEW
-  // ════════════════════════════════════════════════════════════
-  if (selectedBatch) {
-    const count = batchCounts[selectedBatch.id] || batchStudents.length;
-    const pct   = progress(selectedBatch);
-    const schedByDay = {};
-    DAYS.forEach(d => { schedByDay[d] = schedules.filter(s => s.day === d); });
+  return (
+    <div>
+      {/* Welcome */}
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom: 24 }}>
+        <div>
+          <h2 style={{ fontSize: 24, fontWeight: 700, color: 'var(--text)', marginBottom: 4 }}>
+            Welcome back, {profile?.name?.split(' ')[0]}
+          </h2>
+          <div style={{ fontSize: 13, color: '#9CA3AF' }}>
+            {new Date().toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+          </div>
+        </div>
+        {/* Bell + Requests button */}
+        <div style={{ display:'flex', gap:8 }}>
+          <button onClick={() => { setShowSidebar(true); setSidebarTab('requests'); }}
+            style={{ position:'relative', background:'#fff', border:'1px solid #E5E7EB', borderRadius:10, padding:'8px 12px', cursor:'pointer', display:'flex', alignItems:'center', gap:6, fontSize:13, fontWeight:600 }}>
+            <Inbox size={15} style={{ color:'var(--brand)' }}/>
+            My Requests
+            {pendingReqs > 0 && <span style={{ background:'var(--brand)', color:'#fff', fontSize:10, fontWeight:700, borderRadius:'50%', width:18, height:18, display:'flex', alignItems:'center', justifyContent:'center' }}>{pendingReqs}</span>}
+          </button>
+          <button onClick={() => { setShowSidebar(true); setSidebarTab('notif'); }}
+            style={{ position:'relative', background:'#fff', border:'1px solid #E5E7EB', borderRadius:10, padding:'8px 12px', cursor:'pointer', display:'flex', alignItems:'center', gap:6, fontSize:13, fontWeight:600 }}>
+            <Bell size={15} style={{ color:'var(--brand)' }}/>
+            Notifications
+            {unreadNotifs > 0 && <span style={{ background:'var(--brand)', color:'#fff', fontSize:10, fontWeight:700, borderRadius:'50%', width:18, height:18, display:'flex', alignItems:'center', justifyContent:'center' }}>{unreadNotifs}</span>}
+          </button>
+        </div>
+      </div>
 
-    return (
-      <div>
-        {/* Header */}
-        <div className="page-header">
-          <div style={{ display:'flex', alignItems:'center', gap:12 }}>
-            <button className="btn btn-ghost btn-sm btn-icon" onClick={() => setSelectedBatch(null)}>
-              <ArrowLeft size={16}/>
-            </button>
-            <div>
-              <h2>{selectedBatch.name}</h2>
-              <div style={{ fontSize:13, color:'#6B7280' }}>
-                {selectedBatch.course}
-                {selectedBatch.courseDurationMonths ? ` · ${selectedBatch.courseDurationMonths} months` : ''}
-                {' · '}{count} students
+      {/* Notifications + Requests Sidebar */}
+      {showSidebar && (
+        <div style={{ position:'fixed', inset:0, zIndex:9000 }} onClick={() => setShowSidebar(false)}>
+          <div style={{ position:'fixed', top:0, right:0, width:380, height:'100vh', background:'#fff', boxShadow:'-4px 0 24px rgba(0,0,0,0.12)', display:'flex', flexDirection:'column', zIndex:9001 }}
+            onClick={e => e.stopPropagation()}>
+            <div style={{ padding:'18px 20px', borderBottom:'1px solid #E5E7EB', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+              <div style={{ display:'flex', gap:0, background:'#F3F4F6', borderRadius:8, padding:2 }}>
+                {[{ key:'notif', label:'Notifications' }, { key:'requests', label:'My Requests' }].map(t => (
+                  <button key={t.key} onClick={() => setSidebarTab(t.key)}
+                    style={{ padding:'5px 12px', borderRadius:6, border:'none', cursor:'pointer', fontSize:12, fontWeight:600,
+                      background: sidebarTab===t.key ? 'var(--brand)' : 'transparent',
+                      color: sidebarTab===t.key ? '#fff' : '#6B7280' }}>
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+              <button onClick={() => setShowSidebar(false)} style={{ background:'none', border:'none', cursor:'pointer', color:'#9CA3AF' }}><X size={18}/></button>
+            </div>
+            <div style={{ flex:1, overflowY:'auto', padding:'12px 16px' }}>
+              {sidebarTab === 'notif' && (
+                <>
+                  {notifications.length === 0 && <div style={{ color:'#9CA3AF', fontSize:13, textAlign:'center', paddingTop:40 }}>No notifications.</div>}
+                  {notifications.map(n => (
+                    <div key={n.id} onClick={() => markNotificationRead(n.id).then(() => setNotifications(prev => prev.map(x => x.id===n.id ? { ...x, read:true } : x)))}
+                      style={{ padding:'10px 12px', borderRadius:10, marginBottom:8, cursor:'pointer',
+                        background: n.read ? '#FAFBFC' : '#EFF6FF', border:`1px solid ${n.read ? '#E5E7EB' : '#BFDBFE'}` }}>
+                      <div style={{ fontSize:13, fontWeight:n.read ? 400 : 700, color:'var(--text)', marginBottom:2 }}>{n.title}</div>
+                      <div style={{ fontSize:12, color:'#6B7280' }}>{n.body}</div>
+                    </div>
+                  ))}
+                </>
+              )}
+              {sidebarTab === 'requests' && (
+                <>
+                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
+                    <div style={{ fontSize:13, fontWeight:600 }}>My Removal Requests</div>
+                    <button className="btn btn-ghost btn-sm" onClick={() => navigate('/requests')}>View All </button>
+                  </div>
+                  {myRequests.length === 0 && <div style={{ color:'#9CA3AF', fontSize:13, textAlign:'center', paddingTop:40 }}>No requests submitted.</div>}
+                  {myRequests.map(req => {
+                    const isPending = req.status === 'pending';
+                    return (
+                      <div key={req.id} style={{ padding:'12px', borderRadius:10, marginBottom:8, background:'#FAFBFC', border:'1px solid #E5E7EB' }}>
+                        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:4 }}>
+                          <div style={{ fontSize:13, fontWeight:600 }}>{req.targetName}</div>
+                          <span style={{ fontSize:10, padding:'2px 8px', borderRadius:10, fontWeight:600,
+                            background: isPending ? '#FEF3C7' : req.status==='accepted' ? '#D1FAE5' : '#FEE2E2',
+                            color: isPending ? '#92400E' : req.status==='accepted' ? '#065F46' : '#991B1B' }}>
+                            {req.status}
+                          </span>
+                        </div>
+                        <div style={{ fontSize:12, color:'#6B7280', marginBottom:8 }}>
+                          {req.targetType} · {req.reason?.slice(0,80)}
+                        </div>
+                        {isPending && (
+                          <button
+                            disabled={reminding[req.id]}
+                            onClick={async () => {
+                              setReminding(p => ({ ...p, [req.id]: true }));
+                              // Notify CEO
+                              const ceoSnap = await getDocs(query(collection(db,'staff'), where('role','==','ceo')));
+                              for (const ceoDoc of ceoSnap.docs) {
+                                const ceo = ceoDoc.data();
+                                if (ceo.email) await addNotification({
+                                  toEmail: ceo.email, title: 'Reminder: Removal Request',
+                                  body: `${profile?.name} is reminding you about their removal request from ${req.targetName}.`,
+                                  type: 'removal_reminder', read: false,
+                                });
+                              }
+                              setReminding(p => ({ ...p, [req.id]: false }));
+                              alert('Reminder sent to CEO!');
+                            }}
+                            style={{ fontSize:11, padding:'4px 10px', borderRadius:6, border:'1px solid #E5E7EB', background:'#fff', cursor:'pointer', fontWeight:500 }}>
+                            {reminding[req.id] ? 'Sending...' : 'Remind CEO'}
+                          </button>
+                        )}
+                        {req.status === 'accepted' && (
+                          <div style={{ fontSize:11, color:'#10B981', fontWeight:600 }}>Approved — you have been removed.</div>
+                        )}
+                        {req.status === 'rejected' && (
+                          <div style={{ fontSize:11, color:'#EF4444', fontWeight:600 }}>Request was declined by CEO.</div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* KPI Strip */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 14, marginBottom: 24 }}>
+        {statCards.map(card => {
+          const Icon = card.icon;
+          return (
+            <div
+              key={card.label}
+              style={{ ...CARD, cursor: 'pointer', transition: 'box-shadow 0.15s' }}
+              onClick={() => navigate(card.link)}
+              onMouseEnter={e => e.currentTarget.style.boxShadow = '0 4px 16px rgba(0,0,0,0.12)'}
+              onMouseLeave={e => e.currentTarget.style.boxShadow = CARD.boxShadow}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <div>
+                  <div style={{ fontSize: 11, color: '#6B7280', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>{card.label}</div>
+                  <div style={{ fontSize: 30, fontWeight: 700, color: card.color, lineHeight: 1 }}>{card.value}</div>
+                </div>
+                <div style={{ width: 42, height: 42, borderRadius: 12, background: card.bg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Icon size={20} style={{ color: card.color }} />
+                </div>
               </div>
             </div>
-          </div>
-          <div style={{ display:'flex', gap:8 }}>
-            {activeTab === 'students' && (
+          );
+        })}
+      </div>
+
+      {/* ── Batch Activity Hub ── */}
+      {(() => {
+        const kindColor = {
+          schedule:   { bg: '#DBEAFE', color: '#1E40AF', dot: '#3B82F6' },
+          assessment: { bg: '#D1FAE5', color: '#065F46', dot: '#10B981' },
+          task:       { bg: '#FEF3C7', color: '#92400E', dot: '#F59E0B' },
+        };
+        // Derive dropdown options
+        const courseOptions = [...new Set(hubItems.map(i => i._course).filter(Boolean))];
+        const typeOptions = [...new Set(hubItems.filter(i => hubFilter === 'all' || i._kind === hubFilter).map(i => i._type).filter(Boolean))];
+
+        // Apply all filters
+        let list = hubItems;
+        if (hubFilter !== 'all') list = list.filter(i => i._kind === hubFilter);
+        if (hubTimeFilter === 'active')   list = list.filter(i => i._timeStatus === 'active');
+        else if (hubTimeFilter === 'upcoming') list = list.filter(i => i._timeStatus === 'upcoming');
+        else if (hubTimeFilter === 'past')     list = list.filter(i => i._timeStatus === 'past' || i._timeStatus === 'completed');
+        // 'all' = no time filter
+        if (hubCourse)           list = list.filter(i => i._course === hubCourse);
+        if (hubTypeFilter)       list = list.filter(i => i._type === hubTypeFilter);
+        if (hubSearch.trim())    list = list.filter(i => i._label.toLowerCase().includes(hubSearch.toLowerCase()) || (i._sub||'').toLowerCase().includes(hubSearch.toLowerCase()));
+
+        const totalPages = Math.ceil(list.length / HUB_PAGE);
+        const pageList   = list.slice(hubPage * HUB_PAGE, (hubPage + 1) * HUB_PAGE);
+
+        return (
+          <div style={{ ...CARD, marginBottom: 20 }}>
+            {/* Title + batch chips row */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
+              <h3 style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>Batch Activity Hub <span style={{ fontSize: 12, color: '#9CA3AF', fontWeight: 400 }}>(active only)</span></h3>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                {myBatches.map(b => (
+                  <button key={b.id} onClick={() => { setHubBatch(b.id); setHubFilter('all'); setHubTypeFilter(''); setHubSearch(''); setHubPage(0); }}
+                    style={{ padding: '5px 14px', borderRadius: 20, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 600, transition: 'all 0.15s',
+                      background: hubBatch === b.id ? 'var(--brand)' : '#F3F4F6',
+                      color:      hubBatch === b.id ? '#fff'    : '#374151' }}>
+                    {b.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Filter bar */}
+            {hubBatch && (
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: 12, padding: '10px 12px', background: '#F8FAFC', borderRadius: 10, border: '1px solid #E5E7EB' }}>
+                {/* Category pills */}
+                <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                  {[
+                    { key: 'all',        label: 'All'            },
+                    { key: 'schedule',   label: 'Classes'     },
+                    { key: 'assessment', label: 'Assessments' },
+                    { key: 'task',       label: 'Assignments'  },
+                  ].map(f => (
+                    <button key={f.key} onClick={() => { setHubFilter(f.key); setHubTypeFilter(''); setHubPage(0); }}
+                      style={{ padding: '4px 12px', borderRadius: 20, border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 600,
+                        background: hubFilter === f.key ? 'var(--brand)' : '#E5E7EB',
+                        color:      hubFilter === f.key ? '#fff'    : '#374151' }}>
+                      {f.label}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Time filter pills */}
+                <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', borderLeft: '1px solid #E5E7EB', paddingLeft: 8 }}>
+                  {[
+                    { key: 'active',   label: 'Active'   },
+                    { key: 'upcoming', label: 'Upcoming' },
+                    { key: 'past',     label: 'Past'     },
+                    { key: 'all',      label: 'All Time'    },
+                  ].map(f => (
+                    <button key={f.key} onClick={() => { setHubTimeFilter(f.key); setHubPage(0); }}
+                      style={{ padding: '4px 10px', borderRadius: 20, border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 600,
+                        background: hubTimeFilter === f.key ? '#E53935' : '#E5E7EB',
+                        color:      hubTimeFilter === f.key ? '#fff'    : '#374151' }}>
+                      {f.label}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Course dropdown */}
+                {courseOptions.length > 0 && (
+                  <select value={hubCourse} onChange={e => { setHubCourse(e.target.value); setHubPage(0); }}
+                    style={{ padding: '4px 10px', borderRadius: 8, border: '1px solid #E5E7EB', fontSize: 12, background: '#fff', color: '#374151' }}>
+                    <option value="">All Courses</option>
+                    {courseOptions.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                )}
+
+                {/* Subject/type dropdown */}
+                {typeOptions.length > 0 && (
+                  <select value={hubTypeFilter} onChange={e => { setHubTypeFilter(e.target.value); setHubPage(0); }}
+                    style={{ padding: '4px 10px', borderRadius: 8, border: '1px solid #E5E7EB', fontSize: 12, background: '#fff', color: '#374151' }}>
+                    <option value="">All {hubFilter === 'schedule' ? 'Types' : 'Subjects'}</option>
+                    {typeOptions.map(t => <option key={t} value={t}>{t}</option>)}
+                  </select>
+                )}
+
+                {/* Search */}
+                <input
+                  placeholder="Search…"
+                  value={hubSearch}
+                  onChange={e => { setHubSearch(e.target.value); setHubPage(0); }}
+                  style={{ padding: '4px 10px', borderRadius: 8, border: '1px solid #E5E7EB', fontSize: 12, background: '#fff', minWidth: 120, flex: 1 }}
+                />
+
+                {/* Clear */}
+                {(hubSearch || hubTypeFilter || hubCourse || hubFilter !== 'all' || hubTimeFilter !== 'active') && (
+                  <button onClick={() => { setHubFilter('all'); setHubTypeFilter(''); setHubCourse(''); setHubSearch(''); setHubTimeFilter('active'); setHubPage(0); }}
+                    style={{ padding: '4px 10px', borderRadius: 8, border: '1px solid #E5E7EB', fontSize: 11, background: '#fff', cursor: 'pointer', color: 'var(--brand)', fontWeight: 600 }}>
+                    Clear
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* Content */}
+            {!hubBatch && (
+              <div style={{ textAlign: 'center', color: '#9CA3AF', padding: '28px 0', fontSize: 13 }}>No batches assigned yet.</div>
+            )}
+            {hubBatch && hubLoading && (
+              <div style={{ textAlign: 'center', color: '#9CA3AF', padding: '20px 0', fontSize: 13 }}>Loading…</div>
+            )}
+            {hubBatch && !hubLoading && (
               <>
-                <button className="btn btn-ghost" onClick={() => setShowBulk(true)}><Upload size={14}/> Bulk CSV</button>
-                {isCEOorAdmin && <button className="btn btn-primary" onClick={() => setShowAddStudent(true)}><UserPlus size={14}/> Add Student</button>}
+                {/* Count row */}
+                <div style={{ display: 'flex', gap: 16, marginBottom: 10, fontSize: 12, color: '#6B7280', flexWrap: 'wrap' }}>
+                  <span style={{ fontWeight: 600, color: 'var(--text)' }}>{list.length} item{list.length !== 1 ? 's' : ''}</span>
+                  <span>{hubItems.filter(i=>i._kind==='schedule').length} classes</span>
+                  <span>{hubItems.filter(i=>i._kind==='assessment').length} assessments</span>
+                  <span>{hubItems.filter(i=>i._kind==='task').length} assignments</span>
+                </div>
+
+                {pageList.length === 0 ? (
+                  <div style={{ textAlign: 'center', color: '#9CA3AF', padding: '20px 0', fontSize: 13 }}>No active items match your filters.</div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    {pageList.map((item, i) => {
+                      const c = kindColor[item._kind] || kindColor.task;
+                      const tab = item._kind === 'assessment' ? 'assessments' : 'tasks';
+                      return (
+                        <div key={item.id || i} onClick={() => item._kind === 'schedule' ? navigate('/schedule') : navigate('/batches', { state: { batchId: hubBatch, tab } })}
+                          style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', borderRadius: 10, border: '1px solid #E5E7EB', cursor: 'pointer', background: '#fff', transition: 'background 0.12s' }}
+                          onMouseEnter={e => e.currentTarget.style.background = '#F8FAFC'}
+                          onMouseLeave={e => e.currentTarget.style.background = '#fff'}>
+                          <div style={{ width: 9, height: 9, borderRadius: '50%', background: c.dot, flexShrink: 0 }} />
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item._label}</div>
+                            {item._sub && <div style={{ fontSize: 11, color: '#6B7280', marginTop: 1 }}>{item._sub}</div>}
+                          </div>
+                          {item._type && (
+                            <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 20, background: '#F3F4F6', color: '#374151', fontWeight: 500, flexShrink: 0, whiteSpace: 'nowrap' }}>{item._type}</span>
+                          )}
+                          <span style={{ fontSize: 11, padding: '3px 10px', borderRadius: 20, background: c.bg, color: c.color, fontWeight: 600, flexShrink: 0, whiteSpace: 'nowrap' }}>
+                            {item._kind === 'schedule' ? 'Class' : item._kind === 'assessment' ? 'Assessment' : 'Assignment'}
+                          </span>
+                          <span style={{ fontSize: 11, color: '#9CA3AF', flexShrink: 0 }}></span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Pagination */}
+                {totalPages > 1 && (
+                  <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 8, marginTop: 14, paddingTop: 12, borderTop: '1px solid #F3F4F6' }}>
+                    <button className="btn btn-ghost btn-sm" disabled={hubPage === 0} onClick={() => setHubPage(p => p - 1)}>Prev</button>
+                    <span style={{ fontSize: 12, color: '#6B7280' }}>Page {hubPage + 1} of {totalPages} · {list.length} items</span>
+                    <button className="btn btn-ghost btn-sm" disabled={hubPage >= totalPages - 1} onClick={() => setHubPage(p => p + 1)}>Next </button>
+                  </div>
+                )}
               </>
             )}
-            {activeTab === 'schedule' && (
-              <button className="btn btn-primary" onClick={() => setShowSchedule(true)}><Plus size={14}/> Add Class</button>
-            )}
-            {activeTab === 'tasks' && (
-              <button className="btn btn-primary" onClick={() => setShowTask(true)}><Plus size={14}/> Add Task</button>
-            )}
           </div>
-        </div>
+        );
+      })()}
 
-        {/* Batch info strip */}
-        <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:10, marginBottom:16 }}>
-          {[
-            { label:'Total Students', value:count,                                                color:'#3B82F6', bg:'#DBEAFE' },
-            { label:'Active',         value:batchStudents.filter(s=>s.status==='active').length,  color:'#10B981', bg:'#D1FAE5' },
-            { label:'At Risk',        value:batchStudents.filter(s=>s.status==='at-risk').length, color:'#EF4444', bg:'#FEE2E2' },
-            { label:'Progress',       value:`${pct}%`,                                            color:'#E53935', bg:'#FEE2E2' },
-          ].map(c => (
-            <div key={c.label} style={{ background:'#fff', borderRadius:10, border:'1px solid #E5E7EB', padding:'10px 14px' }}>
-              <div style={{ fontSize:11, color:'#6B7280', marginBottom:3 }}>{c.label}</div>
-              <div style={{ fontSize:20, fontWeight:700, color:c.color }}>{c.value}</div>
-            </div>
-          ))}
-        </div>
-
-        {/* Faculties assigned */}
-        {selectedBatch.faculties?.length > 0 && (
-          <div style={{ marginBottom:14, display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }}>
-            <span style={{ fontSize:12, color:'#6B7280' }}>Faculties:</span>
-            {selectedBatch.faculties.map((f,i) => (
-              <span key={i} className="badge badge-blue">{f}</span>
-            ))}
-          </div>
-        )}
-
-        {/* Tab bar */}
-        <div className="tab-bar" style={{ marginBottom:16 }}>
-          {[
-            { key:'students', label:`Students (${count})`           },
-            { key:'schedule', label:`Weekly Schedule (${schedules.length})` },
-            { key:'tasks',    label:`Tasks (${batchTasks.length})`  },
-          ].map(t => (
-            <div key={t.key} className={`tab ${activeTab===t.key?'active':''}`} onClick={() => setActiveTab(t.key)}>
-              {t.label}
-            </div>
-          ))}
-        </div>
-
-        {/* ── STUDENTS TAB ── */}
-        {activeTab === 'students' && (
-          <div className="table-container">
-            <table>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+        {/* My Batches */}
+        <div style={CARD}>
+          {sHead('My Batches', '/batches', 'Manage all')}
+          {myBatches.length === 0 && (
+            <p style={{ fontSize: 13, color: '#9CA3AF' }}>No batches assigned yet.</p>
+          )}
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
               <thead>
-                <tr><th>Child Name</th><th>Parent</th><th>Phone</th><th>Class/Std</th><th>Staff</th><th>Status</th><th>Subscription</th><th></th></tr>
+                <tr>
+                  {['Batch', 'Course', 'Status'].map(h => (
+                    <th key={h} style={{ padding: '7px 8px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.05em', borderBottom: '1px solid #F3F4F6' }}>{h}</th>
+                  ))}
+                </tr>
               </thead>
               <tbody>
-                {batchStudents.length === 0 && (
-                  <tr><td colSpan={8} style={{ textAlign:'center', padding:40 }}>
-                    <div style={{ color:'#6B7280', fontSize:13, marginBottom:12 }}>No students yet.</div>
-                    <div style={{ display:'flex', gap:8, justifyContent:'center' }}>
-                      <button className="btn btn-ghost" onClick={() => setShowBulk(true)}><Upload size={13}/> Import CSV</button>
-                      {isCEOorAdmin && <button className="btn btn-primary" onClick={() => setShowAddStudent(true)}><UserPlus size={13}/> Add Manually</button>}
-                    </div>
-                  </td></tr>
-                )}
-                {batchStudents.map(s => {
-                  let dl = null;
-                  if (s.joinDate && s.courseDurationMonths) {
-                    const exp = new Date(s.joinDate);
-                    exp.setMonth(exp.getMonth() + Number(s.courseDurationMonths));
-                    dl = Math.ceil((exp - Date.now()) / 86400000);
-                  }
-                  return (
-                    <tr key={s.id}>
-                      <td><div style={{ display:'flex', alignItems:'center', gap:8 }}><Avatar name={s.name} size="sm"/><div style={{ fontWeight:500 }}>{s.name}</div></div></td>
-                      <td style={{ fontSize:13 }}>{s.parentName||'—'}</td>
-                      <td>
-                        <div style={{ fontSize:13 }}>{s.phone||'—'}</div>
-                        {s.parentPhone && <div style={{ fontSize:11, color:'#6B7280' }}>P: {s.parentPhone}</div>}
-                      </td>
-                      <td style={{ fontSize:13 }}>{s.classStd||'—'}</td>
-                      <td style={{ fontSize:13 }}>{s.staffAssigned||'—'}</td>
-                      <td><StatusBadge status={s.status}/></td>
-                      <td>
-                        {dl!==null ? (
-                          <span style={{ fontSize:11, padding:'2px 7px', borderRadius:10, fontWeight:600,
-                            background:dl<0?'#FEE2E2':dl<=30?'#FEF3C7':'#D1FAE5',
-                            color:dl<0?'#991B1B':dl<=30?'#92400E':'#065F46' }}>
-                            {dl<0?'Expired':`${dl}d left`}
-                          </span>
-                        ) : '—'}
-                      </td>
-                      <td><button className="btn btn-ghost btn-sm" onClick={() => navigate(`/students/${s.id}`)}>View <ChevronRight size={12}/></button></td>
-                    </tr>
-                  );
-                })}
+                {myBatches.map((batch, idx) => (
+                  <tr
+                    key={batch.id}
+                    style={{ cursor: 'pointer', transition: 'background 0.12s', background: idx % 2 === 0 ? '#fff' : '#FAFBFC' }}
+                    onMouseEnter={e => e.currentTarget.style.background = '#F0F4FF'}
+                    onMouseLeave={e => e.currentTarget.style.background = idx % 2 === 0 ? '#fff' : '#FAFBFC'}
+                    onClick={() => navigate('/batches')}
+                  >
+                    <td style={{ padding: '9px 8px', fontWeight: 600 }}>{batch.name}</td>
+                    <td style={{ padding: '9px 8px', color: '#6B7280' }}>{batch.course || '—'}</td>
+                    <td style={{ padding: '9px 8px' }}>
+                      <span style={{
+                        fontSize: 10, padding: '2px 8px', borderRadius: 20, fontWeight: 600,
+                        background: batch.status === 'active' ? '#D1FAE5' : batch.status === 'upcoming' ? '#DBEAFE' : '#F3F4F6',
+                        color: batch.status === 'active' ? '#065F46' : batch.status === 'upcoming' ? '#1E40AF' : '#374151',
+                      }}>{batch.status}</span>
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
-        )}
+        </div>
 
-        {/* ── SCHEDULE TAB ── */}
-        {activeTab === 'schedule' && (
-          <div>
-            {schedules.length === 0 && (
-              <div className="card" style={{ textAlign:'center', color:'#6B7280', padding:40 }}>
-                No schedule added yet. Click "Add Class" to create the weekly timetable.
-              </div>
-            )}
-            <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
-              {DAYS.map(day => {
-                const daySlots = schedByDay[day] || [];
-                if (!daySlots.length) return null;
-                return (
-                  <div key={day} className="card">
-                    <div style={{ fontWeight:600, fontSize:14, marginBottom:10, color:'#1A1A2E' }}>{day}</div>
-                    <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-                      {daySlots.map(slot => {
-                        const tc = typeColor(slot.type);
-                        return (
-                          <div key={slot.id} style={{ display:'flex', alignItems:'center', gap:12, padding:'10px 14px', background:tc.bg, borderRadius:9, border:`1px solid ${tc.col}20` }}>
-                            <div style={{ flexShrink:0, textAlign:'center', minWidth:52 }}>
-                              <div style={{ fontWeight:700, fontSize:13, color:tc.col }}>{slot.time}</div>
-                              <div style={{ fontSize:10, color:'#6B7280' }}>{slot.duration}min</div>
-                            </div>
-                            <div style={{ flex:1 }}>
-                              <div style={{ fontWeight:500, fontSize:13 }}>{slot.title}</div>
-                              <div style={{ fontSize:12, color:'#6B7280', marginTop:2 }}>
-                                {slot.facultyName && `👤 ${slot.facultyName}`}
-                                {slot.meetLink && <a href={slot.meetLink} target="_blank" rel="noreferrer" style={{ color:'#E53935', marginLeft:8 }}>Join Link →</a>}
-                              </div>
-                              {slot.notes && <div style={{ fontSize:11, color:'#9CA3AF', marginTop:2 }}>{slot.notes}</div>}
-                            </div>
-                            <span style={{ padding:'3px 9px', borderRadius:20, fontSize:11, fontWeight:600, background:tc.bg, color:tc.col, border:`1px solid ${tc.col}40` }}>
-                              {tc.label}
-                            </span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                );
-              })}
+        {/* Recent Activity */}
+        <div style={CARD}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+            <h3 style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>Recent Activity</h3>
+            <div style={{ display: 'inline-flex', background: 'var(--surface-sunken, #F3F4F6)', borderRadius: 9, padding: 3, gap: 2 }}>
+              {[
+                { key: 'all',      label: 'All'        },
+                { key: 'followup', label: 'Follow-ups' },
+                { key: 'task',     label: 'Tasks'      },
+              ].map(f => (
+                <button key={f.key} onClick={() => setActFilter(f.key)} style={{
+                  padding: '5px 12px', border: 'none', borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                  background: actFilter === f.key ? '#fff' : 'transparent',
+                  color:      actFilter === f.key ? 'var(--text)' : '#6B7280',
+                  boxShadow:  actFilter === f.key ? '0 1px 2px rgba(0,0,0,0.08)' : 'none',
+                }}>
+                  {f.label}
+                </button>
+              ))}
             </div>
           </div>
-        )}
-
-        {/* ── TASKS TAB ── */}
-        {activeTab === 'tasks' && (
-          <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
-            {batchTasks.length === 0 && (
-              <div className="card" style={{ textAlign:'center', color:'#6B7280', padding:40 }}>
-                No tasks created yet. Click "Add Task" to assign work to students.
-              </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            {filteredActivity.length === 0 && (
+              <div style={{ color: '#9CA3AF', fontSize: 13, textAlign: 'center', padding: '32px 0' }}>No activity yet.</div>
             )}
-            {batchTasks.map(task => {
-              const submitted   = task.submittedBy?.length || 0;
-              const total       = batchStudents.length || 1;
-              const pctDone     = Math.round(submitted/total*100);
-              const notSubmitted = batchStudents.filter(s => !task.submittedBy?.find(x => x.studentId === s.id));
+            {filteredActivity.map((item, i) => {
+              const isFollowup = item._type === 'followup';
               return (
-                <div key={task.id} className="card" style={{ cursor:'pointer' }} onClick={() => setShowTaskDetail(task)}>
-                  <div style={{ display:'flex', justifyContent:'space-between', marginBottom:8 }}>
-                    <div>
-                      <div style={{ fontWeight:600, fontSize:14 }}>{task.title}</div>
-                      <div style={{ fontSize:12, color:'#6B7280', marginTop:2 }}>
-                        {task.subject && `📚 ${task.subject}`}
-                        {task.assignedFaculty && ` · 👤 ${task.assignedFaculty}`}
-                        {task.dueDate && ` · Due: ${task.dueDate}`}
-                      </div>
+                <div key={item.id || i}
+                  onClick={() => navigate(isFollowup ? '/followups' : '/tasks')}
+                  style={{ display: 'flex', alignItems: 'flex-start', gap: 11, padding: 10, borderRadius: 10, cursor: 'pointer', transition: 'background .12s' }}
+                  onMouseEnter={e => e.currentTarget.style.background = '#F8FAFC'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                  <div style={{ width: 30, height: 30, borderRadius: 9, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: isFollowup ? 'var(--teal-soft, #CCFBF1)' : 'var(--amber-soft, #FEF3C7)' }}>
+                    {isFollowup
+                      ? <Phone size={15} style={{ color: 'var(--teal-ink, #0F766E)' }} />
+                      : <CheckSquare size={15} style={{ color: 'var(--amber-ink, #92400E)' }} />
+                    }
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {isFollowup ? (item.studentName || 'Unknown student') : `Task · ${item.title || 'Task'}`}
                     </div>
-                    <div style={{ textAlign:'right' }}>
-                      <div style={{ fontWeight:700, fontSize:16, color: pctDone===100?'#10B981':'#F59E0B' }}>{submitted}/{total}</div>
-                      <div style={{ fontSize:11, color:'#6B7280' }}>submitted</div>
+                    <div style={{ fontSize: 11.5, color: '#9CA3AF', marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {isFollowup ? item.note : `${item.status === 'completed' ? 'Completed' : item.status === 'in-progress' ? 'In progress' : 'To do'}${item.dueDate ? ` · Due ${item.dueDate}` : ''}`}
                     </div>
                   </div>
-                  <div className="progress-bar">
-                    <div className="progress-fill" style={{ width:`${pctDone}%`, background:pctDone===100?'#10B981':'#F59E0B' }}/>
-                  </div>
-                  {task.description && <div style={{ fontSize:13, color:'#6B7280', marginTop:8 }}>{task.description}</div>}
-                  <div style={{ fontSize:12, color:'#E53935', marginTop:8 }}>
-                    {notSubmitted.length>0 ? `${notSubmitted.length} not submitted yet — click to see` : '✅ All submitted!'}
+                  <div style={{ fontSize: 11, color: '#9CA3AF', whiteSpace: 'nowrap', flexShrink: 0, marginTop: 2 }}>
+                    {timeAgo(item.createdAt)}
                   </div>
                 </div>
               );
             })}
           </div>
-        )}
-
-        {/* ── MODALS ── */}
-
-        {/* Add Student */}
-        {showAddStudent && (
-          <Modal title={`Add Student to ${selectedBatch.name}`} onClose={() => setShowAddStudent(false)} wide>
-            <div style={{ padding:'8px 12px', background:'#EFF6FF', borderRadius:8, fontSize:12, color:'#1E40AF', marginBottom:14 }}>
-              Student will be automatically placed in <strong>{selectedBatch.name}</strong> ({selectedBatch.course}).
-            </div>
-            <form onSubmit={handleAddStudent} style={{ display:'flex', flexDirection:'column', gap:12 }}>
-              <FormRow>
-                <div className="form-group"><label className="form-label">Child Name *</label><input className="form-input" required value={studentForm.name} onChange={e => setStudentForm({...studentForm,name:e.target.value})}/></div>
-                <div className="form-group"><label className="form-label">Child Phone</label><input className="form-input" value={studentForm.phone} onChange={e => setStudentForm({...studentForm,phone:e.target.value})}/></div>
-              </FormRow>
-              <FormRow>
-                <div className="form-group"><label className="form-label">Parent Name *</label><input className="form-input" required value={studentForm.parentName} onChange={e => setStudentForm({...studentForm,parentName:e.target.value})}/></div>
-                <div className="form-group"><label className="form-label">Parent Phone *</label><input className="form-input" required value={studentForm.parentPhone} onChange={e => setStudentForm({...studentForm,parentPhone:e.target.value})}/></div>
-              </FormRow>
-              <FormRow>
-                <div className="form-group"><label className="form-label">Class / Std</label><input className="form-input" placeholder="Class 10, Grade 8..." value={studentForm.classStd} onChange={e => setStudentForm({...studentForm,classStd:e.target.value})}/></div>
-                <div className="form-group"><label className="form-label">Email</label><input className="form-input" type="email" value={studentForm.email} onChange={e => setStudentForm({...studentForm,email:e.target.value})}/></div>
-              </FormRow>
-              <FormRow>
-                <div className="form-group"><label className="form-label">Location</label><input className="form-input" value={studentForm.location} onChange={e => setStudentForm({...studentForm,location:e.target.value})}/></div>
-                <div className="form-group">
-                  <label className="form-label">Staff Assigned</label>
-                  <select className="form-input" value={studentForm.staffAssigned} onChange={e => setStudentForm({...studentForm,staffAssigned:e.target.value})}>
-                    <option value="">Select</option>
-                    {staffList.map(s=><option key={s.id}>{s.name}</option>)}
-                  </select>
-                </div>
-              </FormRow>
-              <FormRow>
-                <div className="form-group"><label className="form-label">ClassPlus ID</label><input className="form-input" value={studentForm.classplusId} onChange={e => setStudentForm({...studentForm,classplusId:e.target.value})}/></div>
-                <div className="form-group"><label className="form-label">Join Date</label><input className="form-input" type="date" value={studentForm.joinDate} onChange={e => setStudentForm({...studentForm,joinDate:e.target.value})}/></div>
-              </FormRow>
-              <div style={{ display:'flex', gap:10, justifyContent:'flex-end' }}>
-                <button type="button" className="btn btn-ghost" onClick={() => setShowAddStudent(false)}>Cancel</button>
-                <button type="submit" className="btn btn-primary" disabled={saving}>{saving?'Adding...':'Add to Batch'}</button>
-              </div>
-            </form>
-          </Modal>
-        )}
-
-        {/* Bulk Import */}
-        {showBulk && (
-          <Modal title={`Bulk Import into ${selectedBatch.name}`} onClose={() => { setShowBulk(false); setCsvPreview(null); }} wide>
-            <div style={{ padding:'8px 12px', background:'#EFF6FF', borderRadius:8, fontSize:12, color:'#1E40AF', marginBottom:14 }}>
-              All students will be placed in <strong>{selectedBatch.name}</strong> automatically.
-            </div>
-            <button className="btn btn-ghost btn-sm" style={{ marginBottom:14 }} onClick={() => downloadTemplate(selectedBatch.name)}>
-              <Download size={13}/> Download CSV Template
-            </button>
-            <input ref={fileRef} type="file" accept=".csv" style={{ display:'none' }}
-              onChange={async e => { const t = await e.target.files[0]?.text(); if(t) setCsvPreview(parseCSV(t)); }}/>
-            <div onClick={() => fileRef.current.click()} style={{
-              border:'2px dashed #E5E7EB', borderRadius:10, padding:'24px', textAlign:'center',
-              cursor:'pointer', background:'#FAFAFA', marginBottom:14
-            }}>
-              <Upload size={22} style={{ color:'#9CA3AF', marginBottom:6 }}/>
-              <div style={{ fontSize:13, fontWeight:500 }}>{csvPreview?`${csvPreview.length} rows loaded — ready to import`:'Click to upload CSV'}</div>
-              <div style={{ fontSize:11, color:'#6B7280', marginTop:3 }}>Required: name, phone — everything else optional</div>
-            </div>
-            {csvPreview && (
-              <div className="table-container" style={{ maxHeight:180, overflow:'auto', marginBottom:12 }}>
-                <table>
-                  <thead><tr><th>#</th><th>Name</th><th>Parent Name</th><th>Phone</th><th>Class</th></tr></thead>
-                  <tbody>
-                    {csvPreview.slice(0,8).map((r,i)=>(
-                      <tr key={i}>
-                        <td style={{ color:'#9CA3AF' }}>{i+1}</td>
-                        <td style={{ fontWeight:500 }}>{r.name}</td>
-                        <td>{r.parentname||'—'}</td>
-                        <td>{r.phone}</td>
-                        <td>{r.classstd||r.class||'—'}</td>
-                      </tr>
-                    ))}
-                    {csvPreview.length>8&&<tr><td colSpan={5} style={{ textAlign:'center', color:'#6B7280', padding:8 }}>...and {csvPreview.length-8} more</td></tr>}
-                  </tbody>
-                </table>
-              </div>
-            )}
-            <div style={{ display:'flex', gap:10, justifyContent:'flex-end' }}>
-              <button className="btn btn-ghost" onClick={() => { setShowBulk(false); setCsvPreview(null); }}>Cancel</button>
-              <button className="btn btn-primary" onClick={handleBulkImport} disabled={!csvPreview||importing}>
-                {importing?'Importing...':`Import ${csvPreview?.length||0} Students`}
-              </button>
-            </div>
-          </Modal>
-        )}
-
-        {/* Add Schedule */}
-        {showSchedule && (
-          <Modal title="Add to Weekly Schedule" onClose={() => setShowSchedule(false)}>
-            <form onSubmit={handleAddSchedule} style={{ display:'flex', flexDirection:'column', gap:12 }}>
-              <div className="form-group"><label className="form-label">Title *</label><input className="form-input" required placeholder="e.g. Python Basics — Chapter 3" value={scheduleForm.title} onChange={e=>setScheduleForm({...scheduleForm,title:e.target.value})}/></div>
-              <FormRow>
-                <div className="form-group">
-                  <label className="form-label">Day *</label>
-                  <select className="form-input" value={scheduleForm.day} onChange={e=>setScheduleForm({...scheduleForm,day:e.target.value})}>
-                    {DAYS.map(d=><option key={d}>{d}</option>)}
-                  </select>
-                </div>
-                <div className="form-group"><label className="form-label">Time *</label><input className="form-input" type="time" required value={scheduleForm.time} onChange={e=>setScheduleForm({...scheduleForm,time:e.target.value})}/></div>
-              </FormRow>
-              <FormRow>
-                <div className="form-group">
-                  <label className="form-label">Type</label>
-                  <select className="form-input" value={scheduleForm.type} onChange={e=>setScheduleForm({...scheduleForm,type:e.target.value})}>
-                    <option value="live-class">🔴 Live Class</option>
-                    <option value="recorded">📹 Recorded Session</option>
-                    <option value="assignment">📝 Assignment</option>
-                  </select>
-                </div>
-                <div className="form-group"><label className="form-label">Duration (minutes)</label><input className="form-input" type="number" value={scheduleForm.duration} onChange={e=>setScheduleForm({...scheduleForm,duration:e.target.value})}/></div>
-              </FormRow>
-              <FormRow>
-                <div className="form-group">
-                  <label className="form-label">Faculty</label>
-                  <select className="form-input" value={scheduleForm.facultyName} onChange={e=>setScheduleForm({...scheduleForm,facultyName:e.target.value})}>
-                    <option value="">Select faculty</option>
-                    {(selectedBatch.faculties||[]).map((f,i)=><option key={i}>{f}</option>)}
-                    {staffList.map(s=><option key={s.id}>{s.name}</option>)}
-                  </select>
-                </div>
-                <div className="form-group"><label className="form-label">Meet / Zoom Link</label><input className="form-input" type="url" placeholder="https://meet.google.com/..." value={scheduleForm.meetLink} onChange={e=>setScheduleForm({...scheduleForm,meetLink:e.target.value})}/></div>
-              </FormRow>
-              <div className="form-group"><label className="form-label">Notes</label><textarea className="form-input" rows={2} value={scheduleForm.notes} onChange={e=>setScheduleForm({...scheduleForm,notes:e.target.value})}/></div>
-              <div style={{ display:'flex', gap:10, justifyContent:'flex-end' }}>
-                <button type="button" className="btn btn-ghost" onClick={() => setShowSchedule(false)}>Cancel</button>
-                <button type="submit" className="btn btn-primary" disabled={saving}>{saving?'Saving...':'Add to Schedule'}</button>
-              </div>
-            </form>
-          </Modal>
-        )}
-
-        {/* Add Task */}
-        {showTask && (
-          <Modal title="Create Student Task" onClose={() => setShowTask(false)}>
-            <form onSubmit={handleAddTask} style={{ display:'flex', flexDirection:'column', gap:12 }}>
-              <div className="form-group"><label className="form-label">Task Title *</label><input className="form-input" required placeholder="e.g. Complete Chapter 3 exercises" value={taskForm.title} onChange={e=>setTaskForm({...taskForm,title:e.target.value})}/></div>
-              <FormRow>
-                <div className="form-group"><label className="form-label">Subject / Topic</label><input className="form-input" placeholder="e.g. Python Functions" value={taskForm.subject} onChange={e=>setTaskForm({...taskForm,subject:e.target.value})}/></div>
-                <div className="form-group">
-                  <label className="form-label">Assigned Faculty</label>
-                  <select className="form-input" value={taskForm.assignedFaculty} onChange={e=>setTaskForm({...taskForm,assignedFaculty:e.target.value})}>
-                    <option value="">Select faculty</option>
-                    {(selectedBatch.faculties||[]).map((f,i)=><option key={i}>{f}</option>)}
-                    {staffList.map(s=><option key={s.id}>{s.name}</option>)}
-                  </select>
-                </div>
-              </FormRow>
-              <div className="form-group"><label className="form-label">Description / Instructions</label><textarea className="form-input" rows={3} placeholder="What should students do? What is the expected output?" value={taskForm.description} onChange={e=>setTaskForm({...taskForm,description:e.target.value})}/></div>
-              <div className="form-group"><label className="form-label">Due Date</label><input className="form-input" type="date" value={taskForm.dueDate} onChange={e=>setTaskForm({...taskForm,dueDate:e.target.value})}/></div>
-              <div style={{ display:'flex', gap:10, justifyContent:'flex-end' }}>
-                <button type="button" className="btn btn-ghost" onClick={() => setShowTask(false)}>Cancel</button>
-                <button type="submit" className="btn btn-primary" disabled={saving}>{saving?'Creating...':'Create Task'}</button>
-              </div>
-            </form>
-          </Modal>
-        )}
-
-        {/* Task detail — who submitted */}
-        {showTaskDetail && (
-          <Modal title={showTaskDetail.title} onClose={() => setShowTaskDetail(null)} wide>
-            <div style={{ marginBottom:14 }}>
-              {showTaskDetail.subject && <div style={{ fontSize:13, color:'#6B7280', marginBottom:4 }}>📚 {showTaskDetail.subject}</div>}
-              {showTaskDetail.description && <div style={{ fontSize:13, lineHeight:1.6 }}>{showTaskDetail.description}</div>}
-              {showTaskDetail.dueDate && <div style={{ fontSize:12, color:'#9CA3AF', marginTop:6 }}>Due: {showTaskDetail.dueDate}</div>}
-            </div>
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14 }}>
-              <div>
-                <div style={{ fontWeight:600, fontSize:13, marginBottom:8, color:'#10B981' }}>
-                  ✅ Submitted ({showTaskDetail.submittedBy?.length||0})
-                </div>
-                {(showTaskDetail.submittedBy||[]).map((s,i)=>(
-                  <div key={i} style={{ padding:'6px 10px', background:'#F0FDF4', borderRadius:7, marginBottom:4, fontSize:13 }}>
-                    {s.studentName}
-                    <span style={{ fontSize:11, color:'#6B7280', marginLeft:8 }}>{s.submittedAt?.slice(0,10)}</span>
-                  </div>
-                ))}
-                {!showTaskDetail.submittedBy?.length && <div style={{ fontSize:12, color:'#9CA3AF' }}>Nobody yet</div>}
-              </div>
-              <div>
-                <div style={{ fontWeight:600, fontSize:13, marginBottom:8, color:'#EF4444' }}>
-                  ⏳ Not Submitted ({batchStudents.filter(s=>!showTaskDetail.submittedBy?.find(x=>x.studentId===s.id)).length})
-                </div>
-                {batchStudents.filter(s=>!showTaskDetail.submittedBy?.find(x=>x.studentId===s.id)).map(s=>(
-                  <div key={s.id} style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'6px 10px', background:'#FFF8F8', borderRadius:7, marginBottom:4 }}>
-                    <span style={{ fontSize:13 }}>{s.name}</span>
-                    <button className="btn btn-ghost btn-sm" style={{ fontSize:11 }}
-                      onClick={async () => {
-                        await markTaskSubmitted(showTaskDetail.id, s.id, s.name);
-                        const tasks = await getBatchTasks(selectedBatch.id);
-                        setBatchTasks(tasks);
-                        setShowTaskDetail(tasks.find(t=>t.id===showTaskDetail.id)||null);
-                      }}>
-                      Mark Done
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </Modal>
-        )}
-
-        {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)}/>}
-      </div>
-    );
-  }
-
-  // ════════════════════════════════════════════════════════════
-  // BATCH LIST VIEW
-  // ════════════════════════════════════════════════════════════
-  const grouped = { active:[], upcoming:[], completed:[] };
-  batches.forEach(b => { (grouped[b.status]||grouped.completed).push(b); });
-
-  return (
-    <div>
-      <div className="page-header">
-        <h2>Batch Management</h2>
-        {isCEOorAdmin && (
-          <button className="btn btn-primary" onClick={() => setShowCreate(true)}>
-            <Plus size={16}/> Create Batch
-          </button>
-        )}
-      </div>
-
-      <div style={{ padding:'10px 14px', background:'#F0FDF4', borderRadius:8, fontSize:12, color:'#065F46', marginBottom:20 }}>
-        <strong>Flow:</strong> Create batch → assign faculties → click batch → add students or import CSV → create weekly schedule and tasks inside the batch.
-      </div>
-
-      {batches.length === 0 && (
-        <div className="card" style={{ textAlign:'center', padding:60 }}>
-          <div style={{ fontSize:14, color:'#6B7280', marginBottom:16 }}>No batches yet.</div>
-          {isCEOorAdmin && <button className="btn btn-primary" onClick={() => setShowCreate(true)}><Plus size={16}/> Create First Batch</button>}
         </div>
-      )}
+      </div>
 
-      {['active','upcoming','completed'].map(group => {
-        if (!grouped[group].length) return null;
-        return (
-          <div key={group} style={{ marginBottom:24 }}>
-            <h3 style={{ fontSize:12, fontWeight:700, color:'#6B7280', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:12 }}>
-              {group} ({grouped[group].length})
-            </h3>
-            <div className="grid-3">
-              {grouped[group].map(b => (
-                <div key={b.id} className="card" style={{ cursor:'pointer' }}
-                  onClick={() => openBatch(b)}
-                  onMouseEnter={e => e.currentTarget.style.boxShadow='0 4px 16px rgba(0,0,0,0.1)'}
-                  onMouseLeave={e => e.currentTarget.style.boxShadow=''}>
-                  <div style={{ display:'flex', justifyContent:'space-between', marginBottom:8 }}>
-                    <div>
-                      <div style={{ fontWeight:600, fontSize:14 }}>{b.name}</div>
-                      <div style={{ fontSize:12, color:'#6B7280' }}>{b.course}{b.courseDurationMonths?` · ${b.courseDurationMonths}mo`:''}</div>
-                    </div>
-                    <span className={`badge ${b.status==='active'?'badge-green':b.status==='upcoming'?'badge-blue':'badge-gray'}`}>{b.status}</span>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+        {/* At-Risk Students in My Batches */}
+        <div style={CARD}>
+          {sHead('At-Risk Students', '/students', 'View all')}
+          {atRisk.length === 0 ? (
+            <div style={{ color: '#9CA3AF', fontSize: 13, textAlign: 'center', padding: '20px 0' }}>
+              No at-risk students in your batches.
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {atRisk.slice(0, 5).map(s => (
+                <div
+                  key={s.id}
+                  style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', borderRadius: 8, cursor: 'pointer', transition: 'background 0.12s' }}
+                  onMouseEnter={e => e.currentTarget.style.background = '#FFF8F8'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                  onClick={() => navigate(`/students/${s.id}`)}
+                >
+                  <div style={{ width: 30, height: 30, borderRadius: '50%', background: '#FEE2E2', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: 'var(--brand)', flexShrink: 0 }}>
+                    {(s.name || '?').charAt(0).toUpperCase()}
                   </div>
-                  <div style={{ fontSize:13, marginBottom:8 }}>
-                    <span style={{ color:'#6B7280' }}>Students: </span><strong>{batchCounts[b.id]||0}</strong>
-                    {b.mentor && <><span style={{ color:'#6B7280', marginLeft:10 }}>Mentor: </span>{b.mentor}</>}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.name}</div>
+                    <div style={{ fontSize: 11, color: '#9CA3AF' }}>{s.batchName || '—'}</div>
                   </div>
-                  {/* Faculty tags */}
-                  {b.faculties?.length>0 && (
-                    <div style={{ display:'flex', flexWrap:'wrap', gap:4, marginBottom:8 }}>
-                      {b.faculties.map((f,i)=>(
-                        <span key={i} style={{ fontSize:10, padding:'2px 7px', borderRadius:10, background:'#DBEAFE', color:'#1E40AF', fontWeight:600 }}>{f}</span>
-                      ))}
-                    </div>
-                  )}
-                  {b.status==='active' && (
-                    <div>
-                      <div className="progress-bar" style={{ marginTop:4 }}>
-                        <div className="progress-fill" style={{ width:`${progress(b)}%`, background:'#E53935' }}/>
-                      </div>
-                    </div>
-                  )}
-                  <div style={{ marginTop:10, paddingTop:8, borderTop:'1px solid var(--border)', fontSize:12, color:'#E53935', display:'flex', alignItems:'center', gap:4 }}>
-                    Click to open — students, schedule, tasks <ChevronRight size={12}/>
-                  </div>
+                  <ChevronRight size={13} style={{ color: '#D1D5DB', flexShrink: 0 }} />
                 </div>
               ))}
-            </div>
-          </div>
-        );
-      })}
-
-      {/* Create Batch Modal */}
-      {showCreate && (
-        <Modal title="Create New Batch" onClose={() => setShowCreate(false)} wide>
-          <form onSubmit={handleCreateBatch} style={{ display:'flex', flexDirection:'column', gap:14 }}>
-            <div className="form-group"><label className="form-label">Batch Name *</label><input className="form-input" required placeholder="e.g. Python Batch A — June 2026" value={createForm.name} onChange={e=>setCreateForm({...createForm,name:e.target.value})}/></div>
-            <FormRow>
-              <div className="form-group">
-                <label className="form-label">Course *</label>
-                <select className="form-input" required value={createForm.course} onChange={e=>setCreateForm({...createForm,course:e.target.value})}>
-                  <option value="">Select</option>{COURSES.map(c=><option key={c}>{c}</option>)}
-                </select>
-              </div>
-              <div className="form-group">
-                <label className="form-label">Course Duration (months) *</label>
-                <input className="form-input" type="number" required placeholder="e.g. 6" value={createForm.courseDurationMonths} onChange={e=>setCreateForm({...createForm,courseDurationMonths:e.target.value})}/>
-                <div style={{ fontSize:11, color:'#6B7280', marginTop:3 }}>Each student's subscription = their join date + this duration</div>
-              </div>
-            </FormRow>
-            <FormRow>
-              <div className="form-group"><label className="form-label">Start Date</label><input className="form-input" type="date" value={createForm.startDate} onChange={e=>setCreateForm({...createForm,startDate:e.target.value})}/></div>
-              <div className="form-group"><label className="form-label">End Date</label><input className="form-input" type="date" value={createForm.endDate} onChange={e=>setCreateForm({...createForm,endDate:e.target.value})}/></div>
-            </FormRow>
-            {/* Faculty multi-select */}
-            <div className="form-group">
-              <label className="form-label">Assign Faculties / Staff to this Batch</label>
-              <div style={{ display:'flex', flexWrap:'wrap', gap:8, padding:'10px', background:'var(--bg)', borderRadius:8, border:'1px solid var(--border)', minHeight:48 }}>
-                {staffList.filter(s=>s.role!=='ceo').map(s=>(
-                  <div key={s.id} onClick={() => toggleFaculty(s.name)} style={{
-                    padding:'5px 12px', borderRadius:20, fontSize:12, cursor:'pointer', fontWeight:500,
-                    background: createForm.faculties.includes(s.name)?'#E53935':'var(--white)',
-                    color:      createForm.faculties.includes(s.name)?'#fff':'var(--text)',
-                    border:     `1px solid ${createForm.faculties.includes(s.name)?'#E53935':'var(--border)'}`,
-                    transition: 'all 0.15s',
-                  }}>
-                    {s.name} <span style={{ fontSize:10, opacity:0.7 }}>({s.role})</span>
-                  </div>
-                ))}
-                {staffList.length===0 && <span style={{ fontSize:12, color:'#9CA3AF' }}>No staff added yet — add staff first then create batches</span>}
-              </div>
-              {createForm.faculties.length>0 && (
-                <div style={{ fontSize:11, color:'#065F46', marginTop:4 }}>
-                  Selected: {createForm.faculties.join(', ')}
-                </div>
+              {atRisk.length > 5 && (
+                <Link to="/students" style={{ fontSize: 12, color: 'var(--brand)', textAlign: 'center', padding: '6px 0', fontWeight: 500 }}>
+                  +{atRisk.length - 5} more                 </Link>
               )}
             </div>
-            <FormRow>
-              <div className="form-group"><label className="form-label">Max Seats</label><input className="form-input" type="number" placeholder="60" value={createForm.maxSeats} onChange={e=>setCreateForm({...createForm,maxSeats:e.target.value})}/></div>
-              <div className="form-group">
-                <label className="form-label">Status</label>
-                <select className="form-input" value={createForm.status} onChange={e=>setCreateForm({...createForm,status:e.target.value})}>
-                  <option value="upcoming">Upcoming</option>
-                  <option value="active">Active</option>
-                </select>
-              </div>
-            </FormRow>
-            <div style={{ display:'flex', gap:10, justifyContent:'flex-end' }}>
-              <button type="button" className="btn btn-ghost" onClick={() => setShowCreate(false)}>Cancel</button>
-              <button type="submit" className="btn btn-primary" disabled={saving}>{saving?'Creating...':'Create Batch'}</button>
-            </div>
-          </form>
-        </Modal>
-      )}
+          )}
+        </div>
 
-      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)}/>}
+        {/* Open Follow-Ups */}
+        <div style={CARD}>
+          {sHead('Open Follow-Ups', '/followups', 'View all')}
+          {pendingFollowups.length === 0 && (
+            <p style={{ fontSize: 13, color: '#9CA3AF', textAlign: 'center', padding: '20px 0' }}>No open follow-ups.</p>
+          )}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {pendingFollowups.slice(0, 5).map(f => (
+              <div key={f.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '9px 10px', borderRadius: 8, transition: 'background 0.12s' }}
+                onMouseEnter={e => e.currentTarget.style.background = '#F8FAFC'}
+                onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+              >
+                <div style={{ width: 30, height: 30, borderRadius: '50%', background: '#D1FAE5', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: '#10B981', flexShrink: 0 }}>
+                  <Activity size={13} />
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600 }}>{f.studentName}</div>
+                  <div style={{ fontSize: 11, color: '#9CA3AF', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: 1 }}>{f.note}</div>
+                </div>
+                {f.priority === 'high' && (
+                  <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 20, background: '#FEE2E2', color: '#991B1B', fontWeight: 600, flexShrink: 0 }}>Urgent</span>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

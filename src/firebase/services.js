@@ -46,11 +46,25 @@ export const searchStudents = async (searchTerm) => {
     );
 };
 
-export const getMyStudents = async (staffName) => {
-  if (!staffName) return [];
-  const q = query(studentsRef(), where('staffAssigned','==', staffName), orderBy('createdAt','desc'));
-  const snap = await getDocs(q);
-  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+export const getMyStudents = async (staffName, staffUid) => {
+  if (!staffName && !staffUid) return [];
+  try {
+    if (staffUid) {
+      const q = query(studentsRef(), where('staffId','==', staffUid), limit(100));
+      const snap = await getDocs(q);
+      if (snap.docs.length > 0) {
+        return snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a,b) => (a.name||'').localeCompare(b.name||''));
+      }
+    }
+    if (staffName) {
+      const q = query(studentsRef(), where('staffAssigned','==', staffName), limit(100));
+      const snap = await getDocs(q);
+      return snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a,b) => (a.name||'').localeCompare(b.name||''));
+    }
+    return [];
+  } catch {
+    return [];
+  }
 };
 
 export const getStudent = async (id) => {
@@ -122,22 +136,29 @@ export const getStudents = async () => {
 
 // ── Follow-ups ─────────────────────────────────────────────────
 export const getFollowUps = async (studentId) => {
-  const q = query(collection(db,'followups'), where('studentId','==',studentId), orderBy('createdAt','desc'));
+  const q = query(collection(db,'followups'), where('studentId','==',studentId));
   const snap = await getDocs(q);
-  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }))
+    .sort((a,b) => (b.createdAt?.seconds||0) - (a.createdAt?.seconds||0));
 };
 
 export const getMyFollowUps = async (staffEmail) => {
   if (!staffEmail) return [];
-  const q = query(collection(db,'followups'), where('assignedToEmail','==',staffEmail), where('completed','==',false), orderBy('createdAt','desc'));
-  const snap = await getDocs(q);
-  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  try {
+    const q = query(collection(db,'followups'), where('assignedToEmail','==',staffEmail), limit(100));
+    const snap = await getDocs(q);
+    return snap.docs.map(d => ({ id: d.id, ...d.data() }))
+      .filter(f => !f.completed)
+      .sort((a,b) => (b.createdAt?.seconds||0) - (a.createdAt?.seconds||0));
+  } catch {
+    return [];
+  }
 };
 
 export const getAllFollowUps = async () => {
-  const q = query(collection(db,'followups'), orderBy('createdAt','desc'), limit(100));
-  const snap = await getDocs(q);
-  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  const snap = await getDocs(query(collection(db,'followups'), limit(100)));
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }))
+    .sort((a,b) => (b.createdAt?.seconds||0) - (a.createdAt?.seconds||0));
 };
 
 export const addFollowUp = async (data) =>
@@ -148,8 +169,9 @@ export const completeFollowUp = async (id, note) =>
 
 // ── Batches ────────────────────────────────────────────────────
 export const getBatches = async () => {
-  const snap = await getDocs(query(collection(db,'batches'), orderBy('createdAt','desc')));
-  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  const snap = await getDocs(collection(db,'batches'));
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }))
+    .sort((a,b) => (b.createdAt?.seconds||0) - (a.createdAt?.seconds||0));
 };
 
 export const getBatch = async (id) => {
@@ -157,15 +179,12 @@ export const getBatch = async (id) => {
   return snap.exists() ? { id: snap.id, ...snap.data() } : null;
 };
 
-export const getBatchStudents = async (batchId, lastDoc = null) => {
-  let q = query(studentsRef(), where('batchId','==',batchId), orderBy('name'), limit(PAGE_SIZE));
-  if (lastDoc) q = query(studentsRef(), where('batchId','==',batchId), orderBy('name'), limit(PAGE_SIZE), startAfter(lastDoc));
+export const getBatchStudents = async (batchId) => {
+  const q = query(studentsRef(), where('batchId','==',batchId), limit(200));
   const snap = await getDocs(q);
-  return {
-    students: snap.docs.map(d => ({ id: d.id, ...d.data() })),
-    lastDoc:  snap.docs[snap.docs.length - 1] || null,
-    hasMore:  snap.docs.length === PAGE_SIZE,
-  };
+  const students = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+    .sort((a,b) => (a.name||'').localeCompare(b.name||''));
+  return { students, lastDoc: snap.docs[snap.docs.length-1]||null, hasMore: false };
 };
 
 export const getBatchStudentCount = async (batchId) => {
@@ -181,9 +200,17 @@ export const updateBatch = async (id, data) =>
 
 // ── Batch Schedules ────────────────────────────────────────────
 export const getBatchSchedules = async (batchId) => {
-  const q = query(collection(db,'schedules'), where('batchId','==',batchId), orderBy('createdAt','asc'));
+  const q = query(collection(db,'schedules'), where('batchId','==',batchId));
   const snap = await getDocs(q);
-  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }))
+    .sort((a,b) => (a.day||'').localeCompare(b.day||'') || (a.time||'').localeCompare(b.time||''));
+};
+
+// All schedules across every batch (for the global Schedule page "All" view)
+export const getAllSchedules = async () => {
+  const snap = await getDocs(collection(db,'schedules'));
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }))
+    .sort((a,b) => (a.day||'').localeCompare(b.day||'') || (a.time||'').localeCompare(b.time||''));
 };
 
 export const addBatchSchedule = async (data) =>
@@ -197,9 +224,10 @@ export const deleteBatchSchedule = async (id) =>
 
 // ── Batch Tasks ────────────────────────────────────────────────
 export const getBatchTasks = async (batchId) => {
-  const q = query(collection(db,'batchTasks'), where('batchId','==',batchId), orderBy('createdAt','desc'));
+  const q = query(collection(db,'batchTasks'), where('batchId','==',batchId));
   const snap = await getDocs(q);
-  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }))
+    .sort((a,b) => (b.createdAt?.seconds||0) - (a.createdAt?.seconds||0));
 };
 
 export const addBatchTask = async (data) =>
@@ -219,11 +247,17 @@ export const markTaskSubmitted = async (taskId, studentId, studentName) => {
 export const updateBatchTask = async (id, data) =>
   updateDoc(doc(db,'batchTasks', id), data);
 
+export const deleteBatchTask = async (id) =>
+  deleteDoc(doc(db,'batchTasks', id));
+
 // ── Assessments ────────────────────────────────────────────────
-export const getAssessments = async (studentId) => {
-  const q = query(collection(db,'assessments'), where('studentId','==',studentId), orderBy('date','asc'));
+export const getAssessments = async (batchId) => {
+  const q = batchId
+    ? query(collection(db,'assessments'), where('batchId','==',batchId))
+    : collection(db,'assessments');
   const snap = await getDocs(q);
-  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }))
+    .sort((a,b) => (b.date||'').localeCompare(a.date||''));
 };
 
 export const getAllAssessments = async () => {
@@ -232,13 +266,26 @@ export const getAllAssessments = async () => {
 };
 
 export const getBatchAssessments = async (batchId, testName) => {
-  const q = query(collection(db,'assessments'), where('batchId','==',batchId), where('testName','==',testName), orderBy('percentage','desc'));
+  const q = query(collection(db,'assessments'), where('batchId','==',batchId), where('testName','==',testName));
   const snap = await getDocs(q);
-  return snap.docs.map((d, i) => ({ id: d.id, rank: i + 1, ...d.data() }));
+  return snap.docs.map((d, i) => ({ id: d.id, rank: i + 1, ...d.data() }))
+    .sort((a,b) => (b.percentage||0) - (a.percentage||0));
 };
 
 export const addAssessment = async (data) =>
   addDoc(collection(db,'assessments'), { ...data, createdAt: serverTimestamp() });
+
+export const deleteAssessment = async (id) => deleteDoc(doc(db,'assessments',id));
+
+export const getAssessmentResults = async (assessmentId) => {
+  const q = query(collection(db,'assessmentResults'), where('assessmentId','==',assessmentId));
+  const snap = await getDocs(q);
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }))
+    .sort((a,b) => (b.percentage||0) - (a.percentage||0));
+};
+
+export const saveAssessmentResults = async (results) =>
+  Promise.all(results.map(r => addDoc(collection(db,'assessmentResults'), { ...r, savedAt: serverTimestamp() })));
 
 // ── Tasks ──────────────────────────────────────────────────────
 export const getTasks = async () => {
@@ -250,13 +297,13 @@ export const getTasks = async () => {
 export const getMyTasks = async (staffEmail) => {
   if (!staffEmail) return [];
   try {
-    const q = query(collection(db,'tasks'), where('assignedToEmail','==',staffEmail), where('status','!=','completed'), orderBy('status'), orderBy('createdAt','desc'));
+    const q = query(collection(db,'tasks'), where('assignedToEmail','==',staffEmail), limit(100));
     const snap = await getDocs(q);
-    return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    return snap.docs.map(d => ({ id: d.id, ...d.data() }))
+      .filter(t => t.status !== 'completed')
+      .sort((a,b) => (b.createdAt?.seconds||0) - (a.createdAt?.seconds||0));
   } catch {
-    const q = query(collection(db,'tasks'), where('assignedToEmail','==',staffEmail), orderBy('createdAt','desc'));
-    const snap = await getDocs(q);
-    return snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(t => t.status !== 'completed');
+    return [];
   }
 };
 
@@ -271,18 +318,56 @@ export const addNotification = async (data) =>
   addDoc(collection(db,'notifications'), { ...data, read: false, createdAt: serverTimestamp() });
 
 export const getMyNotifications = async (email) => {
-  const q = query(collection(db,'notifications'), where('toEmail','==',email), orderBy('createdAt','desc'), limit(20));
+  const q = query(collection(db,'notifications'), where('toEmail','==',email), limit(20));
   const snap = await getDocs(q);
-  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }))
+    .sort((a,b) => (b.createdAt?.seconds||0) - (a.createdAt?.seconds||0));
 };
 
 export const markNotificationRead = async (id) =>
   updateDoc(doc(db,'notifications', id), { read: true });
 
+export const saveFCMToken = async (userId, token) => {
+  try {
+    await updateDoc(doc(db, 'staff', userId), { fcmToken: token });
+  } catch {}
+};
+
+export const sendPushNotification = async ({ toEmail, title, body }) => {
+  // Fetch target staff's FCM token
+  try {
+    const snap = await getDocs(query(collection(db,'staff'), where('email','==',toEmail)));
+    if (snap.empty) return;
+    const staffDoc = snap.docs[0].data();
+    const token = staffDoc.fcmToken;
+    if (!token) return;
+
+    const serverKey = import.meta.env.VITE_FCM_SERVER_KEY;
+    if (!serverKey) {
+      console.warn('FCM server key not set. Add VITE_FCM_SERVER_KEY to .env');
+      return;
+    }
+
+    await fetch('https://fcm.googleapis.com/fcm/send', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `key=${serverKey}`,
+      },
+      body: JSON.stringify({
+        to: token,
+        notification: { title, body },
+        data: { click_action: 'FLUTTER_NOTIFICATION_CLICK' },
+      }),
+    });
+  } catch (err) {
+    console.warn('Push notification failed:', err.message);
+  }
+};
+
 // ── Daily Reports ──────────────────────────────────────────────
 export const getDailyReports = async () => {
-  const q = query(collection(db,'reports'), orderBy('createdAt','desc'), limit(100));
-  const snap = await getDocs(q);
+  const snap = await getDocs(query(collection(db,'reports'), limit(200)));
   return snap.docs.map(d => ({ id: d.id, ...d.data() }));
 };
 
@@ -340,4 +425,194 @@ export const getStaffBySubject = async (subject) => {
   return snap.docs
     .map(d => ({ id: d.id, ...d.data() }))
     .filter(s => s.subjects?.includes(subject) && s.active !== false);
+};
+// ── Schedule status & Attendance ───────────────────────────────
+export const updateScheduleStatus = async (scheduleId, status, note = '') =>
+  updateDoc(doc(db,'schedules', scheduleId), { status, statusNote: note, statusUpdatedAt: new Date().toISOString() });
+
+// Upsert attendance for a session: overwrite the existing record instead of
+// stacking duplicate docs on every save.
+export const saveAttendance = async (scheduleId, batchId, attendanceData) => {
+  const q = query(collection(db,'attendance'), where('scheduleId','==',scheduleId));
+  const snap = await getDocs(q);
+  if (!snap.empty) {
+    const [first, ...rest] = snap.docs;
+    await updateDoc(doc(db,'attendance', first.id), { batchId, records: attendanceData, updatedAt: serverTimestamp() });
+    await Promise.all(rest.map(d => deleteDoc(doc(db,'attendance', d.id)))); // clean up any old duplicates
+    return;
+  }
+  await addDoc(collection(db,'attendance'), { scheduleId, batchId, records: attendanceData, createdAt: serverTimestamp() });
+};
+
+// Remove all attendance for a session (used to undo / clear).
+export const deleteSessionAttendance = async (scheduleId) => {
+  const q = query(collection(db,'attendance'), where('scheduleId','==',scheduleId));
+  const snap = await getDocs(q);
+  await Promise.all(snap.docs.map(d => deleteDoc(doc(db,'attendance', d.id))));
+};
+
+export const getSessionAttendance = async (scheduleId) => {
+  const q = query(collection(db,'attendance'), where('scheduleId','==',scheduleId));
+  const snap = await getDocs(q);
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+};
+
+// Save attendance record (new signature for CSV upload modal)
+export const saveAttendanceRecord = async (data) =>
+  addDoc(collection(db,'attendance'), { ...data, savedAt: serverTimestamp() });
+
+// ── Class progress reports (per-student notes after a class) ────
+// A report is written by a faculty for a student about a specific class session.
+// Any staff can later view all previous reports for a student (across faculty).
+export const saveClassReport = async (data) =>
+  addDoc(collection(db,'classReports'), { ...data, createdAt: serverTimestamp() });
+
+export const updateClassReport = async (id, data) =>
+  updateDoc(doc(db,'classReports', id), { ...data, updatedAt: serverTimestamp() });
+
+export const deleteClassReport = async (id) =>
+  deleteDoc(doc(db,'classReports', id));
+
+// All reports written for one class session (keyed by scheduleId)
+export const getSessionReports = async (scheduleId) => {
+  const q = query(collection(db,'classReports'), where('scheduleId','==',scheduleId));
+  const snap = await getDocs(q);
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }))
+    .sort((a,b) => (b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));
+};
+
+// All reports for a single student across every class & faculty
+export const getStudentReports = async (studentId) => {
+  const q = query(collection(db,'classReports'), where('studentId','==',studentId));
+  const snap = await getDocs(q);
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }))
+    .sort((a,b) => (b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));
+};
+
+// Batch/main-page assessments a student took, merged with their marks.
+// Assessments live in `assessments` (with participantStudents) and marks in
+// `assessmentResults`; this joins them for a single student.
+export const getStudentBatchAssessments = async (studentId, batchId) => {
+  if (!batchId) return [];
+  const snap = await getDocs(query(collection(db,'assessments'), where('batchId','==',batchId)));
+  const assessments = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+    .filter(a => a.participantType !== 'specific'
+      || (a.participantStudents || []).some(p => p.id === studentId));
+  const out = [];
+  for (const a of assessments) {
+    let marks, percentage, pass;
+    try {
+      const res = await getAssessmentResults(a.id);
+      const mine = res.find(r => r.studentId === studentId);
+      if (mine) {
+        marks = mine.marks ?? mine.marksScored;
+        percentage = mine.percentage;
+        pass = mine.pass ?? mine.passed;
+      }
+    } catch {}
+    out.push({
+      id: a.id,
+      testName: a.title || a.testName || 'Assessment',
+      subject: a.subject || '',
+      date: a.date || '',
+      totalMarks: a.totalMarks,
+      marks: marks ?? null,
+      percentage: percentage ?? null,
+      pass,
+      status: a.status,
+      graded: marks != null,
+    });
+  }
+  return out.sort((x,y) => (y.date||'').localeCompare(x.date||''));
+};
+
+// Attendance summary for one student (present/total across all their sessions)
+export const getStudentAttendanceSummary = async (studentId, batchId) => {
+  const q = batchId
+    ? query(collection(db,'attendance'), where('batchId','==',batchId))
+    : collection(db,'attendance');
+  const snap = await getDocs(q);
+  let present = 0, total = 0;
+  const sessions = [];
+  snap.docs.forEach(d => {
+    const data = d.data();
+    const recs = data.attendance || data.records || {};
+    const rec = recs[studentId];
+    if (rec) {
+      total += 1;
+      if (rec.present) present += 1;
+      sessions.push({ scheduleId: data.scheduleId, present: !!rec.present });
+    }
+  });
+  return { present, total, pct: total ? Math.round((present / total) * 100) : null, sessions };
+};
+
+// All reports for a batch (for batch-level progress overview)
+export const getBatchReports = async (batchId) => {
+  const q = query(collection(db,'classReports'), where('batchId','==',batchId));
+  const snap = await getDocs(q);
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }))
+    .sort((a,b) => (b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));
+};
+
+// Mark schedule status (update)
+export const markScheduleStatus = async (scheduleId, status) =>
+  updateDoc(doc(db,'schedules', scheduleId), { status, updatedAt: serverTimestamp() });
+
+// ── Trash ──────────────────────────────────────────────────────
+export const getTrashItems = async (type) => {
+  const q = query(collection(db,'trash'), where('type','==',type));
+  const snap = await getDocs(q);
+  return snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a,b) => (b.deletedAt?.seconds||0)-(a.deletedAt?.seconds||0));
+};
+
+export const restoreFromTrash = async (trashId, type, originalId, data) => {
+  const colName = type === 'student' ? 'students' : 'batches';
+  await setDoc(doc(db, colName, originalId), data);
+  await deleteDoc(doc(db,'trash', trashId));
+};
+
+export const permanentDelete = async (trashId) => {
+  await deleteDoc(doc(db,'trash', trashId));
+};
+
+// ── Staff Requests ─────────────────────────────────────────────
+export const createRequest = async (data) => addDoc(collection(db,'requests'), { ...data, createdAt: serverTimestamp() });
+
+export const getMyRequests = async (uid) => {
+  const q = query(collection(db,'requests'), where('requestedBy','==',uid));
+  const snap = await getDocs(q);
+  return snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a,b) => (b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));
+};
+
+export const getRequests = async (status) => {
+  const q = status ? query(collection(db,'requests'), where('status','==',status)) : collection(db,'requests');
+  const snap = await getDocs(q);
+  return snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a,b) => (b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));
+};
+
+export const updateRequest = async (id, data) =>
+  updateDoc(doc(db,'requests', id), data);
+
+// ── Top-level Assessments (legacy aliases kept for compatibility) ──
+export const getTopLevelAssessments = getAssessments;
+export const addTopLevelAssessment = addAssessment;
+export const updateTopLevelAssessment = async (id, data) =>
+  updateDoc(doc(db,'assessments', id), data);
+export const saveAssessmentResult = async (data) =>
+  addDoc(collection(db,'assessmentResults'), { ...data, savedAt: serverTimestamp() });
+
+// ── Batch staff (for assigned batches by staffIds) ─────────────
+export const getStaffBatches = async (uid) => {
+  try {
+    const [byStaffIds, byMentor] = await Promise.all([
+      getDocs(query(collection(db,'batches'), where('staffIds','array-contains', uid))),
+      getDocs(query(collection(db,'batches'), where('mentorId','==', uid))),
+    ]);
+    const map = {};
+    [...byStaffIds.docs, ...byMentor.docs].forEach(d => { map[d.id] = { id: d.id, ...d.data() }; });
+    return Object.values(map).sort((a,b) => (b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));
+  } catch {
+    return [];
+  }
 };

@@ -21,7 +21,7 @@ export default function Leaderboard() {
 
       <div style={{ padding: '0 0 12px', flexShrink: 0 }}>
         <div style={{ padding: '10px 14px', background: '#FEF3C7', borderRadius: 8, fontSize: 12, color: '#92400E', display: 'flex', alignItems: 'center', gap: 8 }}>
-          🏆 During exams, use this embedded view to check rankings without leaving the management dashboard.
+          During exams, use this embedded view to check rankings without leaving the management dashboard.
           Click "Open Full Screen" to share the leaderboard link with students.
         </div>
       </div>

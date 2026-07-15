@@ -62,7 +62,7 @@ export default function FollowUps() {
         studentId:       form.studentId,
         studentName:     form.studentName,
         assignedTo:      selectedStaff.name,
-        assignedToEmail: selectedStaff.email, // ← auto from Firestore
+        assignedToEmail: selectedStaff.email, // auto from Firestore
         note:            form.note,
         nextAction:      form.nextAction,
         priority:        form.priority,
@@ -139,21 +139,36 @@ export default function FollowUps() {
         </div>
       )}
 
-      <div style={{ display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
+      {/* Search row */}
+      <div style={{ display: 'flex', gap: 10, marginBottom: 12, flexWrap: 'wrap', alignItems: 'center' }}>
         <div className="search-bar" style={{ flex: 1, minWidth: 200 }}>
-          <Search size={15} style={{ color: 'var(--muted)', flexShrink: 0 }} />
+          <Search size={15} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
           <input placeholder="Search student, staff, note..." value={search} onChange={e => setSearch(e.target.value)} />
         </div>
-        <div className="tab-bar">
-          {[
-            { key: 'all',       label: 'All' },
-            { key: 'pending',   label: `Pending (${pendingCount})` },
-            { key: 'urgent',    label: `Urgent (${urgentCount})` },
-            { key: 'completed', label: 'Completed' },
-          ].map(t => (
-            <div key={t.key} className={`tab ${filter === t.key ? 'active' : ''}`} onClick={() => setFilter(t.key)}>{t.label}</div>
-          ))}
-        </div>
+      </div>
+
+      {/* Status filter chips */}
+      <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginBottom:14 }}>
+        {[
+          { key:'all',       label:'All',       dot:'var(--n-400)' },
+          { key:'pending',   label:'Pending',   dot:'var(--amber)' },
+          { key:'urgent',    label:'Urgent',    dot:'var(--red)' },
+          { key:'completed', label:'Completed', dot:'var(--green)' },
+        ].map(chip => {
+          const count = chip.key === 'all' ? followups.length
+            : chip.key === 'pending'   ? followups.filter(f => !f.completed).length
+            : chip.key === 'urgent'    ? followups.filter(f => f.priority === 'urgent' && !f.completed).length
+            : followups.filter(f => f.completed).length;
+          const isActive = filter === chip.key;
+          return (
+            <button key={chip.key} onClick={() => setFilter(chip.key)}
+              style={{ display:'flex', alignItems:'center', gap:6, padding:'6px 14px', borderRadius:'var(--radius-pill)', border:`1px solid ${isActive?'var(--brand)':'var(--border)'}`, background:isActive?'var(--brand-50)':'var(--surface)', cursor:'pointer', fontSize:12, fontWeight:600, color:isActive?'var(--brand-ink)':'var(--text-sub)', transition:'all 0.12s' }}>
+              <span style={{ width:7, height:7, borderRadius:'50%', background:chip.dot, flexShrink:0 }} />
+              {chip.label}
+              <span style={{ fontSize:11, color:isActive?'var(--brand)':'var(--text-muted)', fontWeight:500 }}>{count}</span>
+            </button>
+          );
+        })}
       </div>
 
       <div className="table-container">
@@ -187,8 +202,8 @@ export default function FollowUps() {
                 {isCEOorAdmin && <td style={{ fontSize: 13 }}>{f.assignedTo || '—'}</td>}
                 <td style={{ fontSize: 13, maxWidth: 220 }}>{f.note}</td>
                 <td>
-                  {f.priority === 'urgent' ? <span className="badge badge-red">🔴 Urgent</span>
-                   : f.priority === 'high' ? <span className="badge badge-amber">🟡 High</span>
+                  {f.priority === 'urgent' ? <span className="badge badge-red">Urgent</span>
+                   : f.priority === 'high' ? <span className="badge badge-amber">High</span>
                    : <span className="badge badge-gray">Normal</span>}
                 </td>
                 <td style={{ fontSize: 11, color: 'var(--muted)' }}>{formatDate(f.createdAt)}</td>
@@ -213,7 +228,7 @@ export default function FollowUps() {
         <Modal title="Assign Follow-Up" onClose={() => setShowModal(false)}>
           <form onSubmit={handleAdd} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             <div style={{ padding: '8px 12px', background: '#F0FDF4', borderRadius: 8, fontSize: 12, color: '#065F46' }}>
-              ✅ Select a student and staff member — email is auto-fetched from their account.
+              Select a student and staff member — email is auto-fetched from their account.
             </div>
             <div className="form-group">
               <label className="form-label">Student *</label>
@@ -231,11 +246,11 @@ export default function FollowUps() {
               <select className="form-input" required value={form.staffId}
                 onChange={e => setForm({ ...form, staffId: e.target.value })}>
                 <option value="">Select staff member</option>
-                {staff.map(s => <option key={s.id} value={s.id}>{s.name} — {s.role}</option>)}
+                {staff.filter(s=>s.active!==false).map(s => <option key={s.id} value={s.id}>{s.name} — {s.role}</option>)}
               </select>
               {form.staffId && (
                 <div style={{ fontSize: 11, color: '#6B7280', marginTop: 4 }}>
-                  📧 Will notify: <strong>{staff.find(s => s.id === form.staffId)?.email}</strong>
+                  Will notify: <strong>{staff.find(s => s.id === form.staffId)?.email}</strong>
                 </div>
               )}
             </div>

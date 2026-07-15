@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="_ds/isc-design-system-44b9e318-905b-4330-a4ea-d1d6b542217b/tokens/fonts.css">
+  <link rel="stylesheet" href="_ds/isc-design-system-44b9e318-905b-4330-a4ea-d1d6b542217b/tokens/colors.css">
+  <link rel="stylesheet" href="_ds/isc-design-system-44b9e318-905b-4330-a4ea-d1d6b542217b/tokens/typography.css">
+  <link rel="stylesheet" href="_ds/isc-design-system-44b9e318-905b-4330-a4ea-d1d6b542217b/tokens/spacing.css">
+  <link rel="stylesheet" href="_ds/isc-design-system-44b9e318-905b-4330-a4ea-d1d6b542217b/base.css">
+  <link rel="stylesheet" href="_ds/isc-design-system-44b9e318-905b-4330-a4ea-d1d6b542217b/styles.css">
+  <link rel="stylesheet" href="theme.css">
+  <style>
+    html,body{background:var(--canvas);}
+    .srow:hover{ background: var(--surface-hover); }
+    ::-webkit-scrollbar{ width:9px; height:9px; }
+  </style>
+</helmet>
+
+<div style="display:flex; height:100vh; overflow:hidden; background:var(--canvas); font-family:var(--font-body); color:var(--text);">
+
+  <dc-import name="Sidebar" active="assessments" hint-size="230px,100%"></dc-import>
+
+  <div style="flex:1; display:flex; flex-direction:column; min-width:0; height:100vh;">
+
+    <header style="background:var(--surface); border-bottom:1px solid var(--border); padding:0 26px; height:56px; display:flex; align-items:center; justify-content:space-between; gap:16px; flex-shrink:0;">
+      <div style="display:flex; align-items:center; gap:8px; font-size:12.5px; color:var(--text-muted);">
+        <span>Academic</span>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+        <span style="color:var(--text); font-weight:600;">Assessments</span>
+      </div>
+      <div style="display:flex; align-items:center; gap:9px;">
+        <div style="width:32px; height:32px; border-radius:50%; background:var(--grad-brand); display:flex; align-items:center; justify-content:center; font-family:var(--font-display); font-weight:700; font-size:12px; color:#fff;">AD</div>
+        <div><div style="font-size:13px; font-weight:600; line-height:1.2;">Adithyan R</div><div style="font-size:11px; color:var(--text-muted);">CEO</div></div>
+      </div>
+    </header>
+
+    <main style="flex:1; overflow-y:auto; padding:24px 26px 32px;">
+
+      <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:16px; flex-wrap:wrap; margin-bottom:18px;">
+        <div>
+          <h2 style="font-size:24px; font-weight:700;">Assessments</h2>
+          <div style="font-size:13px; color:var(--text-muted); margin-top:3px;">Manage exams, quizzes and evaluation records across all batches.</div>
+        </div>
+        <button class="btn btn-primary">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+          Add Assessment
+        </button>
+      </div>
+
+      <!-- stat tiles -->
+      <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:16px; margin-bottom:18px;">
+        <div style="background:var(--grad-violet); border-radius:14px; padding:16px 20px; color:#fff; box-shadow:var(--shadow-md);">
+          <div style="font-size:12px; color:rgba(255,255,255,.85);">Total Assessments</div>
+          <div style="font-family:var(--font-display); font-size:26px; font-weight:700; line-height:1; margin-top:8px;">24</div>
+        </div>
+        <div style="background:var(--surface); border:1px solid var(--border); border-radius:14px; box-shadow:var(--shadow-sm); padding:16px 20px;">
+          <div style="font-size:12px; color:var(--text-muted);">Completed</div>
+          <div style="font-family:var(--font-display); font-size:26px; font-weight:700; line-height:1; margin-top:8px; color:var(--green-ink);">18</div>
+        </div>
+        <div style="background:var(--surface); border:1px solid var(--border); border-radius:14px; box-shadow:var(--shadow-sm); padding:16px 20px;">
+          <div style="font-size:12px; color:var(--text-muted);">Scheduled</div>
+          <div style="font-family:var(--font-display); font-size:26px; font-weight:700; line-height:1; margin-top:8px; color:var(--blue-ink);">6</div>
+        </div>
+        <div style="background:var(--surface); border:1px solid var(--border); border-radius:14px; box-shadow:var(--shadow-sm); padding:16px 20px;">
+          <div style="font-size:12px; color:var(--text-muted);">Avg Score</div>
+          <div style="font-family:var(--font-display); font-size:26px; font-weight:700; line-height:1; margin-top:8px; color:var(--amber-ink);">74%</div>
+        </div>
+      </div>
+
+      <!-- toolbar -->
+      <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:16px;">
+        <div class="search-bar" style="width:300px;">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+          <input value="{{ query }}" onInput="{{ onQuery }}" placeholder="Search assessment, batch or staff…" />
+        </div>
+        <div style="flex:1;"></div>
+        <div style="display:flex; align-items:center; gap:8px;">
+          <sc-for list="{{ chips }}" as="c" hint-placeholder-count="4">
+            <button onClick="{{ c.onClick }}" style="padding:7px 14px; border-radius:9999px; border:1px solid {{ c.border }}; background:{{ c.bg }}; color:{{ c.color }}; font-size:12.5px; font-weight:600; cursor:pointer;">{{ c.label }}</button>
+          </sc-for>
+        </div>
+      </div>
+
+      <!-- table -->
+      <div class="table-container">
+        <div class="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>Assessment</th><th style="width:150px;">Batch</th><th style="width:100px;">Date</th>
+                <th style="width:90px;">Total</th><th style="width:180px;">Batch Avg</th><th style="width:140px;">Staff</th>
+                <th style="width:90px;">Type</th><th style="width:120px;">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              <sc-for list="{{ rows }}" as="a" hint-placeholder-count="8">
+                <tr class="srow" style="cursor:pointer;">
+                  <td style="font-weight:600;">{{ a.title }}</td>
+                  <td><span class="chip" style="font-size:11px; white-space:nowrap;">{{ a.batch }}</span></td>
+                  <td style="font-size:12.5px; color:var(--text-sub);">{{ a.date }}</td>
+                  <td style="font-size:12.5px; color:var(--text-sub);">{{ a.total }}</td>
+                  <td>
+                    <sc-if value="{{ a.hasAvg }}" hint-placeholder-val="{{ true }}">
+                      <div style="display:flex; align-items:center; gap:9px;">
+                        <div class="progress-bar" style="width:90px;"><div class="progress-fill" style="width:{{ a.avg }}%; background:{{ a.avgColor }};"></div></div>
+                        <span style="font-size:12.5px; font-weight:700; color:{{ a.avgColor }};">{{ a.avg }}%</span>
+                      </div>
+                    </sc-if>
+                    <sc-if value="{{ a.noAvg }}" hint-placeholder-val="{{ false }}">
+                      <span style="font-size:12px; color:var(--text-muted);">—</span>
+                    </sc-if>
+                  </td>
+                  <td style="font-size:12.5px; color:var(--text-sub);">{{ a.staff }}</td>
+                  <td><span class="badge {{ a.typeCls }}" style="font-size:10.5px;">{{ a.type }}</span></td>
+                  <td><span class="badge {{ a.statusCls }}"><span class="dot"></span>{{ a.statusLabel }}</span></td>
+                </tr>
+              </sc-for>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </main>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1320,&quot;height&quot;:850}}">
+class Component extends DCLogic {
+  TYPES = { Exam:'badge-violet', Quiz:'badge-blue', Mock:'badge-amber' };
+
+  ASSESSMENTS = [
+    { title:'Debate on Topic 1947',   batch:'ISC Level 1',   date:'Jun 10', total:20,  avg:78, staff:'Adhithyan', type:'Exam', status:'completed' },
+    { title:'Test for Math',          batch:'ISC Level 1',   date:'Jun 05', total:100, avg:72, staff:'Adhithyan', type:'Exam', status:'completed' },
+    { title:'IELTS Full Mock 3',      batch:'B-14 IELTS',    date:'Jun 12', total:40,  avg:64, staff:'Rahul Verma', type:'Mock', status:'completed' },
+    { title:'Vocabulary Quiz 4',      batch:'B-12 Soft Skills',date:'Jun 14', total:20, avg:85, staff:'Priya Sharma', type:'Quiz', status:'completed' },
+    { title:'Speaking Assessment',    batch:'A-09 Interview',date:'Jun 24', total:25,  avg:null, staff:'Vikram Nair', type:'Exam', status:'scheduled' },
+    { title:'Grammar Diagnostic',     batch:'B-15 Spoken Eng',date:'Jun 26', total:30, avg:null, staff:'Sneha Patel', type:'Quiz', status:'scheduled' },
+    { title:'Business Writing Test',  batch:'B-10 Business',  date:'May 30', total:50,  avg:69, staff:'Aisha Khan', type:'Exam', status:'completed' },
+    { title:'Mid-term Evaluation',    batch:'B-12 Soft Skills',date:'May 22', total:50, avg:72, staff:'Priya Sharma', type:'Exam', status:'completed' },
+  ];
+
+  state = { query:'', filter:'all' };
+
+  pctColor(p){ return p>=80?'var(--green-ink)':p>=60?'var(--amber-ink)':'var(--red-ink)'; }
+
+  renderVals(){
+    const q = this.state.query.trim().toLowerCase();
+    const f = this.state.filter;
+    const rows = this.ASSESSMENTS.filter(a =>
+      (!q || a.title.toLowerCase().includes(q) || a.batch.toLowerCase().includes(q) || a.staff.toLowerCase().includes(q)) &&
+      (f==='all' || a.type===f)
+    ).map(a => ({
+      ...a,
+      typeCls: this.TYPES[a.type] || 'badge-gray',
+      hasAvg: a.avg!=null, noAvg: a.avg==null,
+      avgColor: a.avg!=null ? this.pctColor(a.avg) : 'var(--text-muted)',
+      statusLabel: a.status==='completed' ? 'Completed' : 'Scheduled',
+      statusCls: a.status==='completed' ? 'badge-green' : 'badge-blue',
+    }));
+
+    const chip = (key,label) => {
+      const on = f===key;
+      return { label, bg: on?'var(--brand-50)':'var(--surface)', border: on?'var(--brand)':'var(--border)', color: on?'var(--brand-ink)':'var(--text-sub)', onClick:()=>this.setState({filter:key}) };
+    };
+
+    return {
+      rows,
+      query:this.state.query, onQuery:(e)=>this.setState({query:e.target.value}),
+      chips: [ chip('all','All'), chip('Exam','Exam'), chip('Quiz','Quiz'), chip('Mock','Mock') ],
+    };
+  }
+}
+</script>
+</body>
+</html>

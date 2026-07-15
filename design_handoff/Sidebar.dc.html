@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="_ds/isc-design-system-44b9e318-905b-4330-a4ea-d1d6b542217b/tokens/fonts.css">
+  <link rel="stylesheet" href="_ds/isc-design-system-44b9e318-905b-4330-a4ea-d1d6b542217b/tokens/colors.css">
+  <link rel="stylesheet" href="_ds/isc-design-system-44b9e318-905b-4330-a4ea-d1d6b542217b/tokens/typography.css">
+  <link rel="stylesheet" href="_ds/isc-design-system-44b9e318-905b-4330-a4ea-d1d6b542217b/tokens/spacing.css">
+  <link rel="stylesheet" href="_ds/isc-design-system-44b9e318-905b-4330-a4ea-d1d6b542217b/base.css">
+  <link rel="stylesheet" href="_ds/isc-design-system-44b9e318-905b-4330-a4ea-d1d6b542217b/styles.css">
+  <link rel="stylesheet" href="theme.css">
+  <style>
+    .navlink{ text-decoration:none; }
+    .navlink:hover{ filter:brightness(0.97); background:var(--n-100) !important; }
+  </style>
+</helmet>
+
+<aside style="width:230px; flex-shrink:0; background:var(--surface); border-right:1px solid var(--border); display:flex; flex-direction:column; height:100vh;">
+  <div style="padding:16px 16px 14px; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:10px;">
+    <div style="width:34px; height:34px; border-radius:9px; background:var(--grad-brand); display:flex; align-items:center; justify-content:center; box-shadow:var(--shadow-brand); flex-shrink:0;">
+      <span style="font-family:var(--font-display); font-weight:700; font-size:13px; color:#fff; letter-spacing:-.02em;">ISC</span>
+    </div>
+    <div>
+      <div style="font-family:var(--font-display); font-weight:700; font-size:13px; line-height:1.2;">International Skills Club</div>
+      <div style="font-size:11px; color:var(--text-muted);">Management System</div>
+    </div>
+  </div>
+
+  <nav style="padding:10px 10px; flex:1; overflow-y:auto;">
+    <div style="padding:12px 10px 4px; color:var(--text-muted); font-size:10px; font-weight:700; letter-spacing:.12em;">OVERVIEW</div>
+    <a href="Dashboard.dc.html" class="navlink" style="display:flex; align-items:center; gap:11px; padding:8px 10px; border-radius:10px; font-size:13.5px; margin-bottom:2px; transition:background .15s; background:{{ nav.dashboard.bg }}; color:{{ nav.dashboard.color }}; font-weight:{{ nav.dashboard.weight }};">
+      <span style="color:{{ nav.dashboard.ic }}; display:flex;"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg></span>
+      <span>Dashboard</span>
+    </a>
+    <a href="All%20Students.dc.html" class="navlink" style="display:flex; align-items:center; gap:11px; padding:8px 10px; border-radius:10px; font-size:13.5px; margin-bottom:2px; transition:background .15s; background:{{ nav.students.bg }}; color:{{ nav.students.color }}; font-weight:{{ nav.students.weight }};">
+      <span style="color:{{ nav.students.ic }}; display:flex;"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>
+      <span>All Students</span>
+    </a>
+    <a href="Follow-Ups.dc.html" class="navlink" style="display:flex; align-items:center; gap:11px; padding:8px 10px; border-radius:10px; font-size:13.5px; margin-bottom:2px; transition:background .15s; background:{{ nav.followups.bg }}; color:{{ nav.followups.color }}; font-weight:{{ nav.followups.weight }};">
+      <span style="color:{{ nav.followups.ic }}; display:flex;"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13.832 16.568a1 1 0 0 0 1.213-.303l.355-.465A2 2 0 0 1 17 15h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2A18 18 0 0 1 2 4a2 2 0 0 1 2-2h3a2 2 0 0 1 2 2v3a2 2 0 0 1-.8 1.6l-.468.351a1 1 0 0 0-.292 1.233 14 14 0 0 0 6.392 6.384"/></svg></span>
+      <span>Follow-Ups</span>
+    </a>
+    <a href="Batches.dc.html" class="navlink" style="display:flex; align-items:center; gap:11px; padding:8px 10px; border-radius:10px; font-size:13.5px; margin-bottom:2px; transition:background .15s; background:{{ nav.batches.bg }}; color:{{ nav.batches.color }}; font-weight:{{ nav.batches.weight }};">
+      <span style="color:{{ nav.batches.ic }}; display:flex;"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.42 10.922a1 1 0 0 0-.019-1.838L12.83 5.18a2 2 0 0 0-1.66 0L2.6 9.08a1 1 0 0 0 0 1.832l8.57 3.908a2 2 0 0 0 1.66 0z"/><path d="M22 10v6"/><path d="M6 12.5V16a6 3 0 0 0 12 0v-3.5"/></svg></span>
+      <span>Batches</span>
+    </a>
+
+    <div style="padding:14px 10px 4px; color:var(--text-muted); font-size:10px; font-weight:700; letter-spacing:.12em;">ACADEMIC</div>
+    <a href="#" class="navlink" style="display:flex; align-items:center; gap:11px; padding:8px 10px; border-radius:10px; font-size:13.5px; margin-bottom:2px; transition:background .15s; background:{{ nav.assessments.bg }}; color:{{ nav.assessments.color }}; font-weight:{{ nav.assessments.weight }};">
+      <span style="color:{{ nav.assessments.ic }}; display:flex;"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11h4"/><path d="M12 16h4"/><path d="M8 11h.01"/><path d="M8 16h.01"/></svg></span>
+      <span>Assessments</span>
+    </a>
+    <a href="#" class="navlink" style="display:flex; align-items:center; gap:11px; padding:8px 10px; border-radius:10px; font-size:13.5px; margin-bottom:2px; transition:background .15s; background:{{ nav.concerns.bg }}; color:{{ nav.concerns.color }}; font-weight:{{ nav.concerns.weight }};">
+      <span style="color:{{ nav.concerns.ic }}; display:flex;"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></span>
+      <span>Concerns</span>
+    </a>
+    <a href="#" class="navlink" style="display:flex; align-items:center; gap:11px; padding:8px 10px; border-radius:10px; font-size:13.5px; margin-bottom:2px; transition:background .15s; background:{{ nav.leaderboard.bg }}; color:{{ nav.leaderboard.color }}; font-weight:{{ nav.leaderboard.weight }};">
+      <span style="color:{{ nav.leaderboard.ic }}; display:flex;"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg></span>
+      <span>Leaderboard</span>
+    </a>
+
+    <div style="padding:14px 10px 4px; color:var(--text-muted); font-size:10px; font-weight:700; letter-spacing:.12em;">OPERATIONS</div>
+    <a href="Staff%20Tasks%20Board.dc.html" class="navlink" style="display:flex; align-items:center; gap:11px; padding:8px 10px; border-radius:10px; font-size:13.5px; margin-bottom:2px; transition:background .15s; background:{{ nav.tasks.bg }}; color:{{ nav.tasks.color }}; font-weight:{{ nav.tasks.weight }};">
+      <span style="color:{{ nav.tasks.ic }}; display:flex;"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 11 3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></span>
+      <span>Staff Tasks</span>
+    </a>
+    <a href="#" class="navlink" style="display:flex; align-items:center; gap:11px; padding:8px 10px; border-radius:10px; font-size:13.5px; margin-bottom:2px; transition:background .15s; background:{{ nav.reports.bg }}; color:{{ nav.reports.color }}; font-weight:{{ nav.reports.weight }};">
+      <span style="color:{{ nav.reports.ic }}; display:flex;"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M16 13H8"/><path d="M16 17H8"/><path d="M10 9H8"/></svg></span>
+      <span>Daily Reports</span>
+    </a>
+    <a href="#" class="navlink" style="display:flex; align-items:center; gap:11px; padding:8px 10px; border-radius:10px; font-size:13.5px; margin-bottom:2px; transition:background .15s; background:{{ nav.leads.bg }}; color:{{ nav.leads.color }}; font-weight:{{ nav.leads.weight }};">
+      <span style="color:{{ nav.leads.ic }}; display:flex;"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 7h6v6"/><path d="m22 7-8.5 8.5-5-5L2 17"/></svg></span>
+      <span>Lead Pipeline</span>
+    </a>
+    <a href="#" class="navlink" style="display:flex; align-items:center; gap:11px; padding:8px 10px; border-radius:10px; font-size:13.5px; margin-bottom:2px; transition:background .15s; background:{{ nav.documents.bg }}; color:{{ nav.documents.color }}; font-weight:{{ nav.documents.weight }};">
+      <span style="color:{{ nav.documents.ic }}; display:flex;"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg></span>
+      <span>Documents</span>
+    </a>
+
+    <div style="padding:14px 10px 4px; color:var(--text-muted); font-size:10px; font-weight:700; letter-spacing:.12em;">MANAGEMENT</div>
+    <a href="Staff%20Management.dc.html" class="navlink" style="display:flex; align-items:center; gap:11px; padding:8px 10px; border-radius:10px; font-size:13.5px; margin-bottom:2px; transition:background .15s; background:{{ nav.staff.bg }}; color:{{ nav.staff.color }}; font-weight:{{ nav.staff.weight }};">
+      <span style="color:{{ nav.staff.ic }}; display:flex;"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 21a8 8 0 0 0-16 0"/><circle cx="10" cy="8" r="5"/><path d="M22 20c0-3.37-2-6.5-4-8a5 5 0 0 0-.45-8.3"/></svg></span>
+      <span>Staff Management</span>
+    </a>
+    <a href="Staff%20Requests.dc.html" class="navlink" style="display:flex; align-items:center; gap:11px; padding:8px 10px; border-radius:10px; font-size:13.5px; margin-bottom:2px; transition:background .15s; background:{{ nav.requests.bg }}; color:{{ nav.requests.color }}; font-weight:{{ nav.requests.weight }};">
+      <span style="color:{{ nav.requests.ic }}; display:flex;"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg></span>
+      <span style="flex:1;">Staff Requests</span>
+      <span style="background:var(--amber); color:#fff; font-size:10.5px; font-weight:700; border-radius:9999px; min-width:18px; height:18px; padding:0 5px; display:flex; align-items:center; justify-content:center;">3</span>
+    </a>
+    <a href="Trash.dc.html" class="navlink" style="display:flex; align-items:center; gap:11px; padding:8px 10px; border-radius:10px; font-size:13.5px; margin-bottom:2px; transition:background .15s; background:{{ nav.trash.bg }}; color:{{ nav.trash.color }}; font-weight:{{ nav.trash.weight }};">
+      <span style="color:{{ nav.trash.ic }}; display:flex;"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg></span>
+      <span>Trash</span>
+    </a>
+    <a href="Settings.dc.html" class="navlink" style="display:flex; align-items:center; gap:11px; padding:8px 10px; border-radius:10px; font-size:13.5px; margin-bottom:2px; transition:background .15s; background:{{ nav.settings.bg }}; color:{{ nav.settings.color }}; font-weight:{{ nav.settings.weight }};">
+      <span style="color:{{ nav.settings.ic }}; display:flex;"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg></span>
+      <span>Settings</span>
+    </a>
+  </nav>
+
+  <div style="padding:12px; border-top:1px solid var(--border);">
+    <div style="display:flex; align-items:center; gap:10px; padding:9px 10px; border-radius:10px; background:var(--surface-sunken);">
+      <div style="width:30px; height:30px; border-radius:50%; background:var(--grad-brand); display:flex; align-items:center; justify-content:center; font-family:var(--font-display); font-weight:700; font-size:11px; color:#fff; flex-shrink:0;">AD</div>
+      <div style="flex:1; overflow:hidden;">
+        <div style="font-size:12.5px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">Adithyan R</div>
+        <div style="font-size:11px; color:var(--text-muted);">CEO</div>
+      </div>
+      <span style="color:var(--text-muted); display:flex; cursor:pointer;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></span>
+    </div>
+  </div>
+</aside>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:230,&quot;height&quot;:820},&quot;active&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;dashboard&quot;,&quot;tsType&quot;:&quot;string&quot;}}">
+class Component extends DCLogic {
+  TINTS = {
+    dashboard:'var(--brand)', students:'var(--blue)', followups:'var(--teal)', batches:'var(--indigo)',
+    assessments:'var(--violet)', concerns:'var(--orange)', leaderboard:'var(--amber)',
+    tasks:'var(--green)', reports:'var(--pink)', leads:'var(--green)', documents:'var(--slate)',
+    staff:'var(--slate)', requests:'var(--blue)', trash:'var(--red)', settings:'var(--slate)',
+  };
+
+  renderVals(){
+    const active = this.props.active || '';
+    const nav = {};
+    for(const k of Object.keys(this.TINTS)){
+      const on = k===active;
+      nav[k] = {
+        bg: on ? 'var(--brand-50)' : 'transparent',
+        color: on ? 'var(--brand-ink)' : 'var(--text-sub)',
+        weight: on ? 600 : 500,
+        ic: on ? 'var(--brand)' : this.TINTS[k],
+      };
+    }
+    return { nav };
+  }
+}
+</script>
+</body>
+</html>

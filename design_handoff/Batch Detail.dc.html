@@ -1,0 +1,601 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="_ds/isc-design-system-44b9e318-905b-4330-a4ea-d1d6b542217b/tokens/fonts.css">
+  <link rel="stylesheet" href="_ds/isc-design-system-44b9e318-905b-4330-a4ea-d1d6b542217b/tokens/colors.css">
+  <link rel="stylesheet" href="_ds/isc-design-system-44b9e318-905b-4330-a4ea-d1d6b542217b/tokens/typography.css">
+  <link rel="stylesheet" href="_ds/isc-design-system-44b9e318-905b-4330-a4ea-d1d6b542217b/tokens/spacing.css">
+  <link rel="stylesheet" href="_ds/isc-design-system-44b9e318-905b-4330-a4ea-d1d6b542217b/base.css">
+  <link rel="stylesheet" href="_ds/isc-design-system-44b9e318-905b-4330-a4ea-d1d6b542217b/styles.css">
+  <link rel="stylesheet" href="theme.css">
+  <style>
+    html,body{background:var(--canvas);}
+    .srow:hover{ background: var(--surface-hover); }
+    .stepRow:hover{ background: var(--surface-hover); }
+    .aCard{ transition: box-shadow .15s var(--ease), transform .12s var(--ease); }
+    .aCard:hover{ box-shadow: var(--shadow-md); }
+    .litem{ transition: box-shadow .15s var(--ease), transform .12s var(--ease); }
+    .litem:hover{ box-shadow: var(--shadow-md); transform: translateY(-1px); }
+    .tabx{ white-space:nowrap; }
+    ::-webkit-scrollbar{ width:9px; height:9px; }
+  </style>
+</helmet>
+
+<div style="display:flex; height:100vh; overflow:hidden; background:var(--canvas); font-family:var(--font-body); color:var(--text);">
+
+  <dc-import name="Sidebar" active="batches" hint-size="230px,100%"></dc-import>
+
+  <div style="flex:1; display:flex; flex-direction:column; min-width:0; height:100vh;">
+
+    <header style="background:var(--surface); border-bottom:1px solid var(--border); padding:0 26px; height:56px; display:flex; align-items:center; justify-content:space-between; gap:16px; flex-shrink:0;">
+      <div style="display:flex; align-items:center; gap:8px; font-size:12.5px; color:var(--text-muted);">
+        <span>Overview</span>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+        <a href="Batches.dc.html" style="color:inherit; text-decoration:none;">Batches</a>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+        <span style="color:var(--text); font-weight:600;">ISC Level 1</span>
+      </div>
+      <div style="display:flex; align-items:center; gap:12px;">
+        <div class="search-bar" style="width:240px;">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+          <input placeholder="Search students, tasks…" />
+        </div>
+        <div style="display:flex; align-items:center; gap:9px;">
+          <div style="width:32px; height:32px; border-radius:50%; background:var(--grad-brand); display:flex; align-items:center; justify-content:center; font-family:var(--font-display); font-weight:700; font-size:12px; color:#fff;">P</div>
+          <div>
+            <div style="font-size:13px; font-weight:600; line-height:1.2;">Prasobh</div>
+            <div style="font-size:11px; color:var(--text-muted);">CEO</div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <main style="flex:1; overflow-y:auto; padding:22px 26px 32px;">
+
+      <!-- Batch header -->
+      <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:16px; flex-wrap:wrap; margin-bottom:18px;">
+        <div style="display:flex; align-items:flex-start; gap:14px;">
+          <a href="Batches.dc.html" style="width:36px; height:36px; border-radius:10px; border:1px solid var(--border); background:var(--surface); display:flex; align-items:center; justify-content:center; color:var(--text-sub); flex-shrink:0; text-decoration:none; margin-top:2px;">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg>
+          </a>
+          <div>
+            <div style="display:flex; align-items:center; gap:10px;">
+              <h2 style="font-size:22px; font-weight:700; white-space:nowrap;">ISC Level 1</h2>
+              <span class="badge badge-green" style="font-size:11.5px;"><span class="dot"></span>Active
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="margin-left:2px;"><path d="m6 9 6 6 6-6"/></svg>
+              </span>
+            </div>
+            <div style="font-size:12.5px; color:var(--text-muted); margin-top:3px;">Other · 7 months · 1 Jun 2026 → 1 Jul 2026 · 16 students</div>
+          </div>
+        </div>
+        <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; justify-content:flex-end;">
+          <button class="btn btn-secondary btn-sm" style="height:36px;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+            Course Flow
+          </button>
+          <button class="btn btn-secondary btn-sm" style="height:36px;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>
+            Student Fields
+          </button>
+          <sc-if value="{{ hasPrimary }}" hint-placeholder-val="{{ true }}">
+            <button class="btn btn-primary btn-sm" style="height:36px;">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+              {{ primaryLabel }}
+            </button>
+          </sc-if>
+          <button class="btn btn-danger btn-sm" style="height:36px;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>
+            Delete Batch
+          </button>
+        </div>
+      </div>
+
+      <!-- KPI tiles -->
+      <div style="display:grid; grid-template-columns:repeat(5, 1fr); gap:14px; margin-bottom:18px;">
+        <div style="background:var(--surface); border:1px solid var(--border); border-radius:14px; box-shadow:var(--shadow-sm); padding:15px 18px;">
+          <div style="font-size:12px; color:var(--text-muted); font-weight:500;">Total Students</div>
+          <div style="font-family:var(--font-display); font-size:26px; font-weight:700; letter-spacing:-.02em; line-height:1; margin-top:8px;">16</div>
+        </div>
+        <div style="background:var(--surface); border:1px solid var(--border); border-radius:14px; box-shadow:var(--shadow-sm); padding:15px 18px;">
+          <div style="font-size:12px; color:var(--text-muted); font-weight:500;">Active</div>
+          <div style="font-family:var(--font-display); font-size:26px; font-weight:700; letter-spacing:-.02em; line-height:1; margin-top:8px; color:var(--green-ink);">16</div>
+        </div>
+        <div style="background:var(--surface); border:1px solid var(--border); border-radius:14px; box-shadow:var(--shadow-sm); padding:15px 18px;">
+          <div style="font-size:12px; color:var(--text-muted); font-weight:500;">At Risk</div>
+          <div style="font-family:var(--font-display); font-size:26px; font-weight:700; letter-spacing:-.02em; line-height:1; margin-top:8px; color:var(--red-ink);">0</div>
+        </div>
+        <div style="background:var(--surface); border:1px solid var(--border); border-radius:14px; box-shadow:var(--shadow-sm); padding:15px 18px;">
+          <div style="font-size:12px; color:var(--text-muted); font-weight:500;">Onboarding Done</div>
+          <div style="font-family:var(--font-display); font-size:26px; font-weight:700; letter-spacing:-.02em; line-height:1; margin-top:8px; color:var(--violet-ink);">0</div>
+        </div>
+        <div style="background:var(--surface); border:1px solid var(--border); border-radius:14px; box-shadow:var(--shadow-sm); padding:15px 18px;">
+          <div style="font-size:12px; color:var(--text-muted); font-weight:500;">Course Progress</div>
+          <div style="font-family:var(--font-display); font-size:26px; font-weight:700; letter-spacing:-.02em; line-height:1; margin-top:8px; color:var(--brand);">67%</div>
+        </div>
+      </div>
+
+      <!-- Tab bar -->
+      <div style="display:inline-flex; background:var(--surface-sunken); border-radius:12px; padding:4px; gap:3px; margin-bottom:20px; max-width:100%; overflow-x:auto;">
+        <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="6">
+          <button onClick="{{ t.onClick }}" class="tabx" style="padding:8px 15px; border:none; border-radius:9px; font-size:13px; font-weight:600; cursor:pointer; background:{{ t.bg }}; color:{{ t.color }}; box-shadow:{{ t.shadow }};">{{ t.label }}</button>
+        </sc-for>
+      </div>
+
+      <!-- ============ STUDENTS ============ -->
+      <sc-if value="{{ isStudents }}" hint-placeholder-val="{{ true }}">
+        <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:14px;">
+          <div class="search-bar" style="flex:1; min-width:280px;">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+            <input placeholder="Search by name, phone, parent, VARK, class, school…" />
+          </div>
+          <select class="form-input" style="width:auto; height:40px; min-width:140px;"><option>All Status</option><option>Active</option><option>At Risk</option></select>
+          <span style="font-size:12.5px; color:var(--text-muted);">16 of 16 students</span>
+          <button class="btn btn-secondary btn-sm" style="height:40px;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Export CSV
+          </button>
+        </div>
+        <div class="table-container">
+          <div class="table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>Kids Name</th><th style="width:150px;">Father Name</th><th style="width:150px;">Mother Name</th>
+                  <th style="width:130px;">Phone</th><th style="width:70px;">Class</th><th style="width:70px;">VARK</th>
+                  <th style="width:90px;">Syllabus</th><th style="width:110px;">Status</th><th style="width:100px;">Onboarding</th>
+                </tr>
+              </thead>
+              <tbody>
+                <sc-for list="{{ students }}" as="s" hint-placeholder-count="8">
+                  <tr class="srow" style="cursor:pointer;" onClick="{{ s.onOpen }}">
+                    <td>
+                      <div style="display:flex; align-items:center; gap:10px;">
+                        <div style="width:30px; height:30px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-family:var(--font-display); font-weight:700; font-size:11px; color:#fff; flex-shrink:0; background:{{ s.color }};">{{ s.initials }}</div>
+                        <span style="font-size:13px; font-weight:600;">{{ s.name }}</span>
+                      </div>
+                    </td>
+                    <td style="font-size:12.5px; color:var(--text-sub);">{{ s.father }}</td>
+                    <td style="font-size:12.5px; color:var(--text-sub);">{{ s.mother }}</td>
+                    <td style="font-size:12.5px; color:var(--text-sub);">{{ s.phone }}</td>
+                    <td style="font-size:12.5px; color:var(--text-sub);">{{ s.cls }}</td>
+                    <td style="font-size:12.5px; color:var(--text-muted);">—</td>
+                    <td style="font-size:12.5px; color:var(--text-muted);">—</td>
+                    <td><span class="badge badge-green"><span class="dot"></span>Active</span></td>
+                    <td><span class="badge {{ s.obCls }}" style="font-size:11px;">{{ s.onboard }}/9</span></td>
+                  </tr>
+                </sc-for>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </sc-if>
+
+      <!-- ============ ONBOARDING ANALYTICS ============ -->
+      <sc-if value="{{ isOnboarding }}" hint-placeholder-val="{{ false }}">
+        <!-- funnel hero -->
+        <div style="display:grid; grid-template-columns:1.4fr 1fr; gap:16px; margin-bottom:18px;">
+          <div style="position:relative; overflow:hidden; background:var(--grad-mesh); border-radius:18px; padding:24px 26px; color:#fff; box-shadow:var(--shadow-md);">
+            <div style="position:absolute; top:-50px; right:-40px; width:180px; height:180px; border-radius:50%; background:radial-gradient(circle, rgba(255,255,255,.16), transparent 70%);"></div>
+            <div style="position:relative;">
+              <div style="font-size:12px; font-weight:600; color:rgba(255,255,255,.75); text-transform:uppercase; letter-spacing:.08em;">Overall Onboarding</div>
+              <div style="display:flex; align-items:flex-end; gap:14px; margin-top:8px;">
+                <span style="font-family:var(--font-display); font-size:46px; font-weight:700; line-height:.9; letter-spacing:-.02em;">{{ overallPct }}%</span>
+                <span style="font-size:13px; color:rgba(255,255,255,.8); padding-bottom:6px;">{{ fullyDone }} of {{ totalStu }} fully onboarded</span>
+              </div>
+              <!-- segmented funnel -->
+              <div style="display:flex; gap:5px; margin-top:18px;">
+                <sc-for list="{{ steps }}" as="st" hint-placeholder-count="9">
+                  <div title="{{ st.name }}" style="flex:1; height:8px; border-radius:4px; background:{{ st.segColor }};"></div>
+                </sc-for>
+              </div>
+              <div style="font-size:12px; color:rgba(255,255,255,.7); margin-top:12px;">9 steps in this batch · {{ avgSteps }} avg steps completed per student</div>
+            </div>
+          </div>
+          <div style="display:grid; grid-template-rows:1fr 1fr; gap:16px;">
+            <div style="background:var(--surface); border:1px solid var(--border); border-radius:16px; box-shadow:var(--shadow-sm); padding:16px 20px; display:flex; align-items:center; gap:14px;">
+              <div style="width:42px; height:42px; border-radius:12px; background:var(--green-soft); color:var(--green-ink); display:flex; align-items:center; justify-content:center; flex-shrink:0;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="m9 11 3 3L22 4"/></svg></div>
+              <div><div style="font-family:var(--font-display); font-size:22px; font-weight:700; line-height:1;">{{ fullyDone }} <span style="font-size:14px; color:var(--text-muted); font-weight:600;">/ {{ totalStu }}</span></div><div style="font-size:12px; color:var(--text-muted); margin-top:3px;">Fully onboarded</div></div>
+            </div>
+            <div style="background:var(--surface); border:1px solid var(--border); border-radius:16px; box-shadow:var(--shadow-sm); padding:16px 20px; display:flex; align-items:center; gap:14px;">
+              <div style="width:42px; height:42px; border-radius:12px; background:var(--amber-soft); color:var(--amber-ink); display:flex; align-items:center; justify-content:center; flex-shrink:0;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>
+              <div><div style="font-family:var(--font-display); font-size:22px; font-weight:700; line-height:1;">{{ inProgress }}</div><div style="font-size:12px; color:var(--text-muted); margin-top:3px;">Still in onboarding</div></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- funnel pipeline -->
+        <div style="background:var(--surface); border:1px solid var(--border); border-radius:16px; box-shadow:var(--shadow-sm); padding:20px 24px;">
+          <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;">
+            <div style="font-size:15px; font-weight:700;">Onboarding funnel</div>
+            <div style="display:flex; align-items:center; gap:14px; font-size:11.5px; color:var(--text-muted);">
+              <span style="display:inline-flex; align-items:center; gap:6px;"><span style="width:9px; height:9px; border-radius:50%; background:var(--brand);"></span>Onboarding</span>
+              <span style="display:inline-flex; align-items:center; gap:6px;"><span style="width:9px; height:9px; border-radius:50%; background:var(--teal);"></span>Course</span>
+            </div>
+          </div>
+          <sc-for list="{{ phases }}" as="ph" hint-placeholder-count="2">
+            <div style="position:relative; padding-top:8px;">
+              <div style="font-size:10.5px; font-weight:700; letter-spacing:.1em; color:var(--text-muted); padding:10px 0 4px 52px;">{{ ph.title }}</div>
+              <div style="position:absolute; left:19px; top:46px; bottom:18px; width:2px; background:var(--border);"></div>
+              <sc-for list="{{ ph.steps }}" as="st" hint-placeholder-count="5">
+                <div class="stepRow" style="position:relative; display:flex; align-items:center; gap:16px; padding:11px 10px 11px 0; border-radius:10px;">
+                  <div style="width:40px; flex-shrink:0; display:flex; justify-content:center;">
+                    <div style="width:30px; height:30px; border-radius:50%; background:{{ st.nodeBg }}; color:{{ st.nodeInk }}; border:2px solid var(--surface); box-shadow:0 0 0 1px var(--border); display:flex; align-items:center; justify-content:center; font-family:var(--font-display); font-weight:700; font-size:12px; z-index:1;">{{ st.idx }}</div>
+                  </div>
+                  <div style="flex:1; min-width:0;">
+                    <div style="font-size:13.5px; font-weight:600;">{{ st.name }}</div>
+                    <div style="display:flex; align-items:center; gap:10px; margin-top:7px;">
+                      <div class="progress-bar" style="flex:1; max-width:320px;"><div class="progress-fill" style="width:{{ st.pct }}%; background:{{ st.barColor }};"></div></div>
+                      <span style="font-size:12px; font-weight:700; color:{{ st.barColor }}; min-width:34px;">{{ st.pct }}%</span>
+                    </div>
+                  </div>
+                  <div style="display:flex; align-items:center; gap:16px; flex-shrink:0;">
+                    <div style="text-align:right;">
+                      <div style="font-size:13px; font-weight:700;">{{ st.done }}<span style="color:var(--text-muted); font-weight:500;">/{{ st.total }}</span></div>
+                      <div style="font-size:10.5px; color:var(--text-muted);">done</div>
+                    </div>
+                    <sc-if value="{{ st.hasPending }}" hint-placeholder-val="{{ true }}">
+                      <span class="badge badge-red" style="font-size:10.5px;">{{ st.notDone }} pending</span>
+                    </sc-if>
+                    <a href="#" style="display:inline-flex; align-items:center; gap:3px; font-size:12px; font-weight:600; color:var(--brand); text-decoration:none; white-space:nowrap;">View <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></a>
+                  </div>
+                </div>
+              </sc-for>
+            </div>
+          </sc-for>
+        </div>
+      </sc-if>
+
+      <!-- ============ SCHEDULE ============ -->
+      <sc-if value="{{ isSchedule }}" hint-placeholder-val="{{ false }}">
+        <div style="display:flex; align-items:center; gap:10px; background:var(--amber-soft); border-radius:10px; padding:11px 16px; margin-bottom:16px;">
+          <span style="display:flex; color:var(--amber-ink); flex-shrink:0;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></span>
+          <span style="font-size:12.5px; color:var(--amber-ink);">1 class from the past has not been marked. Please update its status.</span>
+        </div>
+        <div style="background:var(--surface); border:1px solid var(--border); border-radius:16px; box-shadow:var(--shadow-sm); overflow:hidden;">
+          <!-- toolbar -->
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; padding:16px 20px; border-bottom:1px solid var(--border);">
+            <div style="display:flex; align-items:center; gap:12px;">
+              <div style="display:inline-flex; background:var(--surface-sunken); border-radius:9px; padding:3px; gap:3px;">
+                <button style="padding:6px 14px; border:none; border-radius:7px; font-size:12.5px; font-weight:600; cursor:pointer; background:var(--surface); color:var(--text); box-shadow:var(--shadow-xs);">Week</button>
+                <button style="padding:6px 14px; border:none; border-radius:7px; font-size:12.5px; font-weight:600; cursor:pointer; background:transparent; color:var(--text-muted);">Month</button>
+              </div>
+              <div style="display:flex; align-items:center; gap:4px;">
+                <button style="width:30px; height:30px; border-radius:8px; border:1px solid var(--border); background:var(--surface); cursor:pointer; color:var(--text-sub); display:flex; align-items:center; justify-content:center;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg></button>
+                <button style="width:30px; height:30px; border-radius:8px; border:1px solid var(--border); background:var(--surface); cursor:pointer; color:var(--text-sub); display:flex; align-items:center; justify-content:center;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></button>
+              </div>
+              <span style="font-family:var(--font-display); font-size:15px; font-weight:700;">15 – 21 June 2026</span>
+              <button class="btn btn-ghost btn-sm">Today</button>
+            </div>
+            <div style="display:flex; align-items:center; gap:12px;">
+              <span style="display:inline-flex; align-items:center; gap:6px; font-size:12px; color:var(--text-muted);"><span style="width:9px; height:9px; border-radius:3px; background:var(--teal);"></span>Live class</span>
+              <span style="display:inline-flex; align-items:center; gap:6px; font-size:12px; color:var(--text-muted);"><span style="width:9px; height:9px; border-radius:3px; background:var(--amber);"></span>Needs marking</span>
+              <button class="btn btn-secondary btn-sm">Share Schedule</button>
+            </div>
+          </div>
+
+          <!-- day header row -->
+          <div style="display:grid; grid-template-columns:58px repeat(7,1fr); border-bottom:1px solid var(--border); background:var(--n-25);">
+            <div></div>
+            <sc-for list="{{ weekDays }}" as="d" hint-placeholder-count="7">
+              <div style="padding:10px 8px; text-align:center; border-left:1px solid var(--border);">
+                <div style="font-size:10.5px; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:.06em;">{{ d.name }}</div>
+                <div style="margin-top:4px; display:inline-flex; align-items:center; justify-content:center; width:28px; height:28px; border-radius:50%; font-family:var(--font-display); font-size:14px; font-weight:700; background:{{ d.numBg }}; color:{{ d.numColor }};">{{ d.num }}</div>
+              </div>
+            </sc-for>
+          </div>
+
+          <!-- time grid -->
+          <sc-for list="{{ rows }}" as="r" hint-placeholder-count="6">
+            <div style="display:grid; grid-template-columns:58px repeat(7,1fr); border-bottom:1px solid var(--border);">
+              <div style="padding:6px 8px; font-size:11px; color:var(--text-muted); text-align:right; font-variant-numeric:tabular-nums;">{{ r.label }}</div>
+              <sc-for list="{{ r.cells }}" as="c" hint-placeholder-count="7">
+                <div style="border-left:1px solid var(--border); min-height:56px; padding:4px; background:{{ c.bg }};">
+                  <sc-if value="{{ c.hasEvent }}" hint-placeholder-val="{{ false }}">
+                    <div style="background:{{ c.evBg }}; border-left:3px solid {{ c.evBar }}; border-radius:7px; padding:6px 8px; height:100%;">
+                      <div style="font-size:11.5px; font-weight:700; color:{{ c.evInk }};">{{ c.evTitle }}</div>
+                      <div style="font-size:10.5px; color:{{ c.evInk }}; opacity:.85; margin-top:2px;">{{ c.evTime }}</div>
+                      <div style="font-size:10px; color:{{ c.evInk }}; opacity:.8; margin-top:3px;">{{ c.evFaculty }}</div>
+                    </div>
+                  </sc-if>
+                </div>
+              </sc-for>
+            </div>
+          </sc-for>
+        </div>
+      </sc-if>
+
+      <!-- ============ ASSIGNMENTS ============ -->
+      <sc-if value="{{ isAssignments }}" hint-placeholder-val="{{ false }}">
+        <div style="display:grid; grid-template-columns:340px 1fr; gap:18px; align-items:start;">
+          <!-- left: assignment list -->
+          <div>
+            <div style="display:grid; grid-template-columns:repeat(2,1fr); gap:10px; margin-bottom:14px;">
+              <div style="background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:13px 15px;"><div style="font-family:var(--font-display); font-size:20px; font-weight:700; line-height:1;">{{ aTotal }}</div><div style="font-size:11px; color:var(--text-muted); margin-top:4px;">Assignments</div></div>
+              <div style="background:var(--green-soft); border-radius:12px; padding:13px 15px;"><div style="font-family:var(--font-display); font-size:20px; font-weight:700; color:var(--green-ink); line-height:1;">{{ aDone }}</div><div style="font-size:11px; color:var(--green-ink); margin-top:4px;">Fully done</div></div>
+            </div>
+            <div style="display:flex; flex-direction:column; gap:10px;">
+              <sc-for list="{{ assignList }}" as="a" hint-placeholder-count="3">
+                <div class="aCard" onClick="{{ a.onSelect }}" style="cursor:pointer; background:var(--surface); border:1px solid {{ a.border }}; border-radius:13px; padding:14px 16px; box-shadow:{{ a.shadow }}; border-left:3px solid {{ a.accent }};">
+                  <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:8px;">
+                    <span style="font-size:13.5px; font-weight:600; line-height:1.3;">{{ a.title }}</span>
+                    <span class="badge {{ a.statusCls }}" style="font-size:9.5px; flex-shrink:0;">{{ a.statusLabel }}</span>
+                  </div>
+                  <div style="display:flex; align-items:center; gap:8px; margin-top:9px;">
+                    <span class="badge {{ a.subjectCls }}" style="font-size:10px;">{{ a.subject }}</span>
+                    <span style="font-size:11px; color:var(--text-muted);">Due {{ a.due }}</span>
+                  </div>
+                  <div style="display:flex; align-items:center; gap:9px; margin-top:11px;">
+                    <div class="progress-bar" style="flex:1;"><div class="progress-fill" style="width:{{ a.pct }}%; background:{{ a.barColor }};"></div></div>
+                    <span style="font-size:11.5px; font-weight:700; color:var(--text-sub);">{{ a.submitted }}/{{ a.total }}</span>
+                  </div>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+
+          <!-- right: detail -->
+          <div style="background:var(--surface); border:1px solid var(--border); border-radius:16px; box-shadow:var(--shadow-sm); padding:24px 26px;">
+            <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px;">
+              <div>
+                <div style="font-size:19px; font-weight:700;">{{ sel.title }}</div>
+                <div style="display:flex; align-items:center; gap:8px; margin-top:9px; flex-wrap:wrap;">
+                  <span class="badge {{ sel.subjectCls }}" style="font-size:10.5px;">{{ sel.subject }}</span>
+                  <span class="badge badge-indigo" style="font-size:10.5px;">{{ sel.owner }}</span>
+                  <span style="font-size:12px; color:var(--text-muted);">Due {{ sel.due }}</span>
+                </div>
+              </div>
+              <div style="display:flex; gap:6px; flex-shrink:0;">
+                <button class="btn btn-secondary btn-sm btn-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button>
+                <button class="btn btn-danger btn-sm btn-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg></button>
+              </div>
+            </div>
+
+            <!-- completion banner -->
+            <div style="display:flex; align-items:center; gap:11px; background:{{ sel.bannerBg }}; border-radius:11px; padding:13px 16px; margin-top:18px;">
+              <span style="display:flex; color:{{ sel.bannerInk }}; flex-shrink:0;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="m9 11 3 3L22 4"/></svg></span>
+              <div><div style="font-size:13px; font-weight:600; color:{{ sel.bannerInk }};">{{ sel.bannerTitle }}</div><div style="font-size:11.5px; color:{{ sel.bannerInk }}; opacity:.85;">{{ sel.bannerSub }}</div></div>
+            </div>
+
+            <div style="display:flex; gap:12px; margin-top:16px;">
+              <div style="flex:1; background:var(--green-soft); border-radius:11px; padding:13px 14px; text-align:center;"><div style="font-family:var(--font-display); font-size:22px; font-weight:700; color:var(--green-ink); line-height:1;">{{ sel.submitted }}</div><div style="font-size:11.5px; color:var(--green-ink); margin-top:4px;">Submitted</div></div>
+              <div style="flex:1; background:var(--amber-soft); border-radius:11px; padding:13px 14px; text-align:center;"><div style="font-family:var(--font-display); font-size:22px; font-weight:700; color:var(--amber-ink); line-height:1;">{{ sel.pending }}</div><div style="font-size:11.5px; color:var(--amber-ink); margin-top:4px;">Pending</div></div>
+              <div style="flex:1; background:var(--brand-50); border-radius:11px; padding:13px 14px; text-align:center;"><div style="font-family:var(--font-display); font-size:22px; font-weight:700; color:var(--brand-ink); line-height:1;">{{ sel.total }}</div><div style="font-size:11.5px; color:var(--brand-ink); margin-top:4px;">Total</div></div>
+            </div>
+
+            <div style="display:flex; align-items:center; gap:8px; margin-top:18px; flex-wrap:wrap;">
+              <button class="btn btn-primary btn-sm">Show All</button>
+              <button class="btn btn-ghost btn-sm">Pending</button>
+              <button class="btn btn-ghost btn-sm">Submitted</button>
+              <div class="search-bar" style="flex:1; min-width:160px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg><input placeholder="Search student…" /></div>
+            </div>
+
+            <div style="margin-top:8px;">
+              <sc-for list="{{ sel.rows }}" as="s" hint-placeholder-count="6">
+                <div style="display:flex; align-items:center; gap:12px; padding:11px 4px; border-bottom:1px solid var(--border);">
+                  <span style="width:28px; height:28px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-family:var(--font-display); font-weight:700; font-size:10px; color:#fff; flex-shrink:0; background:{{ s.color }};">{{ s.initials }}</span>
+                  <span style="flex:1; font-size:13px; font-weight:500;">{{ s.name }}</span>
+                  <span style="font-size:12.5px; color:var(--text-sub); width:120px;">{{ s.phone }}</span>
+                  <span class="badge {{ s.statusCls }}" style="font-size:11px;"><span class="dot"></span>{{ s.statusLabel }}</span>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+        </div>
+      </sc-if>
+
+      <!-- ============ ASSESSMENTS ============ -->
+      <sc-if value="{{ isAssessments }}" hint-placeholder-val="{{ false }}">
+        <div style="display:flex; flex-direction:column; gap:12px;">
+          <sc-for list="{{ assessments }}" as="a" hint-placeholder-count="2">
+            <div class="litem" style="display:flex; align-items:center; gap:16px; background:var(--surface); border:1px solid var(--border); border-radius:14px; box-shadow:var(--shadow-sm); padding:18px 20px;">
+              <div style="flex:1; min-width:0;">
+                <div style="font-size:15px; font-weight:700;">{{ a.title }}</div>
+                <div style="display:flex; align-items:center; gap:8px; margin-top:6px; font-size:12.5px; color:var(--text-muted); flex-wrap:wrap;">
+                  <span style="display:inline-flex; align-items:center; gap:5px;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>{{ a.date }}</span>
+                  <span>Total Marks: <b style="color:var(--text);">{{ a.total }}</b></span>
+                  <span>Staff: {{ a.staff }}</span>
+                  <span class="badge badge-violet" style="font-size:10.5px;">Exam</span>
+                </div>
+              </div>
+              <span class="badge badge-green" style="font-size:11px;"><span class="dot"></span>Completed</span>
+              <button class="btn btn-secondary btn-sm">View Results</button>
+              <button class="btn btn-sm" style="background:var(--blue-soft); color:var(--blue-ink);">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                Import Marks
+              </button>
+              <button class="btn btn-danger btn-sm btn-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg></button>
+            </div>
+          </sc-for>
+        </div>
+      </sc-if>
+
+      <!-- ============ STAFF ============ -->
+      <sc-if value="{{ isStaff }}" hint-placeholder-val="{{ false }}">
+        <div style="display:grid; grid-template-columns:repeat(2,1fr); gap:14px; max-width:900px;">
+          <sc-for list="{{ staff }}" as="m" hint-placeholder-count="3">
+            <div class="litem" style="background:var(--surface); border:1px solid var(--border); border-radius:14px; box-shadow:var(--shadow-sm); padding:18px 20px;">
+              <div style="display:flex; align-items:center; gap:12px;">
+                <div style="width:42px; height:42px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-family:var(--font-display); font-weight:700; font-size:14px; color:#fff; flex-shrink:0; background:{{ m.color }};">{{ m.initials }}</div>
+                <div style="flex:1; min-width:0;">
+                  <div style="display:flex; align-items:center; gap:8px;"><span style="font-size:14px; font-weight:600;">{{ m.name }}</span><span class="badge {{ m.roleCls }}" style="font-size:10px;">{{ m.role }}</span></div>
+                  <div style="font-size:12px; color:var(--text-muted); margin-top:2px;">{{ m.email }}</div>
+                </div>
+                <button class="btn btn-danger btn-sm">Remove</button>
+              </div>
+              <div style="display:flex; flex-wrap:wrap; gap:6px; margin-top:12px;">
+                <sc-for list="{{ m.subjects }}" as="sub" hint-placeholder-count="2">
+                  <span class="chip" style="font-size:11px;">{{ sub }}</span>
+                </sc-for>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+      </sc-if>
+
+    </main>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1320,&quot;height&quot;:850}}">
+class Component extends DCLogic {
+  ACCENTS = ['#E81620','#F4683B','#F5A623','#16A974','#11B4C6','#3B6EF6','#6366F1','#8B5CF6','#EC4899','#6E7488'];
+
+  STUDENTS = [
+    { name:'Aarush',         father:'Unikrisnan',       mother:'Viji pv',       phone:'9048169920', cls:'6th',  onboard:2 },
+    { name:'Abinaya A',      father:'Robert George',    mother:'Aswathi S',     phone:'9645787368', cls:'10th', onboard:0 },
+    { name:'Amal S S',       father:'Shaiju',           mother:'Sheeja',        phone:'9544995143', cls:'9th',  onboard:0 },
+    { name:'Annleon Antony', father:'Antony Raju',      mother:'Linda Antony',  phone:'7561843802', cls:'6th',  onboard:0 },
+    { name:'Arvin O S',      father:'Shrikanth',        mother:'Swapna',        phone:'9847221190', cls:'9th',  onboard:0 },
+    { name:'Devika R',       father:'Rajesh Kumar',     mother:'Latha',         phone:'9847551020', cls:'8th',  onboard:1 },
+    { name:'Fahad Ali',      father:'Iqbal Ali',        mother:'Nasreen',       phone:'9961200345', cls:'7th',  onboard:0 },
+    { name:'Gowri Nandan',   father:'Nandakumar',       mother:'Geetha',        phone:'9744803311', cls:'10th', onboard:0 },
+  ];
+
+  STEPS = [
+    { name:'Student Admission',     phase:'Onboarding', done:0, total:16 },
+    { name:'Parent Onboarding',     phase:'Onboarding', done:0, total:16 },
+    { name:'Primary Assessment',    phase:'Onboarding', done:1, total:16 },
+    { name:'VARK Analysis',         phase:'Onboarding', done:0, total:16 },
+    { name:'Kit Packing & Dispatch',phase:'Onboarding', done:0, total:16 },
+    { name:'Instagram Account Open',phase:'Onboarding', done:0, total:16 },
+    { name:'Classes Started',       phase:'Course',     done:0, total:16 },
+    { name:'First Activity',        phase:'Course',     done:0, total:16 },
+    { name:'Regular Follow-up',     phase:'Course',     done:0, total:16 },
+  ];
+
+  ASSESSMENTS = [
+    { title:'Debate on topic 1947', date:'2026-06-10', total:20,  staff:'Adhithyan, ADhi' },
+    { title:'Test for Math',        date:'2026-06-05', total:100, staff:'Adhithyan, ADhi' },
+  ];
+
+  STAFF = [
+    { name:'Adhithyan', role:'Mentor',  email:'adhithyan@internationalskillsclub.com', subjects:['Soft Skills','Public Speaking'] },
+    { name:'ADhi',      role:'Faculty', email:'adhi@internationalskillsclub.com',      subjects:['Mathematics'] },
+    { name:'Meera K',   role:'Faculty', email:'meera@internationalskillsclub.com',     subjects:['English','Science'] },
+  ];
+
+  ASSIGN = [
+    { id:'a1', title:'Create a music generation video using AI', subject:'physics', subjectCls:'badge-violet', owner:'Adhithyan', due:'Jun 06', submitted:16, total:16 },
+    { id:'a2', title:'Essay — "My future career"',               subject:'english', subjectCls:'badge-blue',   owner:'Meera K',   due:'Jun 28', submitted:9,  total:16 },
+    { id:'a3', title:'Solve 20 algebra problems',                subject:'maths',   subjectCls:'badge-amber',  owner:'ADhi',      due:'Jun 30', submitted:3,  total:16 },
+  ];
+
+  state = { tab:'students', selAssign:'a1' };
+
+  initials(name){ const p=name.trim().split(/\s+/); return ((p[0]||'')[0]+((p[1]||'')[0]||'')).toUpperCase(); }
+  color(name){ let h=0; for(const c of name) h=(h*31+c.charCodeAt(0))>>>0; return this.ACCENTS[h%this.ACCENTS.length]; }
+  seg(active){ return { bg:active?'var(--surface)':'transparent', color:active?'var(--text)':'var(--text-muted)', shadow:active?'var(--shadow-xs)':'none' }; }
+
+  renderVals(){
+    const tab = this.state.tab;
+
+    const students = this.STUDENTS.map(s => ({
+      ...s, initials:this.initials(s.name), color:this.color(s.name),
+      obCls: s.onboard>0 ? 'badge-amber' : 'badge-gray',
+      onOpen: () => { window.location.href = 'Student%20Profile.dc.html'; },
+    }));
+
+    const steps = this.STEPS.map((s,i) => {
+      const pct = Math.round(s.done/s.total*100);
+      const barColor = pct>=66?'var(--green)':pct>=33?'var(--amber)':pct>0?'var(--brand)':'var(--n-300)';
+      return { ...s, idx:i+1, pct, notDone:s.total-s.done, hasPending: s.done<s.total,
+        phaseCls: s.phase==='Onboarding' ? 'badge-blue' : 'badge-green',
+        barColor,
+        segColor: pct>0 ? 'rgba(255,255,255,.95)' : 'rgba(255,255,255,.22)',
+        nodeBg: s.done>0 ? 'var(--brand)' : 'var(--surface-sunken)',
+        nodeInk: s.done>0 ? '#fff' : 'var(--text-muted)' };
+    });
+    const phases = [
+      { title:'ONBOARDING PHASE', steps: steps.filter(s=>s.phase==='Onboarding') },
+      { title:'COURSE PHASE',     steps: steps.filter(s=>s.phase==='Course') },
+    ];
+    const totalStu = 16;
+    const sumDone = this.STEPS.reduce((a,s)=>a+s.done,0);
+    const overallPct = Math.round(steps.reduce((a,s)=>a+s.pct,0)/steps.length);
+    const fullyDone = steps[steps.length-1].done;
+    const avgSteps = (sumDone/totalStu).toFixed(1);
+
+    // Week of 15–21 June 2026 (today = Sun 21)
+    const weekDays = [
+      { name:'Mon', num:15 }, { name:'Tue', num:16 }, { name:'Wed', num:17 }, { name:'Thu', num:18 },
+      { name:'Fri', num:19 }, { name:'Sat', num:20 }, { name:'Sun', num:21 },
+    ].map(d => ({ ...d, numBg: d.num===21 ? 'var(--brand)' : 'transparent', numColor: d.num===21 ? '#fff' : 'var(--text)' }));
+
+    const ev = { hasEvent:true, bg:'rgba(79,70,229,.05)', evBg:'var(--amber-soft)', evBar:'var(--amber)', evInk:'var(--amber-ink)', evTitle:'English', evTime:'09:00 – 10:00', evFaculty:'Adhithyan · unmarked' };
+    const hours = ['08:00','09:00','10:00','11:00','12:00','13:00'];
+    const rows = hours.map(h => ({
+      label: h,
+      cells: weekDays.map(d => {
+        const today = d.num===21;
+        if(h==='09:00' && today) return ev;
+        return { hasEvent:false, bg: today ? 'rgba(79,70,229,.05)' : 'transparent' };
+      }),
+    }));
+
+    // Assignments
+    const aTotal = this.ASSIGN.length;
+    const aDone = this.ASSIGN.filter(a=>a.submitted>=a.total).length;
+    const assignList = this.ASSIGN.map(a => {
+      const pct = Math.round(a.submitted/a.total*100);
+      const done = a.submitted>=a.total;
+      const on = this.state.selAssign===a.id;
+      return { ...a, pct,
+        statusLabel: done?'Done':'Active', statusCls: done?'badge-green':'badge-amber',
+        barColor: done?'var(--green)':'var(--brand)',
+        accent: done?'var(--green)':'var(--brand)',
+        border: on?'var(--brand)':'var(--border)',
+        shadow: on?'var(--shadow-md)':'var(--shadow-sm)',
+        onSelect: () => this.setState({ selAssign:a.id }),
+      };
+    });
+    const selA = this.ASSIGN.find(a=>a.id===this.state.selAssign) || this.ASSIGN[0];
+    const selPct = Math.round(selA.submitted/selA.total*100);
+    const selDone = selA.submitted>=selA.total;
+    const selRows = this.STUDENTS.slice(0,6).map((s,i) => {
+      const sub = i < Math.round(selA.submitted/selA.total*6);
+      return { name:s.name, phone:s.phone, initials:this.initials(s.name), color:this.color(s.name),
+        statusLabel: sub?'Submitted':'Pending', statusCls: sub?'badge-green':'badge-amber' };
+    });
+    const sel = { ...selA, pending: selA.total-selA.submitted, rows:selRows,
+      bannerBg: selDone?'var(--green-soft)':'var(--amber-soft)',
+      bannerInk: selDone?'var(--green-ink)':'var(--amber-ink)',
+      bannerTitle: selDone?'All students completed this assignment':selPct+'% submitted so far',
+      bannerSub: selDone?'Every student in this batch has submitted.':(selA.total-selA.submitted)+' students still pending.' };
+
+    const staff = this.STAFF.map(m => ({
+      ...m, initials:this.initials(m.name), color:this.color(m.name),
+      roleCls: m.role==='Mentor' ? 'badge-violet' : 'badge-gray',
+    }));
+
+    const TABS = [
+      { key:'students',   label:'Students (16)' },
+      { key:'onboarding', label:'Onboarding Analytics' },
+      { key:'schedule',   label:'Schedule (1)' },
+      { key:'assignments',label:'Assignments (1)' },
+      { key:'assessments',label:'Assessments (2)' },
+      { key:'staff',      label:'Staff (3)' },
+    ];
+    const tabs = TABS.map(t => { const s=this.seg(tab===t.key); return { label:t.label, bg:s.bg, color:s.color, shadow:s.shadow, onClick:()=>this.setState({tab:t.key}) }; });
+
+    const PRIMARY = { students:'Add Student', schedule:'Add Class', assignments:'Add Task', assessments:'Add Assessment', staff:'Add Staff' };
+
+    return {
+      tabs, students, steps, phases, weekDays, rows, assessments:this.ASSESSMENTS, staff,
+      overallPct, fullyDone, totalStu, avgSteps, inProgress: totalStu - fullyDone,
+      assignList, sel, aTotal, aDone,
+      isStudents:tab==='students', isOnboarding:tab==='onboarding', isSchedule:tab==='schedule',
+      isAssignments:tab==='assignments', isAssessments:tab==='assessments', isStaff:tab==='staff',
+      hasPrimary: !!PRIMARY[tab], primaryLabel: PRIMARY[tab] || '',
+    };
+  }
+}
+</script>
+</body>
+</html>

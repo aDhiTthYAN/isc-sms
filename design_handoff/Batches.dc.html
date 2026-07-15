@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="_ds/isc-design-system-44b9e318-905b-4330-a4ea-d1d6b542217b/tokens/fonts.css">
+  <link rel="stylesheet" href="_ds/isc-design-system-44b9e318-905b-4330-a4ea-d1d6b542217b/tokens/colors.css">
+  <link rel="stylesheet" href="_ds/isc-design-system-44b9e318-905b-4330-a4ea-d1d6b542217b/tokens/typography.css">
+  <link rel="stylesheet" href="_ds/isc-design-system-44b9e318-905b-4330-a4ea-d1d6b542217b/tokens/spacing.css">
+  <link rel="stylesheet" href="_ds/isc-design-system-44b9e318-905b-4330-a4ea-d1d6b542217b/base.css">
+  <link rel="stylesheet" href="_ds/isc-design-system-44b9e318-905b-4330-a4ea-d1d6b542217b/styles.css">
+  <link rel="stylesheet" href="theme.css">
+  <style>
+    html,body{background:var(--canvas);}
+    .navlink:hover{ background:var(--n-100); }
+    .navlink.is-active:hover{ background:var(--brand-50); }
+    .bcard{ transition: box-shadow .15s var(--ease), transform .12s var(--ease), border-color .15s var(--ease); cursor:pointer; }
+    .bcard:hover{ box-shadow: var(--shadow-md); transform: translateY(-2px); border-color:var(--border-strong); }
+    .av-stack > *{ margin-left:-8px; }
+    .av-stack > *:first-child{ margin-left:0; }
+    ::-webkit-scrollbar{ width:9px; height:9px; }
+  </style>
+</helmet>
+
+<div style="display:flex; height:100vh; overflow:hidden; background:var(--canvas); font-family:var(--font-body); color:var(--text);">
+
+  <!-- ===================== SIDEBAR ===================== -->
+  <dc-import name="Sidebar" active="batches" hint-size="230px,100%"></dc-import>
+
+  <!-- ===================== MAIN ===================== -->
+  <div style="flex:1; display:flex; flex-direction:column; min-width:0; height:100vh;">
+
+    <header style="background:var(--surface); border-bottom:1px solid var(--border); padding:0 26px; height:56px; display:flex; align-items:center; justify-content:space-between; gap:16px; flex-shrink:0;">
+      <div style="display:flex; align-items:center; gap:8px; font-size:12.5px; color:var(--text-muted);">
+        <span>Overview</span>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+        <span style="color:var(--text); font-weight:600;">Batches</span>
+      </div>
+      <div style="display:flex; align-items:center; gap:12px;">
+        <div class="search-bar" style="width:240px;">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+          <input placeholder="Search students, tasks…" />
+        </div>
+        <button style="position:relative; width:36px; height:36px; border-radius:10px; border:1px solid var(--border); background:var(--surface); display:flex; align-items:center; justify-content:center; cursor:pointer; color:var(--text-sub);">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.268 21a2 2 0 0 0 3.464 0"/><path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"/></svg>
+          <span style="position:absolute; top:-4px; right:-4px; width:8px; height:8px; border-radius:50%; background:var(--brand); border:2px solid var(--surface);"></span>
+        </button>
+        <div style="width:1px; height:26px; background:var(--border);"></div>
+        <div style="display:flex; align-items:center; gap:9px;">
+          <div style="width:32px; height:32px; border-radius:50%; background:var(--grad-brand); display:flex; align-items:center; justify-content:center; font-family:var(--font-display); font-weight:700; font-size:12px; color:#fff;">AD</div>
+          <div>
+            <div style="font-size:13px; font-weight:600; line-height:1.2;">Adithyan R</div>
+            <div style="font-size:11px; color:var(--text-muted);">CEO</div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <main style="flex:1; overflow-y:auto; padding:24px 26px 32px;">
+
+      <!-- Page header -->
+      <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:16px; flex-wrap:wrap; margin-bottom:18px;">
+        <div>
+          <h2 style="font-size:24px; font-weight:700;">Batch Management</h2>
+          <div style="font-size:13px; color:var(--text-muted); margin-top:3px;">Organize courses, cohorts and schedules across all programs.</div>
+        </div>
+        <button class="btn btn-primary">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+          Create Batch
+        </button>
+      </div>
+
+      <!-- Filter chips -->
+      <div style="display:flex; align-items:center; gap:8px; margin-bottom:18px;">
+        <sc-for list="{{ filters }}" as="c" hint-placeholder-count="4">
+          <button onClick="{{ c.onClick }}" style="display:inline-flex; align-items:center; gap:7px; padding:7px 14px; border-radius:9999px; border:1px solid {{ c.border }}; background:{{ c.bg }}; color:{{ c.color }}; font-size:12.5px; font-weight:600; cursor:pointer;">
+            {{ c.label }}
+            <span style="font-size:11px; opacity:.7;">{{ c.count }}</span>
+          </button>
+        </sc-for>
+      </div>
+
+      <!-- Batch grid -->
+      <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:18px;">
+        <sc-for list="{{ batches }}" as="b" hint-placeholder-count="6">
+          <a href="Batch%20Detail.dc.html" class="bcard" style="display:block; text-decoration:none; color:inherit; background:var(--surface); border:1px solid var(--border); border-radius:16px; box-shadow:var(--shadow-sm); overflow:hidden;">
+            <!-- accent strip -->
+            <div style="height:4px; background:{{ b.accent }};"></div>
+            <div style="padding:18px 20px;">
+              <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:10px; margin-bottom:14px;">
+                <div style="min-width:0;">
+                  <span class="chip" style="font-size:11px; margin-bottom:8px;">{{ b.course }}</span>
+                  <div style="font-family:var(--font-display); font-size:17px; font-weight:700; margin-top:8px; letter-spacing:-.01em;">{{ b.name }}</div>
+                </div>
+                <span class="badge {{ b.statusCls }}"><span class="dot"></span>{{ b.statusLabel }}</span>
+              </div>
+
+              <!-- mentor -->
+              <div style="display:flex; align-items:center; gap:8px; margin-bottom:16px;">
+                <div style="width:24px; height:24px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-family:var(--font-display); font-weight:700; font-size:9.5px; color:#fff; background:{{ b.mentorColor }};">{{ b.mentorInitials }}</div>
+                <span style="font-size:12.5px; color:var(--text-sub);">Mentor · <b style="color:var(--text); font-weight:600;">{{ b.mentor }}</b></span>
+              </div>
+
+              <!-- stats -->
+              <div style="display:flex; gap:8px; margin-bottom:14px;">
+                <div style="flex:1; background:var(--surface-sunken); border-radius:10px; padding:10px 12px;">
+                  <div style="font-family:var(--font-display); font-size:20px; font-weight:700; letter-spacing:-.02em; line-height:1;">{{ b.students }}</div>
+                  <div style="font-size:11px; color:var(--text-muted); margin-top:3px;">Students</div>
+                </div>
+                <div style="flex:1; background:var(--surface-sunken); border-radius:10px; padding:10px 12px;">
+                  <div style="font-family:var(--font-display); font-size:20px; font-weight:700; letter-spacing:-.02em; line-height:1; color:{{ b.pctColor }};">{{ b.pct }}%</div>
+                  <div style="font-size:11px; color:var(--text-muted); margin-top:3px;">Onboarded</div>
+                </div>
+              </div>
+
+              <!-- progress -->
+              <div class="progress-bar" style="margin-bottom:14px;">
+                <div class="progress-fill" style="width:{{ b.pct }}%; background:{{ b.barColor }};"></div>
+              </div>
+
+              <!-- footer -->
+              <div style="display:flex; align-items:center; justify-content:space-between; padding-top:14px; border-top:1px solid var(--border);">
+                <div style="display:flex; align-items:center; gap:8px;">
+                  <span style="display:flex; color:var(--text-muted);"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></span>
+                  <span style="font-size:12px; color:var(--text-sub);">{{ b.schedule }}</span>
+                </div>
+                <span style="display:inline-flex; align-items:center; gap:4px; font-size:12.5px; font-weight:600; color:var(--brand);">Open <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg></span>
+              </div>
+            </div>
+          </a>
+        </sc-for>
+      </div>
+
+    </main>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1320,&quot;height&quot;:850}}">
+class Component extends DCLogic {
+  ACCENTS = ['#E81620','#F4683B','#F5A623','#16A974','#11B4C6','#3B6EF6','#6366F1','#8B5CF6','#EC4899','#6E7488'];
+
+  STATUS = {
+    active:    { label:'Active',    cls:'badge-green' },
+    upcoming:  { label:'Upcoming',  cls:'badge-blue' },
+    completed: { label:'Completed', cls:'badge-gray' },
+  };
+
+  BATCHES = [
+    { name:'B-15 · Spoken English', course:'Spoken English',   status:'upcoming',  students:32, pct:18,  mentor:'Sneha Patel',  schedule:'Mon/Wed/Fri · 6 PM', accent:'var(--blue)' },
+    { name:'B-14 · IELTS Prep',     course:'IELTS',            status:'active',    students:28, pct:64,  mentor:'Rahul Verma',  schedule:'Tue/Thu · 7 PM',     accent:'var(--teal)' },
+    { name:'B-12 · Soft Skills',    course:'Soft Skills',      status:'active',    students:41, pct:88,  mentor:'Priya Sharma', schedule:'Mon–Fri · 5 PM',     accent:'var(--violet)' },
+    { name:'A-09 · Interview Prep', course:'Interview Prep',   status:'active',    students:24, pct:100, mentor:'Vikram Nair',  schedule:'Sat/Sun · 11 AM',    accent:'var(--green)' },
+    { name:'B-10 · Business English',course:'Business English',status:'completed', students:35, pct:100, mentor:'Aisha Khan',   schedule:'Mon/Wed · 6 PM',     accent:'var(--slate)' },
+    { name:'B-13 · Public Speaking',course:'Public Speaking',  status:'active',    students:19, pct:42,  mentor:'Arjun Mehta',  schedule:'Wed/Fri · 8 PM',     accent:'var(--amber)' },
+  ];
+
+  state = { filter:'all' };
+
+  initials(name){ const p=name.trim().split(/\s+/); return ((p[0]||'')[0]+((p[1]||'')[0]||'')).toUpperCase(); }
+  color(name){ let h=0; for(const c of name) h=(h*31+c.charCodeAt(0))>>>0; return this.ACCENTS[h%this.ACCENTS.length]; }
+
+  renderVals(){
+    const f = this.state.filter;
+    const counts = { all:this.BATCHES.length };
+    for(const k of Object.keys(this.STATUS)) counts[k] = this.BATCHES.filter(b=>b.status===k).length;
+
+    const batches = this.BATCHES.filter(b => f==='all' || b.status===f).map(b => {
+      const st = this.STATUS[b.status];
+      return {
+        ...b,
+        statusLabel:st.label, statusCls:st.cls,
+        mentorInitials:this.initials(b.mentor), mentorColor:this.color(b.mentor),
+        barColor: b.pct===100 ? 'var(--green)' : b.pct>=60 ? 'var(--amber)' : 'var(--red)',
+        pctColor: b.pct===100 ? 'var(--green-ink)' : 'var(--text)',
+      };
+    });
+
+    const chip = (key,label) => {
+      const active = f===key;
+      return {
+        label, count:counts[key],
+        bg: active ? 'var(--brand-50)' : 'var(--surface)',
+        border: active ? 'var(--brand)' : 'var(--border)',
+        color: active ? 'var(--brand-ink)' : 'var(--text-sub)',
+        onClick: () => this.setState({ filter:key }),
+      };
+    };
+    const filters = [
+      chip('all','All batches'),
+      chip('active','Active'),
+      chip('upcoming','Upcoming'),
+      chip('completed','Completed'),
+    ];
+
+    return { batches, filters, totalCount:this.BATCHES.length };
+  }
+}
+</script>
+</body>
+</html>

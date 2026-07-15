@@ -13,23 +13,25 @@ const CONCERN_TYPES = [
   'Course Doubt','Personal Concern','Weak Subject','Other'
 ];
 const TYPE_COLORS = {
-  'Fee Issue':        { bg:'#FEE2E2', color:'#991B1B', emoji:'💳' },
-  'Attendance Issue': { bg:'#FEF3C7', color:'#92400E', emoji:'📅' },
-  'Technical Issue':  { bg:'#DBEAFE', color:'#1E40AF', emoji:'💻' },
-  'Course Doubt':     { bg:'#EDE9FE', color:'#5B21B6', emoji:'📚' },
-  'Personal Concern': { bg:'#FCE7F3', color:'#9D174D', emoji:'❤️' },
-  'Weak Subject':     { bg:'#FEF3C7', color:'#92400E', emoji:'⚠️' },
-  'Other':            { bg:'#F3F4F6', color:'#374151', emoji:'📌' },
+  'Fee Issue':        { bg:'var(--red-soft)',    color:'#E81620' },
+  'Attendance Issue': { bg:'var(--amber-soft)',  color:'#F5A623' },
+  'Technical Issue':  { bg:'var(--blue-soft)',   color:'#3B6EF6' },
+  'Course Doubt':     { bg:'var(--violet-soft)', color:'#8B5CF6' },
+  'Personal Concern': { bg:'var(--pink-soft)',   color:'#EC4899' },
+  'Weak Subject':     { bg:'var(--orange-soft)', color:'#F4683B' },
+  'Other':            { bg:'var(--slate-soft)',  color:'#6E7488' },
 };
 
 export default function Concerns() {
   const { profile, user } = useAuth();
+  const isCeo = profile?.role === 'ceo' || profile?.role === 'admin';
   const [concerns, setConcerns]   = useState([]);
   const [students, setStudents]   = useState([]);
   const [staffList, setStaffList] = useState([]);
   const [loading, setLoading]     = useState(true);
   const [search, setSearch]       = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  const [staffFilter, setStaffFilter]   = useState(''); // CEO: filter by raised-by / assigned staff
   const [showModal, setShowModal] = useState(false);
   const [toast, setToast]         = useState(null);
   const [saving, setSaving]       = useState(false);
@@ -50,14 +52,23 @@ export default function Concerns() {
 
   useEffect(() => { load(); }, []);
 
-  const filtered = concerns.filter(c => {
+  // Visibility: CEO/admin see everything. Staff see only concerns they raised
+  // or that are assigned to them.
+  const myEmail = user?.email;
+  const myName  = profile?.name;
+  const visible = concerns.filter(c => isCeo
+    || c.raisedByEmail === myEmail || c.raisedBy === myName
+    || c.assignedToEmail === myEmail || c.assignedTo === myName);
+
+  const filtered = visible.filter(c => {
     const q = search.toLowerCase();
     const matchQ = !q ||
       c.studentName?.toLowerCase().includes(q) ||
       c.type?.toLowerCase().includes(q) ||
       c.description?.toLowerCase().includes(q);
     const matchS = !statusFilter || c.status === statusFilter;
-    return matchQ && matchS;
+    const matchStaff = !staffFilter || c.assignedTo === staffFilter || c.raisedBy === staffFilter;
+    return matchQ && matchS && matchStaff;
   });
 
   const handleAdd = async (e) => {
@@ -125,91 +136,107 @@ export default function Concerns() {
     return d.toLocaleDateString('en-IN', { day:'2-digit', month:'short' });
   };
 
-  // Summary counts
-  const counts = {};
-  CONCERN_TYPES.forEach(t => { counts[t] = concerns.filter(c => c.type === t).length; });
+  // Status meta
+  const STATUS = {
+    open:          { label:'Open',        cls:'badge-red'   },
+    'in-progress': { label:'In Progress', cls:'badge-amber' },
+    resolved:      { label:'Resolved',    cls:'badge-green' },
+  };
+  const statusOf = (c) => c.status || 'open';
+  const counts = {
+    all:           visible.length,
+    open:          visible.filter(c => statusOf(c) === 'open').length,
+    'in-progress': visible.filter(c => statusOf(c) === 'in-progress').length,
+    resolved:      visible.filter(c => statusOf(c) === 'resolved').length,
+  };
+  const TABS = [
+    { key:'open',        label:'Open'        },
+    { key:'in-progress', label:'In Progress' },
+    { key:'resolved',    label:'Resolved'    },
+    { key:'',            label:'All'         },
+  ];
+
+  const initials = (name='') => {
+    const p = name.trim().split(/\s+/);
+    return ((p[0]?.[0] || '') + (p[1]?.[0] || '')).toUpperCase() || '?';
+  };
+  const concernKey = (c, i) => 'CON-' + (c.id ? c.id.slice(-3).toUpperCase() : String(i + 1).padStart(3, '0'));
 
   if (loading) return <Loading />;
 
   return (
     <div>
-      <div className="page-header">
-        <h2>Student Concerns
-          <span style={{ fontSize:14, color:'#6B7280', fontWeight:400, marginLeft:8 }}>
-            ({filtered.length})
-          </span>
-        </h2>
+      <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', gap:16, flexWrap:'wrap', marginBottom:16 }}>
+        <div>
+          <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+            <h2 style={{ fontSize:24, fontWeight:700 }}>Student Concerns</h2>
+            {counts.open > 0 && <span className="badge badge-red"><span className="dot" />{counts.open} open</span>}
+          </div>
+          <div style={{ fontSize:13, color:'var(--text-muted)', marginTop:3 }}>Review and resolve flagged issues raised by staff and students.</div>
+        </div>
         <button className="btn btn-primary" onClick={() => setShowModal(true)}>
-          <Plus size={16} /> Log Concern
+          <Plus size={16} /> Raise Concern
         </button>
       </div>
 
-      {/* Summary pills */}
-      <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginBottom:18 }}>
-        {CONCERN_TYPES.map(t => {
-          const s = TYPE_COLORS[t] || TYPE_COLORS['Other'];
-          if (!counts[t]) return null;
-          return (
-            <div key={t} style={{ padding:'5px 12px', borderRadius:20, background:s.bg, color:s.color, fontSize:12, fontWeight:600, display:'flex', gap:5, alignItems:'center', cursor:'pointer' }}
-              onClick={() => setSearch(t.toLowerCase().split(' ')[0])}>
-              {s.emoji} {t}
-              <span style={{ background:s.color, color:'#fff', borderRadius:10, padding:'0 6px', fontSize:11 }}>{counts[t]}</span>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Filters */}
-      <div style={{ display:'flex', gap:10, marginBottom:16 }}>
-        <div className="search-bar" style={{ flex:1 }}>
-          <Search size={15} style={{ color:'var(--muted)', flexShrink:0 }} />
-          <input placeholder="Search student, type, description..."
+      <div style={{ display:'flex', alignItems:'center', gap:12, flexWrap:'wrap', marginBottom:18 }}>
+        <div className="search-bar" style={{ width:320 }}>
+          <Search size={15} style={{ color:'var(--text-muted)', flexShrink:0 }} />
+          <input placeholder="Search concern, student or category…"
             value={search} onChange={e => setSearch(e.target.value)} />
         </div>
-        <select className="form-input" style={{ width:160 }} value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
-          <option value="">All Status</option>
-          <option value="open">Open</option>
-          <option value="in-progress">In Progress</option>
-          <option value="resolved">Resolved</option>
-        </select>
+        {isCeo && (
+          <select className="form-input" style={{ width:'auto', height:38 }} value={staffFilter} onChange={e => setStaffFilter(e.target.value)}>
+            <option value="">All staff</option>
+            {[...new Set(concerns.flatMap(c => [c.assignedTo, c.raisedBy]).filter(Boolean))].sort().map(n => (
+              <option key={n} value={n}>{n}</option>
+            ))}
+          </select>
+        )}
+        <div style={{ flex:1 }} />
+        <div className="segmented">
+          {TABS.map(t => (
+            <button key={t.key || 'all'} className={statusFilter === t.key ? 'active' : ''} onClick={() => setStatusFilter(t.key)}>
+              {t.label}<span className="seg-count">{counts[t.key || 'all']}</span>
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Concern cards */}
-      <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+      <div style={{ display:'flex', flexDirection:'column', gap:12, maxWidth:920 }}>
         {filtered.length === 0 && (
-          <div className="card" style={{ textAlign:'center', color:'#6B7280', padding:40 }}>
-            No concerns found.
+          <div style={{ padding:'48px 20px', textAlign:'center', color:'var(--text-muted)', fontSize:13.5, background:'var(--surface)', border:'1px solid var(--border)', borderRadius:14 }}>
+            No concerns in this view.
           </div>
         )}
-        {filtered.map(c => {
+        {filtered.map((c, i) => {
           const style = TYPE_COLORS[c.type] || TYPE_COLORS['Other'];
+          const st = STATUS[statusOf(c)] || STATUS.open;
+          const isOpen = statusOf(c) !== 'resolved';
           return (
-            <div key={c.id} className="card" style={{ padding:'14px 18px', display:'flex', alignItems:'flex-start', gap:14 }}>
-              <div style={{ width:40, height:40, borderRadius:10, background:style.bg, display:'flex', alignItems:'center', justifyContent:'center', fontSize:20, flexShrink:0 }}>
-                {style.emoji}
-              </div>
-              <div style={{ flex:1 }}>
-                <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:4 }}>
-                  <span style={{ fontWeight:600, fontSize:14 }}>{c.type} — {c.studentName}</span>
-                  <span style={{ fontSize:11, color:'#9CA3AF' }}>{formatDate(c.createdAt)}</span>
+            <div key={c.id} className="card" style={{ padding:'16px 20px', borderLeft:`3px solid ${style.color}` }}>
+              <div style={{ display:'flex', alignItems:'flex-start', gap:14 }}>
+                <div style={{ flex:1, minWidth:0 }}>
+                  <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
+                    <span style={{ fontFamily:'var(--font-display)', fontSize:11.5, fontWeight:600, color:'var(--text-muted)' }}>{concernKey(c, i)}</span>
+                    <span style={{ fontSize:14, fontWeight:600 }}>{c.type}</span>
+                  </div>
+                  <div style={{ fontSize:12.5, color:'var(--text-sub)', marginTop:8 }}>{c.description}</div>
+                  <div style={{ display:'flex', alignItems:'center', gap:14, marginTop:11, fontSize:12, color:'var(--text-muted)', flexWrap:'wrap' }}>
+                    <span style={{ display:'inline-flex', alignItems:'center', gap:6 }}>
+                      <span style={{ width:22, height:22, borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center', fontFamily:'var(--font-display)', fontWeight:700, fontSize:9, color:'#fff', background:style.color }}>{initials(c.studentName)}</span>
+                      {c.studentName}
+                    </span>
+                    {c.assignedTo && <span className="chip">{c.assignedTo}</span>}
+                    {c.raisedBy && <span>Raised by {c.raisedBy} · {formatDate(c.createdAt)}</span>}
+                  </div>
                 </div>
-                <p style={{ fontSize:13, color:'#374151', lineHeight:1.5 }}>{c.description}</p>
-                <div style={{ display:'flex', gap:8, marginTop:8, flexWrap:'wrap', alignItems:'center' }}>
-                  <span className={`badge ${c.status==='resolved'?'badge-green':c.status==='in-progress'?'badge-amber':'badge-red'}`}>
-                    {c.status==='in-progress'?'In Progress':c.status.charAt(0).toUpperCase()+c.status.slice(1)}
-                  </span>
-                  <span className={`badge`} style={{ background:style.bg, color:style.color }}>{c.type}</span>
-                  {c.assignedTo && (
-                    <span className="badge badge-blue">👤 {c.assignedTo}</span>
-                  )}
-                  {c.raisedBy && (
-                    <span style={{ fontSize:11, color:'#9CA3AF' }}>raised by {c.raisedBy}</span>
-                  )}
+                <div style={{ flexShrink:0, display:'flex', flexDirection:'column', alignItems:'flex-end', gap:10 }}>
+                  <span className={`badge ${st.cls}`}><span className="dot" />{st.label}</span>
+                  {isOpen && <button className="btn btn-secondary btn-sm" onClick={() => toggleStatus(c)}>Resolve</button>}
                 </div>
               </div>
-              <button className="btn btn-ghost btn-sm" onClick={() => toggleStatus(c)}>
-                {c.status === 'resolved' ? 'Reopen' : 'Resolve'}
-              </button>
             </div>
           );
         })}
@@ -219,7 +246,7 @@ export default function Concerns() {
       {showModal && (
         <Modal title="Log Student Concern" onClose={() => setShowModal(false)}>
           <form onSubmit={handleAdd} style={{ display:'flex', flexDirection:'column', gap:14 }}>
-            <div style={{ padding:'8px 12px', background:'#EFF6FF', borderRadius:8, fontSize:12, color:'#1E40AF', display:'flex', gap:6 }}>
+            <div style={{ padding:'8px 12px', background:'var(--blue-soft)', borderRadius:8, fontSize:12, color:'var(--blue-ink)', display:'flex', gap:6 }}>
               <Mail size={13} style={{ flexShrink:0, marginTop:1 }} />
               If you assign this to a staff member, they will be notified via email + in-app notification.
             </div>
@@ -241,17 +268,21 @@ export default function Concerns() {
                 </select>
               </div>
               <div className="form-group">
-                <label className="form-label">Assign To (Staff)</label>
+                <label className="form-label">Assign / Raise To</label>
                 <select className="form-input" value={form.assignedTo}
                   onChange={e => setForm({...form, assignedTo:e.target.value})}>
                   <option value="">No assignment</option>
-                  {staffList.filter(s => s.role !== 'ceo').map(s => (
+                  {/* CEOs first so staff can raise a concern directly to the CEO */}
+                  {staffList.filter(s => s.role === 'ceo' && s.active !== false).map(s => (
+                    <option key={s.id} value={s.id}>⭐ {s.name} (CEO)</option>
+                  ))}
+                  {staffList.filter(s => s.role !== 'ceo' && s.active !== false).map(s => (
                     <option key={s.id} value={s.id}>{s.name} ({s.role})</option>
                   ))}
                 </select>
                 {form.assignedTo && (
-                  <div style={{ fontSize:11, color:'#065F46', marginTop:3 }}>
-                    📧 Will notify: {staffList.find(s=>s.id===form.assignedTo)?.email}
+                  <div style={{ fontSize:11, color:'var(--green-ink)', marginTop:3 }}>
+                    Will notify: {staffList.find(s=>s.id===form.assignedTo)?.email}
                   </div>
                 )}
               </div>

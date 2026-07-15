@@ -3,7 +3,9 @@ import { useParams, useNavigate } from 'react-router-dom';
 import {
   getStudent, updateStudent, getBatches,
   getFollowUps, addFollowUp, getAssessments, addAssessment,
-  getStaffProfiles, updateWeakSubjects, updateCourseFlowStep
+  getStaffProfiles, updateWeakSubjects, updateCourseFlowStep, addNotification,
+  getStudentReports, getStudentAttendanceSummary, getBatchTasks,
+  getStudentBatchAssessments
 } from '../firebase/services';
 import { Modal, Toast, Avatar, StatusBadge, Loading, FormRow } from '../components/ui';
 import { useAuth } from '../context/AuthContext';
@@ -13,31 +15,26 @@ import {
   TrendingUp, TrendingDown, Minus, ChevronDown, ChevronUp
 } from 'lucide-react';
 
-// ── Course Flow Steps ─────────────────────────────────────────
-const COURSE_FLOW = [
-  { key: 'admission',        label: 'Student Admission',                  phase: 'onboarding' },
-  { key: 'parent_onboarding',label: 'Parent Onboarding',                  phase: 'onboarding' },
-  { key: 'group_admission',  label: 'Group Admission',                    phase: 'onboarding' },
-  { key: 'initial_assess',   label: 'Initial Assessment',                 phase: 'onboarding' },
-  { key: 'vark_analysis',    label: 'VARK Analysis',                      phase: 'onboarding' },
-  { key: 'psychologist',     label: 'Psychologist Interaction',           phase: 'onboarding' },
-  { key: 'kit_dispatch',     label: 'Kit Packing & Dispatch',             phase: 'onboarding' },
-  { key: 'instagram_setup',  label: 'Instagram Setup',                    phase: 'onboarding' },
-  { key: 'kit_activities',   label: 'Kit Activities',                     phase: 'course' },
-  { key: 'insta_post',       label: 'Instagram Post & Collaboration',     phase: 'course' },
-  { key: 'faculty_interact', label: 'Faculty Interaction',                phase: 'course' },
-  { key: 'class_start',      label: 'Class Start',                        phase: 'course' },
-  { key: 'first_activity',   label: 'First Activity',                     phase: 'course' },
-  { key: 'quiz_debate',      label: 'Quiz & Debate Sessions',             phase: 'course' },
-  { key: 'skill_activities', label: 'Continuous Skill-Based Activities',  phase: 'course' },
-  { key: 'subject_uploads',  label: 'Subject-wise Activity Uploads',      phase: 'course' },
-  { key: 'insta_showcase',   label: 'Instagram Collaboration & Showcase', phase: 'course' },
-  { key: 'followup_monitor', label: 'Regular Follow-up & Progress Monitoring', phase: 'course' },
+// ── Default Course Flow (fallback if batch has no custom flow) ──
+const DEFAULT_batchCourseFlow = [
+  { key: 'admission',         label: 'Student Admission',                    phase: 'onboarding', fieldType: 'none' },
+  { key: 'parent_onboarding', label: 'Parent Onboarding',                    phase: 'onboarding', fieldType: 'none' },
+  { key: 'group_admission',   label: 'Group Admission',                      phase: 'onboarding', fieldType: 'none' },
+  { key: 'initial_assess',    label: 'Primary Assessment',                   phase: 'onboarding', fieldType: 'note', fieldLabel: 'Assessment Notes' },
+  { key: 'vark_analysis',     label: 'VARK Analysis',                        phase: 'onboarding', fieldType: 'dropdown', fieldLabel: 'VARK Learning Style', fieldOptions: ['Visual','Auditory','Read/Write','Kinesthetic','Visual-Auditory','Visual-Kinesthetic','Auditory-Kinesthetic','Multimodal'], displayInTable: true },
+  { key: 'kit_dispatch',      label: 'Kit Packing & Dispatch',               phase: 'onboarding', fieldType: 'none' },
+  { key: 'instagram_setup',   label: 'Instagram Account Open',               phase: 'onboarding', fieldType: 'none' },
+  { key: 'kit_activities',    label: 'Kit Activities',                       phase: 'course',     fieldType: 'none' },
+  { key: 'kit_insta',         label: 'Kit Activity on Instagram',            phase: 'course',     fieldType: 'none' },
+  { key: 'class_start',       label: 'Classes Started',                      phase: 'course',     fieldType: 'none' },
+  { key: 'first_recheck',     label: 'First Recheck on Progress',            phase: 'course',     fieldType: 'note', fieldLabel: 'Notes' },
+  { key: 'action_plan',       label: 'Action Plan on First Assessment',      phase: 'course',     fieldType: 'note', fieldLabel: 'Action Plan Details' },
+  { key: 'followup_monitor',  label: 'Regular Follow-up & Progress Monitoring', phase: 'course', fieldType: 'none' },
 ];
 
 const PHASE_LABELS = {
-  onboarding: { label: '🚀 Onboarding Phase', color: '#3B82F6', bg: '#DBEAFE' },
-  course:     { label: '📚 Course Phase',      color: '#10B981', bg: '#D1FAE5' },
+  onboarding: { label: 'Onboarding Phase', color: '#3B82F6', bg: '#DBEAFE' },
+  course:     { label: 'Course Phase',      color: '#10B981', bg: '#D1FAE5' },
 };
 
 const ALL_SUBJECTS = [
@@ -54,8 +51,16 @@ export default function StudentProfile() {
 
   const [student,     setStudent]     = useState(null);
   const [batches,     setBatches]     = useState([]);
+  const [batchCourseFlow, setBatchCourseFlow] = useState([]);
   const [followups,   setFollowups]   = useState([]);
   const [assessments, setAssessments] = useState([]);
+  const [classReports, setClassReports] = useState([]);
+  const [attendance,  setAttendance]  = useState(null);
+  const [batchTasks,  setBatchTasks]  = useState([]);
+  const [perfFrom,    setPerfFrom]    = useState('');
+  const [perfTo,      setPerfTo]      = useState('');
+  const [asgStatus,   setAsgStatus]   = useState(''); // '', 'done', 'pending', 'overdue'
+  const [asgStaff,    setAsgStaff]    = useState('');
   const [staffList,   setStaffList]   = useState([]);
   const [loading,     setLoading]     = useState(true);
   const [activeTab,   setActiveTab]   = useState('overview');
@@ -68,7 +73,7 @@ export default function StudentProfile() {
 
   // Assessment modal
   const [assessModal, setAssessModal] = useState(false);
-  const [assessForm,  setAssessForm]  = useState({ testName:'', subject:'', date:'', marks:'', totalMarks:'' });
+  const [assessForm,  setAssessForm]  = useState({ testName:'', subject:'', date:'', marks:'', totalMarks:'', conductingStaffIds:[] });
 
   // Follow-up note
   const [newNote,    setNewNote]    = useState('');
@@ -81,24 +86,46 @@ export default function StudentProfile() {
 
   // Course flow
   const [flowExpanded, setFlowExpanded] = useState({ onboarding: true, course: false });
-  const [flowNoteModal, setFlowNoteModal] = useState(null); // { key, label }
+  const [flowNoteModal, setFlowNoteModal] = useState(null); // step object
   const [flowNote,      setFlowNote]      = useState('');
+  const [flowValue,     setFlowValue]     = useState('');
   const [savingFlow,    setSavingFlow]    = useState(false);
 
   const isCEOorAdmin = profile?.role === 'ceo' || profile?.role === 'admin';
 
   const load = async () => {
-    const [s, b, f, a, st] = await Promise.all([
-      getStudent(id), getBatches(), getFollowUps(id), getAssessments(id), getStaffProfiles()
-    ]);
-    setStudent(s);
-    setBatches(b);
-    setFollowups(f);
-    setAssessments(a);
-    setStaffList(st.filter(x => x.active !== false));
-    setEditForm(s || {});
-    setWeakSubjects(s?.weakSubjects || []);
-    setLoading(false);
+    try {
+      const s  = await getStudent(id).catch(() => null);
+      const b  = await getBatches().catch(() => []);
+      const f  = await getFollowUps(id).catch(() => []);
+      const a  = await getAssessments(id).catch(() => []);       // student-level results added on this page
+      const ba = s?.batchId ? await getStudentBatchAssessments(id, s.batchId).catch(() => []) : []; // batch/main-page assessments
+      const st = await getStaffProfiles().catch(() => []);
+      setStudent(s);
+      setBatches(b);
+      setFollowups(f);
+      // merge, de-dupe by id, newest first
+      const merged = [...a, ...ba].filter((v, i, arr) => arr.findIndex(x => x.id === v.id) === i);
+      setAssessments(merged);
+      getStudentReports(id).then(setClassReports).catch(() => setClassReports([]));
+      getStudentAttendanceSummary(id, s?.batchId).then(setAttendance).catch(() => setAttendance(null));
+      if (s?.batchId) {
+        getBatchTasks(s.batchId)
+          .then(tasks => setBatchTasks(tasks.filter(t =>
+            t.assignedType !== 'specific' || (t.assignedStudentIds || []).includes(id))))
+          .catch(() => setBatchTasks([]));
+      }
+      setStaffList(st.filter(x => x.active !== false));
+      setEditForm(s || {});
+      setWeakSubjects(s?.weakSubjects || []);
+      const batchDoc = b.find(batch => batch.id === s?.batchId);
+      const flow = batchDoc?.courseFlow || DEFAULT_batchCourseFlow;
+      setBatchCourseFlow(flow);
+    } catch (err) {
+      console.error('StudentProfile load error:', err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => { load(); }, [id]);
@@ -122,13 +149,16 @@ export default function StudentProfile() {
 
   // Course flow helpers
   const flowStep = (key) => student?.courseFlow?.[key];
-  const flowDoneCount = () => COURSE_FLOW.filter(s => flowStep(s.key)?.done).length;
+  const flowDoneCount = () => batchCourseFlow.filter(s => flowStep(s.key)?.done).length;
 
   const handleMarkFlow = async (step, done) => {
     if (done) {
+      const existing = flowStep(step.key);
+      setFlowNote(existing?.note || '');
+      setFlowValue(existing?.value || '');
       setFlowNoteModal(step);
     } else {
-      await updateCourseFlowStep(id, step.key, { done: false, date: '', note: '' });
+      await updateCourseFlowStep(id, step.key, { done: false, date: '', note: '', value: '' });
       setToast({ message: `"${step.label}" unmarked`, type: 'info' });
       load();
     }
@@ -136,14 +166,26 @@ export default function StudentProfile() {
 
   const handleSaveFlowNote = async () => {
     if (!flowNoteModal) return;
+    const ft = flowNoteModal.fieldType || 'none';
+    if (ft === 'dropdown' && !flowValue) {
+      setToast({ message: 'Please select a value before saving.', type: 'error' });
+      return;
+    }
     setSavingFlow(true);
-    await updateCourseFlowStep(id, flowNoteModal.key, {
+    const update = {
       done: true,
       date: new Date().toLocaleDateString('en-IN'),
       note: flowNote,
-    });
+      value: flowValue,
+    };
+    await updateCourseFlowStep(id, flowNoteModal.key, update);
+    // Also persist displayInTable field to student top-level (e.g. varkResult)
+    if (flowNoteModal.displayInTable && flowNoteModal.key === 'vark_analysis' && flowValue) {
+      await updateStudent(id, { varkResult: flowValue });
+    }
     setFlowNoteModal(null);
     setFlowNote('');
+    setFlowValue('');
     setSavingFlow(false);
     setToast({ message: `"${flowNoteModal.label}" marked complete!`, type: 'success' });
     load();
@@ -176,10 +218,30 @@ export default function StudentProfile() {
   const handleAddAssessment = async (e) => {
     e.preventDefault();
     const pct = Math.round(Number(assessForm.marks) / Number(assessForm.totalMarks) * 100);
-    await addAssessment({ studentId: id, studentName: student.name, ...assessForm, percentage: pct });
+    const conductingStaff = staffList.filter(s => assessForm.conductingStaffIds.includes(s.id))
+      .map(s => ({ uid: s.id, name: s.name, email: s.email || '' }));
+    await addAssessment({
+      studentId: id, studentName: student.name,
+      testName: assessForm.testName, subject: assessForm.subject,
+      date: assessForm.date, marks: assessForm.marks, totalMarks: assessForm.totalMarks,
+      percentage: pct, conductingStaff,
+      createdBy: profile?.uid, createdByName: profile?.name,
+    });
+    // Notify each conducting staff member
+    for (const s of conductingStaff) {
+      if (s.uid !== profile?.uid && s.email) {
+        addNotification({
+          toEmail: s.email,
+          title: 'Assessment Assigned',
+          message: `${profile?.name} assigned you to conduct "${assessForm.testName}" for student ${student.name}`,
+          type: 'task',
+          fromName: profile?.name,
+        }).catch(() => {});
+      }
+    }
     setToast({ message: 'Assessment added!', type: 'success' });
     setAssessModal(false);
-    setAssessForm({ testName:'', subject:'', date:'', marks:'', totalMarks:'' });
+    setAssessForm({ testName:'', subject:'', date:'', marks:'', totalMarks:'', conductingStaffIds:[] });
     const upd = await getAssessments(id);
     setAssessments(upd);
   };
@@ -198,21 +260,36 @@ export default function StudentProfile() {
     setWeakSubjects(prev => prev.includes(sub) ? prev.filter(s => s !== sub) : [...prev, sub]);
   };
 
-  if (loading || !student) return <Loading />;
+  const toggleConductingStaff = (staffId) => {
+    setAssessForm(prev => ({
+      ...prev,
+      conductingStaffIds: prev.conductingStaffIds.includes(staffId)
+        ? prev.conductingStaffIds.filter(id => id !== staffId)
+        : [...prev.conductingStaffIds, staffId],
+    }));
+  };
+
+  if (loading) return <Loading />;
+  if (!student) return (
+    <div style={{ textAlign:'center', padding:60, color:'#6B7280' }}>
+      <div style={{ fontSize:16, fontWeight:600, marginBottom:8 }}>Student not found</div>
+      <div style={{ fontSize:13 }}>This student may have been deleted or the link is invalid.</div>
+    </div>
+  );
 
   const sub        = subInfo();
   const latestPct  = assessments.length ? assessments[assessments.length - 1].percentage : null;
   const firstPct   = assessments.length ? assessments[0].percentage : null;
   const trend      = (latestPct !== null && firstPct !== null && assessments.length > 1) ? latestPct - firstPct : null;
   const flowDone   = flowDoneCount();
-  const flowTotal  = COURSE_FLOW.length;
+  const flowTotal  = batchCourseFlow.length;
 
   return (
     <div>
       {/* Page header */}
       <div className="page-header">
         <div style={{ display:'flex', alignItems:'center', gap:12 }}>
-          <button className="btn btn-ghost btn-sm btn-icon" onClick={() => navigate('/students')}>
+          <button className="btn btn-ghost btn-sm btn-icon" onClick={() => navigate(-1)}>
             <ArrowLeft size={16}/>
           </button>
           <div>
@@ -240,6 +317,7 @@ export default function StudentProfile() {
           { key:'overview',   label:'Overview'                              },
           { key:'courseflow', label:`Course Flow (${flowDone}/${flowTotal})`},
           { key:'assessments',label:`Assessments (${assessments.length})`   },
+          { key:'performance',label:`Performance (${classReports.length})`  },
           { key:'followups',  label:`Follow-Ups (${followups.length})`      },
         ].map(t => (
           <div key={t.key} className={`tab ${activeTab===t.key?'active':''}`} onClick={() => setActiveTab(t.key)}>
@@ -274,12 +352,22 @@ export default function StudentProfile() {
                   { icon:User,     label:'Staff',        val:student.staffAssigned},
                   { icon:Calendar, label:'Joined',       val:student.joinDate    },
                   { icon:Calendar, label:'Education',    val:student.education   },
+                  { icon:User,     label:'Father',       val:student.fatherName     },
+                  { icon:User,     label:'Mother',       val:student.motherName     },
+                  { icon:BookOpen, label:'School',       val:student.schoolName     },
+                  { icon:Phone,    label:'WhatsApp',     val:student.whatsappNumber },
+                  { icon:MapPin,   label:'Address',      val:student.address        },
+                  { icon:User,     label:'Occupation',   val:student.occupation     },
+                  { icon:User,     label:'Gender',       val:student.gender         },
+                  { icon:Calendar, label:'Age',          val:student.age ? `${student.age} years` : null },
+                  { icon:BookOpen, label:'VARK Style',   val:student.varkResult     },
+                  { icon:BookOpen, label:'Syllabus',     val:student.syllabus       },
                 ].filter(r => r.val).map(row => {
                   const Icon = row.icon;
                   return (
                     <div key={row.label}>
                       <div style={{ color:'#9CA3AF', fontSize:10, fontWeight:600, textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:3 }}>{row.label}</div>
-                      <div style={{ display:'flex', alignItems:'center', gap:5, color:'#1A1A2E' }}>
+                      <div style={{ display:'flex', alignItems:'center', gap:5, color:'var(--text)' }}>
                         <Icon size={12} style={{ color:'#9CA3AF' }}/> {row.val}
                       </div>
                     </div>
@@ -296,7 +384,7 @@ export default function StudentProfile() {
                   fontSize:13,
                 }}>
                   <div style={{ fontWeight:600, marginBottom:3, color: sub.expired?'#991B1B':sub.expiringSoon?'#92400E':'#065F46' }}>
-                    📅 Subscription {sub.expired?'EXPIRED':sub.expiringSoon?'Expiring Soon':'Active'}
+                    Subscription {sub.expired?'EXPIRED':sub.expiringSoon?'Expiring Soon':'Active'}
                   </div>
                   <div style={{ fontSize:12, color:'#6B7280' }}>
                     {student.courseDurationMonths}mo course · Joined {student.joinDate} · Expires {sub.exp.toLocaleDateString('en-IN')} · {sub.expired?`Expired ${Math.abs(sub.days)} days ago`:`${sub.days} days left`}
@@ -306,7 +394,7 @@ export default function StudentProfile() {
 
               {student.notes && (
                 <div style={{ marginTop:12, padding:'10px 14px', background:'#FFFBEB', borderRadius:8, fontSize:13, color:'#92400E' }}>
-                  📝 {student.notes}
+                  {student.notes}
                 </div>
               )}
             </div>
@@ -324,13 +412,13 @@ export default function StudentProfile() {
               {(!student.weakSubjects || student.weakSubjects.length === 0) ? (
                 <div style={{ fontSize:13, color:'#9CA3AF' }}>
                   No weak subjects marked.
-                  <span style={{ color:'#E53935', cursor:'pointer', marginLeft:6 }} onClick={() => setWeakModal(true)}>Add now →</span>
+                  <span style={{ color:'#E53935', cursor:'pointer', marginLeft:6 }} onClick={() => setWeakModal(true)}>Add now </span>
                 </div>
               ) : (
                 <div style={{ display:'flex', flexWrap:'wrap', gap:8 }}>
                   {student.weakSubjects.map(s => (
                     <span key={s} style={{ padding:'5px 12px', borderRadius:20, background:'#FEE2E2', color:'#991B1B', fontSize:12, fontWeight:600 }}>
-                      ⚠️ {s}
+                      {s}
                     </span>
                   ))}
                 </div>
@@ -350,12 +438,11 @@ export default function StudentProfile() {
                 <div className="progress-fill" style={{ width:`${Math.round(flowDone/flowTotal*100)}%`, background:'#E53935' }}/>
               </div>
               <div style={{ fontSize:12, color:'#6B7280' }}>
-                {COURSE_FLOW.filter(s => !flowStep(s.key)?.done).slice(0,3).map(s => (
-                  <div key={s.key} style={{ marginBottom:3 }}>⏳ {s.label}</div>
+                {batchCourseFlow.filter(s => !flowStep(s.key)?.done).slice(0,3).map(s => (
+                  <div key={s.key} style={{ marginBottom:3 }}>{s.label}</div>
                 ))}
                 <span style={{ color:'#E53935', cursor:'pointer' }} onClick={() => setActiveTab('courseflow')}>
-                  View all steps →
-                </span>
+                  View all steps                 </span>
               </div>
             </div>
 
@@ -396,7 +483,7 @@ export default function StudentProfile() {
               ))}
               {followups.length === 0 && <div style={{ fontSize:13, color:'#9CA3AF' }}>No follow-ups yet.</div>}
               <span style={{ fontSize:12, color:'#E53935', cursor:'pointer', marginTop:6, display:'block' }} onClick={() => setActiveTab('followups')}>
-                {followups.length > 3 && `View all ${followups.length} →`}
+                {followups.length > 3 && `View all ${followups.length} `}
               </span>
             </div>
           </div>
@@ -407,7 +494,7 @@ export default function StudentProfile() {
       {activeTab === 'courseflow' && (
         <div>
           <div style={{ padding:'10px 14px', background:'#EFF6FF', borderRadius:8, fontSize:12, color:'#1E40AF', marginBottom:16 }}>
-            Track each step of the student's journey from admission to course completion. Click ✓ to mark a step done, add a note for context.
+            Track each step of the student's journey from admission to course completion. Click to mark a step done, add a note for context.
           </div>
 
           {/* Progress summary */}
@@ -426,7 +513,7 @@ export default function StudentProfile() {
 
           {/* Phases */}
           {Object.entries(PHASE_LABELS).map(([phase, phaseInfo]) => {
-            const steps    = COURSE_FLOW.filter(s => s.phase === phase);
+            const steps    = batchCourseFlow.filter(s => s.phase === phase);
             const doneHere = steps.filter(s => flowStep(s.key)?.done).length;
             const expanded = flowExpanded[phase];
             return (
@@ -466,20 +553,32 @@ export default function StudentProfile() {
                         }
                       </button>
                       <div style={{ flex:1 }}>
-                        <div style={{ fontSize:13, fontWeight: fs?.done?500:400, color: fs?.done?'#1A1A2E':'#6B7280', textDecoration: fs?.done?'none':'none' }}>
+                        <div style={{ fontSize:13, fontWeight: fs?.done?500:400, color: fs?.done?'var(--text)':'#6B7280', textDecoration: fs?.done?'none':'none' }}>
                           {step.label}
                         </div>
                         {fs?.done && (
-                          <div style={{ fontSize:11, color:'#9CA3AF', marginTop:2 }}>
-                            ✅ Done {fs.date && `on ${fs.date}`}{fs.note && ` — ${fs.note}`}
+                          <div style={{ fontSize:11, color:'#6B7280', marginTop:2 }}>
+                            Done{fs.date && ` on ${fs.date}`}
+                            {(fs.value || fs.note) && (
+                              <span style={{ display:'block', marginTop:3, color:'#374151', fontStyle:'italic' }}>
+                                {fs.value || fs.note}
+                              </span>
+                            )}
                           </div>
                         )}
                       </div>
-                      {!fs?.done && (
-                        <button className="btn btn-ghost btn-sm" style={{ fontSize:11 }} onClick={() => handleMarkFlow(step, true)}>
-                          Mark Done
-                        </button>
-                      )}
+                      <div style={{ display:'flex', flexDirection:'column', gap:4, flexShrink:0 }}>
+                        {!fs?.done && (
+                          <button className="btn btn-ghost btn-sm" style={{ fontSize:11 }} onClick={() => handleMarkFlow(step, true)}>
+                            Mark Done
+                          </button>
+                        )}
+                        {fs?.done && (
+                          <button className="btn btn-ghost btn-sm" style={{ fontSize:11 }} onClick={() => handleMarkFlow(step, true)}>
+                            Edit Note
+                          </button>
+                        )}
+                      </div>
                     </div>
                   );
                 })}
@@ -506,23 +605,30 @@ export default function StudentProfile() {
             <table>
               <thead><tr><th>#</th><th>Test Name</th><th>Subject</th><th>Date</th><th>Score</th><th>Percentage</th></tr></thead>
               <tbody>
-                {assessments.map((a, i) => (
-                  <tr key={a.id}>
-                    <td style={{ color:'#9CA3AF' }}>{i+1}</td>
-                    <td style={{ fontWeight:500 }}>{a.testName}</td>
-                    <td>{a.subject||'—'}</td>
-                    <td style={{ fontSize:12, color:'#6B7280' }}>{a.date||'—'}</td>
-                    <td>{a.marks}/{a.totalMarks}</td>
-                    <td>
-                      <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-                        <div className="progress-bar" style={{ width:80 }}>
-                          <div className="progress-fill" style={{ width:`${a.percentage}%`, background:a.percentage>=60?'#10B981':a.percentage>=40?'#F59E0B':'#EF4444' }}/>
-                        </div>
-                        <span style={{ fontSize:13, fontWeight:600, color:a.percentage>=60?'#10B981':a.percentage>=40?'#F59E0B':'#EF4444' }}>{a.percentage}%</span>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                {assessments.map((a, i) => {
+                  const graded = a.marks != null && a.percentage != null;
+                  return (
+                    <tr key={a.id}>
+                      <td style={{ color:'#9CA3AF' }}>{i+1}</td>
+                      <td style={{ fontWeight:500 }}>{a.testName}</td>
+                      <td>{a.subject||'—'}</td>
+                      <td style={{ fontSize:12, color:'#6B7280' }}>{a.date||'—'}</td>
+                      <td>{graded ? `${a.marks}/${a.totalMarks}` : <span style={{ color:'#9CA3AF' }}>— / {a.totalMarks}</span>}</td>
+                      <td>
+                        {graded ? (
+                          <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                            <div className="progress-bar" style={{ width:80 }}>
+                              <div className="progress-fill" style={{ width:`${a.percentage}%`, background:a.percentage>=60?'#10B981':a.percentage>=40?'#F59E0B':'#EF4444' }}/>
+                            </div>
+                            <span style={{ fontSize:13, fontWeight:600, color:a.percentage>=60?'#10B981':a.percentage>=40?'#F59E0B':'#EF4444' }}>{a.percentage}%</span>
+                          </div>
+                        ) : (
+                          <span className="badge badge-amber">{a.status === 'completed' ? 'Not marked' : 'Upcoming'}</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -533,7 +639,7 @@ export default function StudentProfile() {
               <h3 style={{ fontSize:14, fontWeight:600, marginBottom:14 }}>Subject-wise Average</h3>
               {(() => {
                 const bySubject = {};
-                assessments.forEach(a => {
+                assessments.filter(a => a.percentage != null).forEach(a => {
                   const sub = a.subject || 'General';
                   if (!bySubject[sub]) bySubject[sub] = [];
                   bySubject[sub].push(a.percentage);
@@ -561,6 +667,150 @@ export default function StudentProfile() {
           )}
         </div>
       )}
+
+      {/* ══ PERFORMANCE TAB ══ */}
+      {activeTab === 'performance' && (() => {
+        const inRange = (dateStr) => {
+          if (!perfFrom && !perfTo) return true;
+          if (!dateStr) return false;
+          if (perfFrom && dateStr < perfFrom) return false;
+          if (perfTo && dateStr > perfTo) return false;
+          return true;
+        };
+        const shownReports = classReports.filter(r => inRange(r.sessionDate));
+        const taskState = (t) => {
+          if (t.submittedBy?.some(x => x.studentId === id)) return 'done';
+          if (t.dueDate && new Date(t.dueDate) < new Date()) return 'overdue';
+          return 'pending';
+        };
+        const shownTasks = batchTasks
+          .filter(t => inRange(t.dueDate) || (!t.dueDate && !perfFrom && !perfTo))
+          .filter(t => !asgStatus || taskState(t) === asgStatus)
+          .filter(t => !asgStaff || t.assignedFaculty === asgStaff);
+        const asgStaffNames = [...new Set(batchTasks.map(t => t.assignedFaculty).filter(Boolean))];
+        const absent = attendance ? attendance.total - attendance.present : 0;
+        return (
+        <div>
+          {/* Summary tiles */}
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(150px,1fr))', gap:12, marginBottom:18 }}>
+            <div className="card" style={{ padding:'14px 16px' }}>
+              <div style={{ fontSize:11, color:'var(--text-muted)', fontWeight:600, textTransform:'uppercase', letterSpacing:'.04em' }}>Attendance</div>
+              <div style={{ fontSize:26, fontWeight:700, fontFamily:'var(--font-display)', color: attendance?.pct == null ? 'var(--text-muted)' : attendance.pct >= 75 ? 'var(--green-ink)' : attendance.pct >= 50 ? 'var(--amber-ink)' : 'var(--red-ink)' }}>
+                {attendance?.pct == null ? '—' : `${attendance.pct}%`}
+              </div>
+              <div style={{ display:'flex', gap:8, marginTop:4 }}>
+                <span className="badge badge-green">{attendance?.present || 0} present</span>
+                <span className="badge badge-red">{absent} absent</span>
+              </div>
+              <div style={{ fontSize:11, color:'var(--text-muted)', marginTop:4 }}>{attendance ? `across ${attendance.total} classes` : 'No attendance recorded'}</div>
+            </div>
+            <div className="card" style={{ padding:'14px 16px' }}>
+              <div style={{ fontSize:11, color:'var(--text-muted)', fontWeight:600, textTransform:'uppercase', letterSpacing:'.04em' }}>Class Reports</div>
+              <div style={{ fontSize:26, fontWeight:700, fontFamily:'var(--font-display)', color:'var(--brand)' }}>{classReports.length}</div>
+              <div style={{ fontSize:11.5, color:'var(--text-muted)' }}>from faculty across classes</div>
+            </div>
+            <div className="card" style={{ padding:'14px 16px' }}>
+              <div style={{ fontSize:11, color:'var(--text-muted)', fontWeight:600, textTransform:'uppercase', letterSpacing:'.04em' }}>Assignments Done</div>
+              <div style={{ fontSize:26, fontWeight:700, fontFamily:'var(--font-display)', color:'var(--pos)' }}>
+                {batchTasks.filter(t => t.submittedBy?.some(x => x.studentId === id)).length}/{batchTasks.length}
+              </div>
+              <div style={{ fontSize:11.5, color:'var(--text-muted)' }}>submitted</div>
+            </div>
+            <div className="card" style={{ padding:'14px 16px' }}>
+              <div style={{ fontSize:11, color:'var(--text-muted)', fontWeight:600, textTransform:'uppercase', letterSpacing:'.04em' }}>Avg Assessment</div>
+              <div style={{ fontSize:26, fontWeight:700, fontFamily:'var(--font-display)', color:'var(--violet-ink)' }}>
+                {assessments.filter(a=>a.percentage!=null).length ? `${Math.round(assessments.filter(a=>a.percentage!=null).reduce((s,a)=>s+a.percentage,0)/assessments.filter(a=>a.percentage!=null).length)}%` : '—'}
+              </div>
+              <div style={{ fontSize:11.5, color:'var(--text-muted)' }}>{assessments.length} assessments</div>
+            </div>
+          </div>
+
+          {/* Date filter — applies to reports & assignments below */}
+          <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:16, flexWrap:'wrap' }}>
+            <span style={{ fontSize:12, color:'var(--text-muted)', fontWeight:600 }}>Filter by date</span>
+            <input type="date" className="form-input" style={{ width:'auto', height:34 }} value={perfFrom} onChange={e => setPerfFrom(e.target.value)}/>
+            <span style={{ color:'var(--text-muted)' }}>→</span>
+            <input type="date" className="form-input" style={{ width:'auto', height:34 }} value={perfTo} onChange={e => setPerfTo(e.target.value)}/>
+            <button className="btn btn-ghost btn-sm" onClick={() => {
+              const now = new Date(); const from = new Date(now); from.setDate(now.getDate() - 7);
+              const f = (d) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+              setPerfFrom(f(from)); setPerfTo(f(now));
+            }}>Last 7 days</button>
+            {(perfFrom || perfTo) && <button className="btn btn-ghost btn-sm" onClick={() => { setPerfFrom(''); setPerfTo(''); }}>Clear</button>}
+          </div>
+
+          {/* Class progress reports timeline — ABOVE assignments */}
+          <div className="card" style={{ padding:'16px 20px', marginBottom:16 }}>
+            <div style={{ fontSize:14, fontWeight:700, marginBottom:12 }}>Progress Reports from Faculty ({shownReports.length})</div>
+            {shownReports.length === 0 ? (
+              <div style={{ fontSize:13, color:'var(--text-muted)', padding:'20px 0', textAlign:'center' }}>
+                {classReports.length === 0 ? 'No class reports yet. Faculty add these from the Schedule → Progress Reports after a class.' : 'No reports in the selected date range.'}
+              </div>
+            ) : (
+              <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+                {shownReports.map(r => (
+                  <div key={r.id} style={{ borderLeft:'3px solid var(--brand)', paddingLeft:12 }}>
+                    <div style={{ display:'flex', gap:8, alignItems:'center', flexWrap:'wrap', marginBottom:2 }}>
+                      <span style={{ fontSize:13, fontWeight:600 }}>{r.sessionTitle || 'Class'}</span>
+                      {r.rating && <span className="badge badge-blue" style={{ textTransform:'capitalize' }}>{r.rating.replace('-',' ')}</span>}
+                      <span style={{ fontSize:11.5, color:'var(--text-muted)' }}>{r.batchName} · {r.sessionDate}</span>
+                    </div>
+                    {r.note && <div style={{ fontSize:12.5, color:'var(--text-sub)', marginBottom:2 }}>{r.note}</div>}
+                    <div style={{ fontSize:11, color:'var(--text-muted)' }}>— {r.facultyName || 'Staff'}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Assignments / activity submission tracker */}
+          <div className="card" style={{ padding:'16px 20px' }}>
+            <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:12, flexWrap:'wrap' }}>
+              <div style={{ fontSize:14, fontWeight:700 }}>Assignments &amp; Activities ({shownTasks.filter(t => t.submittedBy?.some(x => x.studentId === id)).length}/{shownTasks.length} done)</div>
+              <div style={{ flex:1 }}/>
+              <select className="form-input" style={{ width:'auto', height:32, fontSize:12 }} value={asgStatus} onChange={e => setAsgStatus(e.target.value)}>
+                <option value="">All status</option>
+                <option value="done">Done</option>
+                <option value="pending">Pending</option>
+                <option value="overdue">Overdue</option>
+              </select>
+              <select className="form-input" style={{ width:'auto', height:32, fontSize:12 }} value={asgStaff} onChange={e => setAsgStaff(e.target.value)}>
+                <option value="">All staff</option>
+                {asgStaffNames.map(n => <option key={n} value={n}>{n}</option>)}
+              </select>
+            </div>
+            {shownTasks.length === 0 ? (
+              <div style={{ fontSize:13, color:'var(--text-muted)', padding:'16px 0', textAlign:'center' }}>{batchTasks.length === 0 ? 'No assignments for this student yet.' : 'No assignments in the selected date range.'}</div>
+            ) : (
+              <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                {shownTasks.map(t => {
+                  const sub = t.submittedBy?.find(x => x.studentId === id);
+                  const overdue = !sub && t.dueDate && new Date(t.dueDate) < new Date();
+                  return (
+                    <div key={t.id} style={{ display:'flex', alignItems:'center', gap:10, padding:'9px 12px', borderRadius:9, border:'1px solid var(--border)' }}>
+                      {sub
+                        ? <CheckCircle size={16} style={{ color:'var(--green-ink)', flexShrink:0 }}/>
+                        : <Circle size={16} style={{ color: overdue ? 'var(--red-ink)' : 'var(--text-muted)', flexShrink:0 }}/>}
+                      <div style={{ flex:1, minWidth:0 }}>
+                        <div style={{ fontSize:13, fontWeight:500 }}>{t.title}</div>
+                        <div style={{ fontSize:11, color:'var(--text-muted)' }}>
+                          {t.subject ? `${t.subject} · ` : ''}{t.dueDate ? `Due ${t.dueDate}` : 'No due date'}
+                          {t.assignedType === 'specific' ? ' · Individually assigned' : ''}
+                          {t.assignedFaculty ? ` · by ${t.assignedFaculty}` : ''}
+                        </div>
+                      </div>
+                      <span className={`badge ${sub ? 'badge-green' : overdue ? 'badge-red' : 'badge-amber'}`}>
+                        {sub ? 'Submitted' : overdue ? 'Overdue' : 'Pending'}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+        );
+      })()}
 
       {/* ══ FOLLOW-UPS TAB ══ */}
       {activeTab === 'followups' && (
@@ -603,7 +853,7 @@ export default function StudentProfile() {
             {student.weakSubjects?.length > 0 ? (
               <div style={{ display:'flex', flexWrap:'wrap', gap:8, marginBottom:14 }}>
                 {student.weakSubjects.map(s => (
-                  <span key={s} style={{ padding:'6px 14px', borderRadius:20, background:'#FEE2E2', color:'#991B1B', fontSize:13, fontWeight:600 }}>⚠️ {s}</span>
+                  <span key={s} style={{ padding:'6px 14px', borderRadius:20, background:'#FEE2E2', color:'#991B1B', fontSize:13, fontWeight:600 }}>{s}</span>
                 ))}
               </div>
             ) : (
@@ -627,11 +877,35 @@ export default function StudentProfile() {
               <div className="form-group"><label className="form-label">Phone</label><input className="form-input" value={editForm.phone||''} onChange={e=>setEditForm({...editForm,phone:e.target.value})}/></div>
             </FormRow>
             <FormRow>
+              <div className="form-group"><label className="form-label">Email</label><input className="form-input" value={editForm.email||''} onChange={e=>setEditForm({...editForm,email:e.target.value})}/></div>
+              <div className="form-group"><label className="form-label">WhatsApp Number</label><input className="form-input" value={editForm.whatsappNumber||''} onChange={e=>setEditForm({...editForm,whatsappNumber:e.target.value})}/></div>
+            </FormRow>
+            <FormRow>
+              <div className="form-group"><label className="form-label">Father's Name</label><input className="form-input" value={editForm.fatherName||''} onChange={e=>setEditForm({...editForm,fatherName:e.target.value})}/></div>
+              <div className="form-group"><label className="form-label">Mother's Name</label><input className="form-input" value={editForm.motherName||''} onChange={e=>setEditForm({...editForm,motherName:e.target.value})}/></div>
+            </FormRow>
+            <FormRow>
               <div className="form-group"><label className="form-label">Parent Name</label><input className="form-input" value={editForm.parentName||''} onChange={e=>setEditForm({...editForm,parentName:e.target.value})}/></div>
               <div className="form-group"><label className="form-label">Parent Phone</label><input className="form-input" value={editForm.parentPhone||''} onChange={e=>setEditForm({...editForm,parentPhone:e.target.value})}/></div>
             </FormRow>
             <FormRow>
+              <div className="form-group"><label className="form-label">School Name</label><input className="form-input" value={editForm.schoolName||''} onChange={e=>setEditForm({...editForm,schoolName:e.target.value})}/></div>
+              <div className="form-group"><label className="form-label">Occupation</label><input className="form-input" value={editForm.occupation||''} onChange={e=>setEditForm({...editForm,occupation:e.target.value})}/></div>
+            </FormRow>
+            <div className="form-group"><label className="form-label">Address</label><textarea className="form-input" rows={2} value={editForm.address||''} onChange={e=>setEditForm({...editForm,address:e.target.value})}/></div>
+            <FormRow>
+              <div className="form-group"><label className="form-label">Gender</label>
+                <select className="form-input" value={editForm.gender||''} onChange={e=>setEditForm({...editForm,gender:e.target.value})}>
+                  <option value="">Select</option>{['Girl','Boy','Other'].map(g=><option key={g} value={g}>{g}</option>)}
+                </select>
+              </div>
+              <div className="form-group"><label className="form-label">Age</label><input className="form-input" type="number" value={editForm.age||''} onChange={e=>setEditForm({...editForm,age:e.target.value})}/></div>
+            </FormRow>
+            <FormRow>
+              <div className="form-group"><label className="form-label">Syllabus</label><input className="form-input" value={editForm.syllabus||''} onChange={e=>setEditForm({...editForm,syllabus:e.target.value})}/></div>
               <div className="form-group"><label className="form-label">Class / Std</label><input className="form-input" value={editForm.classStd||''} onChange={e=>setEditForm({...editForm,classStd:e.target.value})}/></div>
+            </FormRow>
+            <FormRow>
               <div className="form-group"><label className="form-label">Status</label>
                 <select className="form-input" value={editForm.status||'active'} onChange={e=>setEditForm({...editForm,status:e.target.value})}>
                   {['active','moderate','at-risk','dropped'].map(s=><option key={s} value={s}>{s}</option>)}
@@ -645,7 +919,7 @@ export default function StudentProfile() {
             <FormRow>
               <div className="form-group"><label className="form-label">Staff Assigned</label>
                 <select className="form-input" value={editForm.staffAssigned||''} onChange={e=>setEditForm({...editForm,staffAssigned:e.target.value})}>
-                  <option value="">Select</option>{staffList.map(s=><option key={s.id}>{s.name}</option>)}
+                  <option value="">Select</option>{staffList.filter(s=>s.active!==false).map(s=><option key={s.id}>{s.name}</option>)}
                 </select>
               </div>
               <div className="form-group"><label className="form-label">ClassPlus ID</label><input className="form-input" value={editForm.classplusId||''} onChange={e=>setEditForm({...editForm,classplusId:e.target.value})}/></div>
@@ -676,6 +950,23 @@ export default function StudentProfile() {
               <div className="form-group"><label className="form-label">Marks Scored *</label><input className="form-input" type="number" required value={assessForm.marks} onChange={e=>setAssessForm({...assessForm,marks:e.target.value})}/></div>
               <div className="form-group"><label className="form-label">Total Marks *</label><input className="form-input" type="number" required value={assessForm.totalMarks} onChange={e=>setAssessForm({...assessForm,totalMarks:e.target.value})}/></div>
             </FormRow>
+            <div className="form-group">
+              <label className="form-label">Conducting Staff <span style={{ fontWeight: 400, color: '#6B7280' }}>(optional — select all involved)</span></label>
+              <div style={{ border: '1px solid var(--border)', borderRadius: 8, padding: '8px 10px', maxHeight: 130, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 5 }}>
+                {staffList.filter(s => s.active !== false).map(s => (
+                  <label key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13 }}>
+                    <input type="checkbox"
+                      checked={assessForm.conductingStaffIds.includes(s.id)}
+                      onChange={() => toggleConductingStaff(s.id)} />
+                    <span style={{ flex: 1 }}>{s.name}</span>
+                    <span style={{ fontSize: 11, color: '#9CA3AF' }}>{s.role}</span>
+                  </label>
+                ))}
+                {staffList.filter(s => s.active !== false).length === 0 && (
+                  <div style={{ fontSize: 12, color: '#9CA3AF' }}>No staff found</div>
+                )}
+              </div>
+            </div>
             {assessForm.marks && assessForm.totalMarks && (
               <div style={{ padding:'8px 12px', background:'#F0FDF4', borderRadius:8, fontSize:13, color:'#065F46' }}>
                 Percentage: <strong>{Math.round(Number(assessForm.marks)/Number(assessForm.totalMarks)*100)}%</strong>
@@ -704,7 +995,7 @@ export default function StudentProfile() {
                 border:     `1px solid ${weakSubjects.includes(sub)?'#FECACA':'var(--border)'}`,
                 transition:'all .15s',
               }}>
-                {weakSubjects.includes(sub)?'⚠️ ':''}{sub}
+                {weakSubjects.includes(sub)?'':''}{sub}
               </div>
             ))}
           </div>
@@ -718,21 +1009,42 @@ export default function StudentProfile() {
       )}
 
       {/* Course flow note */}
-      {flowNoteModal && (
-        <Modal title={`Mark Complete: ${flowNoteModal.label}`} onClose={() => { setFlowNoteModal(null); setFlowNote(''); }}>
-          <div className="form-group" style={{ marginBottom:14 }}>
-            <label className="form-label">Add a note (optional)</label>
-            <textarea className="form-input" rows={3} placeholder="Any observations or remarks about this step..."
-              value={flowNote} onChange={e => setFlowNote(e.target.value)}/>
-          </div>
-          <div style={{ display:'flex', gap:10, justifyContent:'flex-end' }}>
-            <button className="btn btn-ghost" onClick={() => { setFlowNoteModal(null); setFlowNote(''); }}>Cancel</button>
-            <button className="btn btn-primary" onClick={handleSaveFlowNote} disabled={savingFlow}>
-              {savingFlow?'Saving...':'Mark Complete ✓'}
-            </button>
-          </div>
-        </Modal>
-      )}
+      {flowNoteModal && (() => {
+        const ft = flowNoteModal.fieldType || 'none';
+        const opts = flowNoteModal.fieldOptions || [];
+        const fieldLabel = flowNoteModal.fieldLabel || flowNoteModal.label;
+        return (
+          <Modal title={`Mark Complete: ${flowNoteModal.label}`} onClose={() => { setFlowNoteModal(null); setFlowNote(''); setFlowValue(''); }}>
+            {ft === 'dropdown' && (
+              <div className="form-group" style={{ marginBottom:14 }}>
+                <label className="form-label">{fieldLabel} *</label>
+                <select className="form-input" required value={flowValue} onChange={e => setFlowValue(e.target.value)}>
+                  <option value="">Select…</option>
+                  {opts.map(o => <option key={o} value={o}>{o}</option>)}
+                </select>
+              </div>
+            )}
+            {(ft === 'note' || ft === 'text') && (
+              <div className="form-group" style={{ marginBottom:14 }}>
+                <label className="form-label">{fieldLabel}</label>
+                <textarea className="form-input" rows={3} placeholder={`Enter ${fieldLabel.toLowerCase()}...`}
+                  value={flowValue} onChange={e => setFlowValue(e.target.value)}/>
+              </div>
+            )}
+            <div className="form-group" style={{ marginBottom:14 }}>
+              <label className="form-label">Additional Note (optional)</label>
+              <textarea className="form-input" rows={3} placeholder="Any observations or remarks about this step..."
+                value={flowNote} onChange={e => setFlowNote(e.target.value)}/>
+            </div>
+            <div style={{ display:'flex', gap:10, justifyContent:'flex-end' }}>
+              <button className="btn btn-ghost" onClick={() => { setFlowNoteModal(null); setFlowNote(''); setFlowValue(''); }}>Cancel</button>
+              <button className="btn btn-primary" onClick={handleSaveFlowNote} disabled={savingFlow}>
+                {savingFlow ? 'Saving...' : 'Mark Complete'}
+              </button>
+            </div>
+          </Modal>
+        );
+      })()}
 
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)}/>}
     </div>

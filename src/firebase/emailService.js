@@ -24,7 +24,7 @@ emailjs.init(PUBLIC_KEY);
 // ── Send email when CEO assigns a task ────────────────────────
 export const sendTaskEmail = async ({ toEmail, toName, taskTitle, dueDate, priority, assignedBy }) => {
   if (SERVICE_ID === 'YOUR_EMAILJS_SERVICE_ID') {
-    console.log('📧 [DEV MODE] Task email would send to:', toEmail, { taskTitle, dueDate });
+    console.log('📧 [DEV MODE] Task email skipped — configure EmailJS keys');
     return { status: 'dev-mode' };
   }
   try {
@@ -47,7 +47,7 @@ export const sendTaskEmail = async ({ toEmail, toName, taskTitle, dueDate, prior
 // ── Send email when CEO assigns a follow-up ───────────────────
 export const sendFollowUpEmail = async ({ toEmail, toName, studentName, note, priority, assignedBy }) => {
   if (SERVICE_ID === 'YOUR_EMAILJS_SERVICE_ID') {
-    console.log('📧 [DEV MODE] Follow-up email would send to:', toEmail, { studentName, note });
+    console.log('📧 [DEV MODE] Follow-up email skipped — configure EmailJS keys');
     return { status: 'dev-mode' };
   }
   try {
@@ -70,7 +70,7 @@ export const sendFollowUpEmail = async ({ toEmail, toName, studentName, note, pr
 // ── Send email when a concern is assigned ─────────────────────
 export const sendConcernEmail = async ({ toEmail, toName, studentName, concernType, description, assignedBy }) => {
   if (SERVICE_ID === 'YOUR_EMAILJS_SERVICE_ID') {
-    console.log('📧 [DEV MODE] Concern email would send to:', toEmail);
+    console.log('📧 [DEV MODE] Concern email skipped — configure EmailJS keys');
     return { status: 'dev-mode' };
   }
   try {
@@ -82,6 +82,29 @@ export const sendConcernEmail = async ({ toEmail, toName, studentName, concernTy
       description:  description,
       assigned_by:  assignedBy,
       app_url:      window.location.origin,
+    });
+    return { status: 'sent' };
+  } catch (err) {
+    console.error('Email failed:', err);
+    return { status: 'failed', error: err };
+  }
+};
+
+// ── Generic assignment email (reuses task template) ───────────
+export const sendAssignmentEmail = async ({ toEmail, toName, title, detail, assignedBy }) => {
+  if (SERVICE_ID === 'YOUR_EMAILJS_SERVICE_ID') {
+    console.log('📧 [DEV MODE] Assignment email skipped — configure EmailJS keys');
+    return { status: 'dev-mode' };
+  }
+  try {
+    await emailjs.send(SERVICE_ID, TEMPLATES.task, {
+      to_email:    toEmail,
+      to_name:     toName,
+      task_title:  title,
+      due_date:    detail || '',
+      priority:    'Normal',
+      assigned_by: assignedBy,
+      app_url:     window.location.origin,
     });
     return { status: 'sent' };
   } catch (err) {

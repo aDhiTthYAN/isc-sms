@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="_ds/isc-design-system-44b9e318-905b-4330-a4ea-d1d6b542217b/tokens/fonts.css">
+  <link rel="stylesheet" href="_ds/isc-design-system-44b9e318-905b-4330-a4ea-d1d6b542217b/tokens/colors.css">
+  <link rel="stylesheet" href="_ds/isc-design-system-44b9e318-905b-4330-a4ea-d1d6b542217b/tokens/typography.css">
+  <link rel="stylesheet" href="_ds/isc-design-system-44b9e318-905b-4330-a4ea-d1d6b542217b/tokens/spacing.css">
+  <link rel="stylesheet" href="_ds/isc-design-system-44b9e318-905b-4330-a4ea-d1d6b542217b/base.css">
+  <link rel="stylesheet" href="_ds/isc-design-system-44b9e318-905b-4330-a4ea-d1d6b542217b/styles.css">
+  <link rel="stylesheet" href="theme.css">
+  <style>
+    html,body{background:var(--canvas);}
+    .navlink:hover{ background:var(--n-100); }
+    .navlink.is-active:hover{ background:var(--brand-50); }
+    .kcard{ transition: box-shadow .15s var(--ease), transform .12s var(--ease); }
+    .kcard:hover{ box-shadow: var(--shadow-md); transform: translateY(-1px); }
+    .kcard:active{ cursor: grabbing; }
+    .lrow:hover{ background: var(--surface-hover); }
+    .av-stack > *{ margin-left:-8px; }
+    .av-stack > *:first-child{ margin-left:0; }
+    ::-webkit-scrollbar{ width:9px; height:9px; }
+  </style>
+</helmet>
+
+<div style="display:flex; height:100vh; overflow:hidden; background:var(--canvas); font-family:var(--font-body); color:var(--text);">
+
+  <!-- ===================== SIDEBAR ===================== -->
+  <dc-import name="Sidebar" active="tasks" hint-size="230px,100%"></dc-import>
+
+  <!-- ===================== MAIN ===================== -->
+  <div style="flex:1; display:flex; flex-direction:column; min-width:0; height:100vh;">
+
+    <!-- Topbar -->
+    <header style="background:var(--surface); border-bottom:1px solid var(--border); padding:0 26px; height:56px; display:flex; align-items:center; justify-content:space-between; gap:16px; flex-shrink:0;">
+      <div style="display:flex; align-items:center; gap:8px; font-size:12.5px; color:var(--text-muted);">
+        <span>Operations</span>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"></path></svg>
+        <span style="color:var(--text); font-weight:600;">Staff Tasks</span>
+      </div>
+      <div style="display:flex; align-items:center; gap:12px;">
+        <div class="search-bar" style="width:240px;">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path></svg>
+          <input placeholder="Search students, tasks…">
+        </div>
+        <button style="position:relative; width:36px; height:36px; border-radius:10px; border:1px solid var(--border); background:var(--surface); display:flex; align-items:center; justify-content:center; cursor:pointer; color:var(--text-sub);">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.268 21a2 2 0 0 0 3.464 0"></path><path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"></path></svg>
+          <span style="position:absolute; top:-4px; right:-4px; width:8px; height:8px; border-radius:50%; background:var(--brand); border:2px solid var(--surface);"></span>
+        </button>
+        <div style="width:1px; height:26px; background:var(--border);"></div>
+        <div style="display:flex; align-items:center; gap:9px;">
+          <div style="width:32px; height:32px; border-radius:50%; background:var(--grad-brand); display:flex; align-items:center; justify-content:center; font-family:var(--font-display); font-weight:700; font-size:12px; color:#fff;">AD</div>
+          <div>
+            <div style="font-size:13px; font-weight:600; line-height:1.2;">Adithyan R</div>
+            <div style="font-size:11px; color:var(--text-muted);">CEO</div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- Scroll region -->
+    <main style="flex:1; overflow-y:auto; padding:24px 26px 32px;">
+
+      <!-- Page header -->
+      <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:16px; flex-wrap:wrap; margin-bottom:18px;">
+        <div>
+          <div style="display:flex; align-items:center; gap:10px;">
+            <h2 style="font-size:24px; font-weight:700;">Staff Tasks</h2>
+            <span class="badge badge-gray" style="font-size:11.5px;">Sprint board</span>
+          </div>
+          <div style="font-size:13px; color:var(--text-muted); margin-top:3px;">Assign and track your team's work — drag a card across columns to update its status.</div>
+        </div>
+        <div style="display:flex; align-items:center; gap:14px;">
+          <div class="av-stack" style="display:flex; align-items:center;">
+            <sc-for list="{{ team }}" as="m" hint-placeholder-count="6">
+              <div title="{{ m.name }}" style="width:30px; height:30px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-family:var(--font-display); font-weight:700; font-size:11px; color:#fff; box-shadow:0 0 0 2px var(--surface); background:{{ m.color }};">{{ m.initials }}</div>
+            </sc-for>
+          </div>
+          <button class="btn btn-primary">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"></path><path d="M12 5v14"></path></svg>
+            Assign Task
+          </button>
+        </div>
+      </div>
+
+      <!-- Toolbar -->
+      <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:18px;">
+        <div class="search-bar" style="width:280px;">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path></svg>
+          <input value="{{ query }}" onInput="{{ onQuery }}" placeholder="Search board by task, key or assignee…">
+        </div>
+
+        <div style="display:flex; align-items:center; gap:2px; padding-left:4px;">
+          <span style="font-size:12px; color:var(--text-muted); margin-right:6px;">Assignee</span>
+          <div class="av-stack" style="display:flex; align-items:center;">
+            <sc-for list="{{ team }}" as="m" hint-placeholder-count="6">
+              <div onClick="{{ m.onClick }}" title="{{ m.name }}" style="width:28px; height:28px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-family:var(--font-display); font-weight:700; font-size:10.5px; color:#fff; cursor:pointer; box-shadow:{{ m.ring }}; background:{{ m.color }};">{{ m.initials }}</div>
+            </sc-for>
+          </div>
+        </div>
+
+        <select class="form-input" value="{{ priority }}" onChange="{{ onPriority }}" style="width:auto; height:36px; min-width:130px;">
+          <option value="all">All priorities</option>
+          <option value="urgent">Urgent</option>
+          <option value="high">High</option>
+          <option value="normal">Normal</option>
+          <option value="low">Low</option>
+        </select>
+
+        <sc-if value="{{ hasFilters }}" hint-placeholder-val="{{ false }}">
+          <button onClick="{{ onClear }}" class="btn btn-subtle btn-sm" style="height:36px;">Clear filters</button>
+        </sc-if>
+
+        <div style="flex:1;"></div>
+
+        <span style="font-size:12.5px; color:var(--text-muted);">{{ filteredCount }} of {{ totalCount }} tasks</span>
+
+        <!-- view toggle -->
+        <div style="display:inline-flex; background:var(--surface-sunken); border-radius:10px; padding:3px; gap:3px;">
+          <button onClick="{{ onBoard }}" style="display:flex; align-items:center; gap:6px; padding:6px 12px; border:none; border-radius:8px; font-size:12.5px; font-weight:600; cursor:pointer; background:{{ boardBtnBg }}; color:{{ boardBtnColor }}; box-shadow:{{ boardBtnShadow }};">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="18" rx="1"></rect><rect x="14" y="3" width="7" height="18" rx="1"></rect></svg>
+            Board
+          </button>
+          <button onClick="{{ onList }}" style="display:flex; align-items:center; gap:6px; padding:6px 12px; border:none; border-radius:8px; font-size:12.5px; font-weight:600; cursor:pointer; background:{{ listBtnBg }}; color:{{ listBtnColor }}; box-shadow:{{ listBtnShadow }};">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>
+            List
+          </button>
+        </div>
+      </div>
+
+      <!-- ===================== BOARD ===================== -->
+      <sc-if value="{{ isBoard }}" hint-placeholder-val="{{ true }}">
+        <div style="display:flex; gap:16px; align-items:flex-start;">
+          <sc-for list="{{ cols }}" as="col" hint-placeholder-count="3">
+            <div onDragOver="{{ col.onDragOver }}" onDrop="{{ col.onDrop }}" style="flex:1; min-width:0; background:{{ col.bg }}; border:1px solid {{ col.bd }}; border-radius:14px; padding:6px; transition:background .15s, border-color .15s;">
+              <!-- column header -->
+              <div style="display:flex; align-items:center; gap:8px; padding:10px 12px 8px;">
+                <span style="width:9px; height:9px; border-radius:50%; background:{{ col.dot }};"></span>
+                <span style="font-size:12.5px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; color:var(--text-sub);">{{ col.label }}</span>
+                <span class="badge {{ col.badge }}" style="font-size:11px;">{{ col.count }}</span>
+                <span style="flex:1;"></span>
+                <span onClick="{{ col.onAdd }}" title="Add task" style="display:flex; color:var(--text-muted); cursor:pointer; padding:2px; border-radius:6px;">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"></path><path d="M12 5v14"></path></svg>
+                </span>
+              </div>
+
+              <!-- cards -->
+              <div style="display:flex; flex-direction:column; gap:{{ col.cardGap }}px; padding:4px; min-height:120px;">
+                <sc-for list="{{ col.cards }}" as="card" hint-placeholder-count="3">
+                  <div class="kcard" draggable="true" onDragStart="{{ card.onDragStart }}" onDragEnd="{{ card.onDragEnd }}" style="opacity:{{ card.opacity }}; background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:{{ card.pad }}; box-shadow:var(--shadow-sm); cursor:grab;">
+                    <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:8px;">
+                      <span class="badge {{ card.labelCls }}" style="font-size:10.5px; padding:2px 8px;">{{ card.label }}</span>
+                      <sc-if value="{{ card.showKeys }}" hint-placeholder-val="{{ true }}">
+                        <span style="font-family:var(--font-display); font-size:11px; font-weight:600; color:var(--text-muted); letter-spacing:.02em;">{{ card.key }}</span>
+                      </sc-if>
+                    </div>
+                    <div style="font-size:13.5px; font-weight:500; line-height:1.4; color:var(--text);">{{ card.title }}</div>
+                    <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-top:11px;">
+                      <div style="display:flex; align-items:center; gap:10px;">
+                        <span style="display:inline-flex; align-items:center; gap:4px; font-size:11.5px; font-weight:600; color:{{ card.prio.flag }};">
+                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"></path><line x1="4" y1="22" x2="4" y2="15"></line></svg>
+                          {{ card.prio.label }}
+                        </span>
+                        <sc-if value="{{ card.hasDue }}" hint-placeholder-val="{{ true }}">
+                          <span style="display:inline-flex; align-items:center; gap:4px; font-size:11.5px; color:var(--text-muted);">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+                            {{ card.due }}
+                          </span>
+                        </sc-if>
+                        <sc-if value="{{ card.hasComments }}" hint-placeholder-val="{{ false }}">
+                          <span style="display:inline-flex; align-items:center; gap:4px; font-size:11.5px; color:var(--text-muted);">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+                            {{ card.comments }}
+                          </span>
+                        </sc-if>
+                      </div>
+                      <div title="{{ card.assignee }}" style="width:26px; height:26px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-family:var(--font-display); font-weight:700; font-size:10px; color:#fff; flex-shrink:0; background:{{ card.avColor }};">{{ card.initials }}</div>
+                    </div>
+                  </div>
+                </sc-for>
+
+                <!-- inline quick-add -->
+                <sc-if value="{{ col.adding }}" hint-placeholder-val="{{ false }}">
+                  <div style="background:var(--surface); border:1px solid var(--brand); border-radius:12px; padding:10px; box-shadow:var(--ring);">
+                    <textarea value="{{ addText }}" onInput="{{ onAddText }}" onKeyDown="{{ col.onAddKey }}" autofocus="" placeholder="What needs doing?" style="width:100%; border:none; outline:none; resize:none; font-family:var(--font-body); font-size:13px; line-height:1.4; color:var(--text); background:transparent; min-height:38px;"></textarea>
+                    <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:6px;">
+                      <button onClick="{{ col.onCommit }}" class="btn btn-primary btn-sm">Add</button>
+                    </div>
+                  </div>
+                </sc-if>
+
+                <sc-if value="{{ col.notAdding }}" hint-placeholder-val="{{ true }}">
+                  <button onClick="{{ col.onAdd }}" style="display:flex; align-items:center; gap:7px; width:100%; padding:9px 10px; border:none; background:transparent; border-radius:9px; font-size:12.5px; font-weight:600; color:var(--text-muted); cursor:pointer; transition:background .15s;" onMouseOver="this.style.background='var(--surface-hover)'" onMouseOut="this.style.background='transparent'">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"></path><path d="M12 5v14"></path></svg>
+                    Create
+                  </button>
+                </sc-if>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+      </sc-if>
+
+      <!-- ===================== LIST ===================== -->
+      <sc-if value="{{ isList }}" hint-placeholder-val="{{ false }}">
+        <div class="table-container">
+          <div class="table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th style="width:80px;">Key</th>
+                  <th>Summary</th>
+                  <th style="width:120px;">Label</th>
+                  <th style="width:120px;">Priority</th>
+                  <th style="width:130px;">Status</th>
+                  <th style="width:170px;">Assignee</th>
+                  <th style="width:110px;">Due</th>
+                </tr>
+              </thead>
+              <tbody>
+                <sc-for list="{{ listRows }}" as="r" hint-placeholder-count="10">
+                  <tr class="lrow" style="cursor:pointer;">
+                    <td style="font-family:var(--font-display); font-weight:600; font-size:12px; color:var(--text-muted);">{{ r.key }}</td>
+                    <td style="font-weight:500;">{{ r.title }}</td>
+                    <td><span class="badge {{ r.labelCls }}" style="font-size:11px;">{{ r.label }}</span></td>
+                    <td>
+                      <span style="display:inline-flex; align-items:center; gap:5px; font-size:12px; font-weight:600; color:{{ r.prio.flag }};">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"></path><line x1="4" y1="22" x2="4" y2="15"></line></svg>
+                        {{ r.prio.label }}
+                      </span>
+                    </td>
+                    <td>
+                      <span style="display:inline-flex; align-items:center; gap:7px; font-size:12.5px; color:var(--text-sub);">
+                        <span style="width:8px; height:8px; border-radius:50%; background:{{ r.col.dot }};"></span>
+                        {{ r.col.label }}
+                      </span>
+                    </td>
+                    <td>
+                      <span style="display:inline-flex; align-items:center; gap:8px;">
+                        <span style="width:24px; height:24px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-family:var(--font-display); font-weight:700; font-size:9.5px; color:#fff; background:{{ r.avColor }};">{{ r.initials }}</span>
+                        <span style="font-size:12.5px;">{{ r.assignee }}</span>
+                      </span>
+                    </td>
+                    <td style="font-size:12.5px; color:var(--text-sub);">{{ r.due }}</td>
+                  </tr>
+                </sc-for>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </sc-if>
+
+    </main>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1320,&quot;height&quot;:850},&quot;showIssueKeys&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;},&quot;defaultView&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;board&quot;,&quot;list&quot;],&quot;default&quot;:&quot;board&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;compactCards&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;}}">
+class Component extends DCLogic {
+  ACCENTS = ['#E81620','#F4683B','#F5A623','#16A974','#11B4C6','#3B6EF6','#6366F1','#8B5CF6','#EC4899','#6E7488'];
+  COLS = [
+    { key:'pending',     label:'To Do',       dot:'var(--slate)', badge:'badge-gray' },
+    { key:'in-progress', label:'In Progress', dot:'var(--blue)',  badge:'badge-blue' },
+    { key:'completed',   label:'Done',        dot:'var(--green)', badge:'badge-green' },
+  ];
+  PRIO = {
+    urgent: { label:'Urgent', flag:'var(--red-ink)' },
+    high:   { label:'High',   flag:'var(--orange-ink)' },
+    normal: { label:'Normal', flag:'var(--slate)' },
+    low:    { label:'Low',    flag:'var(--blue-ink)' },
+  };
+  LABELS = {
+    'Outreach':'badge-pink', 'Data':'badge-blue', 'Fees':'badge-amber',
+    'Onboarding':'badge-green', 'Follow-up':'badge-teal', 'Assessment':'badge-violet', 'Docs':'badge-gray',
+  };
+  TEAM = ['Priya Sharma','Rahul Verma','Aisha Khan','Vikram Nair','Sneha Patel','Arjun Mehta'];
+
+  state = {
+    query:'', assignee:null, priority:'all',
+    view:null, dragId:null, dragOver:null,
+    addingCol:null, addText:'', nextKey:143,
+    tasks: [
+      { id:'t142', key:'ISC-142', title:'Call 20 at-risk students in Batch B-12', assignee:'Priya Sharma', status:'pending', priority:'urgent', due:'Jun 22', label:'Outreach', comments:3 },
+      { id:'t141', key:'ISC-141', title:'Verify ClassPlus IDs for July intake', assignee:'Rahul Verma', status:'pending', priority:'high', due:'Jun 24', label:'Data', comments:1 },
+      { id:'t138', key:'ISC-138', title:'Collect pending fee payments — 8 students', assignee:'Aisha Khan', status:'pending', priority:'high', due:'Jun 23', label:'Fees', comments:5 },
+      { id:'t135', key:'ISC-135', title:'Prepare welcome kit for the new B-15 cohort', assignee:'Sneha Patel', status:'pending', priority:'normal', due:'Jun 26', label:'Onboarding', comments:0 },
+      { id:'t133', key:'ISC-133', title:'Reschedule mock interview slots for this week', assignee:'Vikram Nair', status:'pending', priority:'normal', due:'Jun 25', label:'Follow-up', comments:2 },
+
+      { id:'t129', key:'ISC-129', title:'Onboard 15 new students to the LMS', assignee:'Arjun Mehta', status:'in-progress', priority:'high', due:'Jun 21', label:'Onboarding', comments:4 },
+      { id:'t127', key:'ISC-127', title:'Update assessment scores — Batch A-09', assignee:'Priya Sharma', status:'in-progress', priority:'normal', due:'Jun 22', label:'Assessment', comments:2 },
+      { id:'t124', key:'ISC-124', title:'Resolve login concerns (6 open tickets)', assignee:'Aisha Khan', status:'in-progress', priority:'urgent', due:'Jun 20', label:'Follow-up', comments:7 },
+      { id:'t121', key:'ISC-121', title:'Compile the weekly lead pipeline report', assignee:'Rahul Verma', status:'in-progress', priority:'normal', due:'Jun 23', label:'Data', comments:1 },
+
+      { id:'t118', key:'ISC-118', title:'Send fee reminders to Batch B-10', assignee:'Sneha Patel', status:'completed', priority:'high', due:'Jun 18', label:'Fees', comments:3 },
+      { id:'t115', key:'ISC-115', title:'Verify documents for 22 students', assignee:'Vikram Nair', status:'completed', priority:'normal', due:'Jun 17', label:'Docs', comments:0 },
+      { id:'t112', key:'ISC-112', title:'Schedule the June orientation webinar', assignee:'Arjun Mehta', status:'completed', priority:'normal', due:'Jun 16', label:'Onboarding', comments:5 },
+      { id:'t109', key:'ISC-109', title:'Export attendance for the May batches', assignee:'Priya Sharma', status:'completed', priority:'low', due:'Jun 15', label:'Data', comments:1 },
+    ],
+  };
+
+  initials(name){
+    if(!name || name==='Unassigned') return '?';
+    const p = name.trim().split(/\s+/);
+    return ((p[0]||'')[0] + ((p[1]||'')[0]||'')).toUpperCase();
+  }
+  color(name){
+    if(!name || name==='Unassigned') return 'var(--slate)';
+    let h=0; for(const c of name) h=(h*31 + c.charCodeAt(0))>>>0;
+    return this.ACCENTS[h % this.ACCENTS.length];
+  }
+
+  drop(status){
+    const id = this.state.dragId;
+    if(!id){ this.setState({ dragOver:null }); return; }
+    this.setState(s => ({ tasks: s.tasks.map(t => t.id===id ? { ...t, status } : t), dragId:null, dragOver:null }));
+  }
+  startAdd(col){ this.setState({ addingCol:col, addText:'' }); }
+  commitAdd(col){
+    const text = (this.state.addText||'').trim();
+    if(!text){ this.setState({ addingCol:null, addText:'' }); return; }
+    this.setState(s => ({
+      tasks: [{ id:'t'+Date.now(), key:'ISC-'+s.nextKey, title:text, assignee:'Unassigned', status:col, priority:'normal', due:'', label:'Follow-up', comments:0 }, ...s.tasks],
+      addingCol:null, addText:'', nextKey:s.nextKey+1,
+    }));
+  }
+
+  renderVals(){
+    const showKeys = this.props.showIssueKeys ?? true;
+    const compact  = this.props.compactCards ?? false;
+    const view     = this.state.view ?? (this.props.defaultView ?? 'board');
+    const pad      = compact ? '10px 12px' : '13px 14px';
+    const cardGap  = compact ? 7 : 9;
+    const q        = this.state.query.trim().toLowerCase();
+
+    const match = t =>
+      (!q || t.title.toLowerCase().includes(q) || t.key.toLowerCase().includes(q) || t.assignee.toLowerCase().includes(q)) &&
+      (!this.state.assignee || t.assignee===this.state.assignee) &&
+      (this.state.priority==='all' || t.priority===this.state.priority);
+
+    const filtered = this.state.tasks.filter(match);
+
+    const enrich = t => ({
+      ...t,
+      initials: this.initials(t.assignee),
+      avColor: this.color(t.assignee),
+      prio: this.PRIO[t.priority] || this.PRIO.normal,
+      labelCls: this.LABELS[t.label] || 'badge-gray',
+      opacity: this.state.dragId===t.id ? 0.35 : 1,
+      pad, showKeys,
+      hasComments: t.comments>0,
+      hasDue: !!t.due,
+      onDragStart: () => this.setState({ dragId:t.id }),
+      onDragEnd: () => this.setState({ dragId:null, dragOver:null }),
+    });
+
+    const cols = this.COLS.map(c => {
+      const cards = filtered.filter(t => t.status===c.key).map(enrich);
+      const over = this.state.dragOver===c.key;
+      return {
+        ...c, cards, count:cards.length, cardGap,
+        bg: over ? 'var(--brand-50)' : 'var(--surface-sunken)',
+        bd: over ? 'var(--brand)' : 'transparent',
+        adding: this.state.addingCol===c.key,
+        notAdding: this.state.addingCol!==c.key,
+        onAdd: () => this.startAdd(c.key),
+        onCommit: () => this.commitAdd(c.key),
+        onAddKey: (e) => {
+          if(e.key==='Enter'){ e.preventDefault(); this.commitAdd(c.key); }
+          if(e.key==='Escape'){ this.setState({ addingCol:null }); }
+        },
+        onDragOver: (e) => { e.preventDefault(); if(this.state.dragOver!==c.key) this.setState({ dragOver:c.key }); },
+        onDrop: (e) => { e.preventDefault(); this.drop(c.key); },
+      };
+    });
+
+    const team = this.TEAM.map(n => ({
+      name:n, initials:this.initials(n), color:this.color(n),
+      active: this.state.assignee===n,
+      ring: this.state.assignee===n ? '0 0 0 2px var(--surface), 0 0 0 4px var(--brand)' : '0 0 0 2px var(--surface)',
+      onClick: () => this.setState(s => ({ assignee: s.assignee===n ? null : n })),
+    }));
+
+    const listRows = filtered.map(t => ({ ...enrich(t), col: this.COLS.find(c => c.key===t.status) }));
+    const hasFilters = !!q || !!this.state.assignee || this.state.priority!=='all';
+
+    return {
+      cols, team, listRows,
+      isBoard: view==='board', isList: view==='list',
+      onBoard: () => this.setState({ view:'board' }),
+      onList: () => this.setState({ view:'list' }),
+      boardBtnBg: view==='board' ? 'var(--surface)' : 'transparent',
+      boardBtnColor: view==='board' ? 'var(--text)' : 'var(--text-muted)',
+      boardBtnShadow: view==='board' ? 'var(--shadow-xs)' : 'none',
+      listBtnBg: view==='list' ? 'var(--surface)' : 'transparent',
+      listBtnColor: view==='list' ? 'var(--text)' : 'var(--text-muted)',
+      listBtnShadow: view==='list' ? 'var(--shadow-xs)' : 'none',
+      query: this.state.query, onQuery: (e) => this.setState({ query:e.target.value }),
+      priority: this.state.priority, onPriority: (e) => this.setState({ priority:e.target.value }),
+      addText: this.state.addText, onAddText: (e) => this.setState({ addText:e.target.value }),
+      hasFilters, onClear: () => this.setState({ query:'', assignee:null, priority:'all' }),
+      totalCount: this.state.tasks.length,
+      filteredCount: filtered.length,
+    };
+  }
+}
+</script>
+</body>
+</html>
