@@ -374,7 +374,7 @@ export default function StaffDashboard() {
                             onClick={async () => {
                               setReminding(p => ({ ...p, [req.id]: true }));
                               // Notify CEO
-                              const ceoSnap = await getDocs(query(collection(db,'staff'), where('role','==','ceo')));
+                              const ceoSnap = await getDocs(query(collection(db,'staffDirectory'), where('role','==','ceo')));
                               for (const ceoDoc of ceoSnap.docs) {
                                 const ceo = ceoDoc.data();
                                 if (ceo.email) await addNotification({

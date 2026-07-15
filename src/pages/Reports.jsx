@@ -26,7 +26,7 @@ function isoToDisplay(iso) {
 
 export default function Reports() {
   const { profile } = useAuth();
-  const isCEO = profile?.role === 'ceo' || profile?.role === 'admin';
+  const isCEO = profile?.role === 'ceo';
 
   const [allReports, setAllReports] = useState([]);
   const [loading, setLoading]       = useState(true);
@@ -47,7 +47,7 @@ export default function Reports() {
   const [form, setForm] = useState(blankForm());
 
   const load = async () => {
-    const r = await getDailyReports();
+    const r = await getDailyReports({ role: profile?.role, uid: profile?.uid, email: profile?.email });
     setAllReports(r);
     setLoading(false);
   };

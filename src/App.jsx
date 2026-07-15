@@ -23,7 +23,6 @@ import StaffManagement from './pages/StaffManagement';
 import Trash           from './pages/Trash';
 import Requests        from './pages/Requests';
 import Schedule        from './pages/Schedule';
-import PublicSchedule  from './pages/PublicSchedule';
 import ErrorBoundary   from './components/ErrorBoundary';
 
 const NAV_BY_ROLE = {
@@ -47,22 +46,6 @@ const NAV_BY_ROLE = {
     { to: '/staff',       label: 'Staff Management',  icon: 'UsersRound'     },
     { to: '/requests',    label: 'Staff Requests',    icon: 'Inbox', badge: 0 },
     { to: '/trash',       label: 'Trash',             icon: 'Trash2'         },
-  ],
-  admin: [
-    { section: 'Overview' },
-    { to: '/',            label: 'Dashboard',        icon: 'LayoutDashboard' },
-    { section: 'Students' },
-    { to: '/students',    label: 'All Students',     icon: 'Users'           },
-    { to: '/followups',   label: 'Follow-Ups',       icon: 'PhoneCall'       },
-    { to: '/concerns',    label: 'Concerns',         icon: 'AlertCircle'     },
-    { section: 'Academic' },
-    { to: '/assessments', label: 'Assessments',      icon: 'ClipboardList'   },
-    { to: '/batches',     label: 'Batches',          icon: 'School'          },
-    { to: '/schedule',    label: 'Schedule',         icon: 'CalendarDays'    },
-    { to: '/leaderboard', label: 'Leaderboard',      icon: 'Trophy'          },
-    { section: 'Operations' },
-    { to: '/reports',     label: 'Daily Reports',    icon: 'FileText'        },
-    { to: '/documents',   label: 'Documents',        icon: 'FolderOpen'      },
   ],
   staff: [
     { section: 'My Work' },
@@ -117,7 +100,7 @@ function GuestGuard() {
 function HomeDashboard() {
   const { profile } = useAuth();
   const role = profile?.role || 'staff';
-  if (role === 'ceo' || role === 'admin') return <Dashboard />;
+  if (role === 'ceo') return <Dashboard />;
   return <StaffDashboard />;
 }
 
@@ -147,7 +130,6 @@ export default function App() {
             <Route path="/requests"      element={<Requests />}        />
             <Route path="/schedule"      element={<Schedule />}        />
           </Route>
-          <Route path="/public-schedule/:batchId" element={<PublicSchedule />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </AuthProvider>

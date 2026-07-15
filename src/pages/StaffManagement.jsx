@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { collection, getDocs, doc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import { createStaffAccount } from '../firebase/adminAuth';
+import { setRoleDoc, deleteRoleDoc, setDirectoryDoc, deleteDirectoryDoc } from '../firebase/services';
 import { Modal, Toast, Loading, Confirm, FormRow } from '../components/ui';
 import {
   Plus, ShieldOff, RefreshCw, Shield,
@@ -79,8 +80,12 @@ export default function StaffManagement() {
   };
 
   // ── Revoke / restore access ────────────────────────────────
+  // Roles doc is the authorization source of truth — revoking there
+  // cuts off ALL data access immediately (rules check roles.active).
   const handleRevoke = async () => {
     await updateDoc(doc(db, 'staff', revoking.id), { active: false });
+    await setRoleDoc(revoking.id, { role: revoking.role || 'staff', active: false });
+    await setDirectoryDoc(revoking.id, { ...revoking, active: false });
     setRevoking(null);
     setToast({ message: `Access revoked for ${revoking.name}.`, type:'info' });
     load();
@@ -88,6 +93,8 @@ export default function StaffManagement() {
 
   const handleRestore = async (member) => {
     await updateDoc(doc(db, 'staff', member.id), { active: true });
+    await setRoleDoc(member.id, { role: member.role || 'staff', active: true });
+    await setDirectoryDoc(member.id, { ...member, active: true });
     setToast({ message: `Access restored for ${member.name}.`, type:'success' });
     load();
   };
@@ -97,6 +104,8 @@ export default function StaffManagement() {
     if (!deleting) return;
     try {
       await deleteDoc(doc(db, 'staff', deleting.id));
+      await deleteRoleDoc(deleting.id).catch(() => {});
+      await deleteDirectoryDoc(deleting.id).catch(() => {});
       setToast({ message: `${deleting.name} permanently deleted.`, type:'success' });
     } catch (err) {
       setToast({ message: 'Error: ' + err.message, type:'error' });
@@ -108,6 +117,7 @@ export default function StaffManagement() {
   // ── Subject assignment ─────────────────────────────────────
   const handleSaveSubjects = async () => {
     await updateDoc(doc(db, 'staff', showSubjectModal.id), { subjects: editingSubjects });
+    await setDirectoryDoc(showSubjectModal.id, { ...showSubjectModal, subjects: editingSubjects });
     setToast({ message: `Subjects updated for ${showSubjectModal.name}!`, type:'success' });
     setShowSubjectModal(null);
     load();
@@ -142,7 +152,7 @@ export default function StaffManagement() {
           {[
             { label:'Total Staff', value: staffList.length, color:'var(--brand)' },
             { label:'Active', value: active.length, color:'var(--green)' },
-            { label:'CEO / Admin', value: staffList.filter(s=>s.role==='ceo'||s.role==='admin').length, color:'#7C3AED' },
+            { label:'CEO', value: staffList.filter(s=>s.role==='ceo').length, color:'#7C3AED' },
             { label:'Teaching Staff', value: staffList.filter(s=>s.role==='staff').length, color:'#2563EB' },
           ].map(tile => (
             <div key={tile.label} style={{ background:'var(--surface)', borderRadius:12, border:'1px solid var(--border)', padding:'14px 18px', boxShadow:'var(--shadow-xs)' }}>
@@ -377,7 +387,6 @@ export default function StaffManagement() {
                 onChange={e => setForm({...form, role:e.target.value})}
               >
                 <option value="staff">Staff — Limited access</option>
-                <option value="admin">Admin — Moderate access</option>
                 <option value="ceo">CEO — Full access</option>
               </select>
               <div style={{ fontSize:11, color:'#6B7280', marginTop:4 }}>

@@ -131,7 +131,7 @@ function computeDayLayout(slots) {
 // ── Component ───────────────────────────────────────────────────
 export default function Schedule() {
   const { profile } = useAuth();
-  const isCEO = profile?.role === 'ceo' || profile?.role === 'admin';
+  const isCEO = profile?.role === 'ceo';
 
   const [batches,       setBatches]       = useState([]);
   const [selectedBatch, setSelectedBatch] = useState(ALL); // default: show everything
@@ -194,7 +194,7 @@ export default function Schedule() {
     if (!batchId) return [];
     if (studentsCache[batchId]) return studentsCache[batchId];
     try {
-      const res = await getBatchStudents(batchId);
+      const res = await getBatchStudents(batchId, { role: profile?.role, uid: profile?.uid, email: profile?.email });
       const list = (res.students || []).map(s => ({ id: s.id, name: s.name, phone: s.phone || '', course: s.course || '', education: s.education || '' }));
       setStudentsCache(prev => ({ ...prev, [batchId]: list }));
       return list;

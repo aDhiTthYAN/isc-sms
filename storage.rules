@@ -1,8 +1,40 @@
 rules_version = '2';
+
+// ISC SMS — hardened Storage rules (Phase 1)
+// Access requires an ACTIVE staff account (checked against the
+// Firestore /roles/{uid} doc — cross-service rules).
+// Uploads: 10 MB cap + content-type allowlist.
 service firebase.storage {
   match /b/{bucket}/o {
-    match /documents/{allPaths=**} {
-      allow read, write: if request.auth != null;
+
+    function isActiveStaff() {
+      return request.auth != null
+        && firestore.get(/databases/(default)/documents/roles/$(request.auth.uid)).data.active == true;
+    }
+    function isCEO() {
+      return request.auth != null
+        && firestore.get(/databases/(default)/documents/roles/$(request.auth.uid)).data.role == 'ceo';
+    }
+    function allowedType() {
+      return request.resource.contentType.matches('application/pdf')
+        || request.resource.contentType.matches('image/.*')
+        || request.resource.contentType.matches('text/csv')
+        || request.resource.contentType.matches('application/msword')
+        || request.resource.contentType.matches('application/vnd.openxmlformats-officedocument..*')
+        || request.resource.contentType.matches('application/vnd.ms-excel');
+    }
+
+    match /documents/{fileName} {
+      allow read: if isActiveStaff();
+      allow create, update: if isActiveStaff()
+        && request.resource.size < 10 * 1024 * 1024
+        && allowedType();
+      allow delete: if isCEO();
+    }
+
+    // Default deny for any other path.
+    match /{allPaths=**} {
+      allow read, write: if false;
     }
   }
 }

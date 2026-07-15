@@ -1,6 +1,6 @@
 import {
   collection, doc, addDoc, updateDoc, deleteDoc,
-  getDocs, getDoc, query, where, orderBy,
+  getDocs, getDoc, query, where, orderBy, or,
   serverTimestamp, setDoc, limit, startAfter,
   getCountFromServer
 } from 'firebase/firestore';
@@ -8,15 +8,58 @@ import { db } from './config';
 
 const PAGE_SIZE = 50;
 
+// ── Access scoping helpers (Phase 1 security remediation) ───────
+// A "scope" is { role, uid, email }. Staff queries MUST carry the
+// where() clause that proves the rules condition — Firestore rules
+// reject unprovable queries outright, they don't filter results.
+export const isCeoScope = (scope) => scope?.role === 'ceo';
+
+// staffIds on a student = batch staff + mentor (denormalized so
+// rules can check membership without a join).
+export const computeBatchStaffIds = (batch) =>
+  [...new Set([...(batch?.staffIds || []), batch?.mentorId].filter(Boolean))];
+
+export const getBatchStaffIds = async (batchId) => {
+  if (!batchId) return [];
+  const snap = await getDoc(doc(db, 'batches', batchId));
+  return snap.exists() ? computeBatchStaffIds(snap.data()) : [];
+};
+
+// Fan-out: keep every student in a batch in sync with the batch's
+// staff assignment. Call whenever batch staff/mentor changes.
+export const syncBatchStaffToStudents = async (batchId, batchData) => {
+  const staffIds = computeBatchStaffIds(batchData);
+  const snap = await getDocs(query(collection(db, 'students'), where('batchId', '==', batchId)));
+  await Promise.all(snap.docs.map(d => updateDoc(d.ref, { staffIds })));
+  return { updated: snap.docs.length, staffIds };
+};
+
 // ── Students ───────────────────────────────────────────────────
 export const studentsRef = () => collection(db, 'students');
 
-export const getStudentCount = async () => {
+export const getStudentCount = async (scope) => {
+  // Staff: count only their own students (aggregate over a provable query).
+  if (scope && !isCeoScope(scope)) {
+    const snap = await getCountFromServer(
+      query(studentsRef(), where('staffIds', 'array-contains', scope.uid)));
+    return snap.data().count;
+  }
   const snap = await getCountFromServer(collection(db, 'students'));
   return snap.data().count;
 };
 
-export const getStudentsPaged = async (filters = {}, lastDoc = null) => {
+export const getStudentsPaged = async (filters = {}, lastDoc = null, scope = null) => {
+  // Staff path: must include the staffIds membership clause the rules
+  // check. No orderBy (avoids composite index); sorted client-side.
+  if (scope && !isCeoScope(scope)) {
+    let constraints = [where('staffIds', 'array-contains', scope.uid), limit(500)];
+    if (filters.batchId) constraints.push(where('batchId', '==', filters.batchId));
+    if (filters.status)  constraints.push(where('status', '==', filters.status));
+    const snap = await getDocs(query(studentsRef(), ...constraints));
+    const students = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+      .sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+    return { students, lastDoc: null, hasMore: false };
+  }
   let constraints = [orderBy('createdAt', 'desc'), limit(PAGE_SIZE)];
   if (filters.batchId)       constraints = [where('batchId','==',filters.batchId), orderBy('createdAt','desc'), limit(PAGE_SIZE)];
   if (filters.status)        constraints = [where('status','==',filters.status), orderBy('createdAt','desc'), limit(PAGE_SIZE)];
@@ -30,9 +73,12 @@ export const getStudentsPaged = async (filters = {}, lastDoc = null) => {
   };
 };
 
-export const searchStudents = async (searchTerm) => {
+export const searchStudents = async (searchTerm, scope = null) => {
   if (!searchTerm) return [];
-  const snap = await getDocs(query(studentsRef(), orderBy('name'), limit(200)));
+  const base = (scope && !isCeoScope(scope))
+    ? query(studentsRef(), where('staffIds', 'array-contains', scope.uid), limit(500))
+    : query(studentsRef(), orderBy('name'), limit(200));
+  const snap = await getDocs(base);
   const term = searchTerm.toLowerCase();
   return snap.docs
     .map(d => ({ id: d.id, ...d.data() }))
@@ -47,21 +93,12 @@ export const searchStudents = async (searchTerm) => {
 };
 
 export const getMyStudents = async (staffName, staffUid) => {
-  if (!staffName && !staffUid) return [];
+  if (!staffUid) return [];
   try {
-    if (staffUid) {
-      const q = query(studentsRef(), where('staffId','==', staffUid), limit(100));
-      const snap = await getDocs(q);
-      if (snap.docs.length > 0) {
-        return snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a,b) => (a.name||'').localeCompare(b.name||''));
-      }
-    }
-    if (staffName) {
-      const q = query(studentsRef(), where('staffAssigned','==', staffName), limit(100));
-      const snap = await getDocs(q);
-      return snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a,b) => (a.name||'').localeCompare(b.name||''));
-    }
-    return [];
+    const q = query(studentsRef(), where('staffIds', 'array-contains', staffUid), limit(500));
+    const snap = await getDocs(q);
+    return snap.docs.map(d => ({ id: d.id, ...d.data() }))
+      .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
   } catch {
     return [];
   }
@@ -72,19 +109,38 @@ export const getStudent = async (id) => {
   return snap.exists() ? { id: snap.id, ...snap.data() } : null;
 };
 
-export const addStudent = async (data) =>
-  addDoc(studentsRef(), { ...data, createdAt: serverTimestamp() });
+// Creates a student with staffIds denormalized from its batch, so the
+// batch's staff (and mentor) can access the record under the rules.
+export const addStudent = async (data) => {
+  const staffIds = await getBatchStaffIds(data.batchId);
+  return addDoc(studentsRef(), { ...data, staffIds, createdAt: serverTimestamp() });
+};
 
-export const updateStudent = async (id, data) =>
-  updateDoc(doc(db, 'students', id), { ...data, updatedAt: serverTimestamp() });
+export const updateStudent = async (id, data) => {
+  const payload = { ...data, updatedAt: serverTimestamp() };
+  delete payload.staffIds; // never client-set directly
+  // Batch move → recompute scope (CEO-only per rules).
+  if ('batchId' in data) {
+    const current = await getDoc(doc(db, 'students', id));
+    if (current.exists() && current.data().batchId !== data.batchId) {
+      payload.staffIds = await getBatchStaffIds(data.batchId);
+    }
+  }
+  return updateDoc(doc(db, 'students', id), payload);
+};
 
 export const deleteStudent = async (id) => deleteDoc(doc(db, 'students', id));
 
 export const bulkAddStudents = async (arr) => {
   const results = { success: 0, failed: 0, errors: [] };
+  const staffIdsCache = {};
   for (const s of arr) {
     try {
-      await addDoc(studentsRef(), { ...s, createdAt: serverTimestamp() });
+      if (s.batchId && !(s.batchId in staffIdsCache)) {
+        staffIdsCache[s.batchId] = await getBatchStaffIds(s.batchId);
+      }
+      const staffIds = s.batchId ? staffIdsCache[s.batchId] : [];
+      await addDoc(studentsRef(), { ...s, staffIds, createdAt: serverTimestamp() });
       results.success++;
     } catch (err) {
       results.failed++;
@@ -95,7 +151,11 @@ export const bulkAddStudents = async (arr) => {
 };
 
 // ── Unassigned / self-assign ───────────────────────────────────
-export const getUnassignedStudents = async (batchId) => {
+// CEO-only under the batch-scoped access model: staff cannot query
+// students outside their batches, so "unassigned across all batches"
+// is not answerable for them (returns []).
+export const getUnassignedStudents = async (batchId, scope = null) => {
+  if (scope && !isCeoScope(scope)) return [];
   try {
     let q = batchId
       ? query(studentsRef(), where('batchId','==',batchId), where('staffAssigned','==',''), limit(100))
@@ -103,8 +163,7 @@ export const getUnassignedStudents = async (batchId) => {
     const snap = await getDocs(q);
     return snap.docs.map(d => ({ id: d.id, ...d.data() }));
   } catch {
-    const snap = await getDocs(query(studentsRef(), limit(100)));
-    return snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(s => !s.staffAssigned || s.staffAssigned === '');
+    return [];
   }
 };
 
@@ -129,14 +188,18 @@ export const updateStudentActivity = async (id, data) =>
   updateDoc(doc(db, 'students', id), { ...data, lastActivityUpdate: serverTimestamp() });
 
 // ── Alias for backward compat ──────────────────────────────────
-export const getStudents = async () => {
-  const result = await getStudentsPaged();
+export const getStudents = async (scope = null) => {
+  const result = await getStudentsPaged({}, null, scope);
   return result.students;
 };
 
 // ── Follow-ups ─────────────────────────────────────────────────
-export const getFollowUps = async (studentId) => {
-  const q = query(collection(db,'followups'), where('studentId','==',studentId));
+// Staff may only read follow-ups assigned to them, so the per-student
+// history query must include their email clause to be provable.
+export const getFollowUps = async (studentId, scope = null) => {
+  const q = (scope && !isCeoScope(scope))
+    ? query(collection(db,'followups'), where('studentId','==',studentId), where('assignedToEmail','==',scope.email))
+    : query(collection(db,'followups'), where('studentId','==',studentId));
   const snap = await getDocs(q);
   return snap.docs.map(d => ({ id: d.id, ...d.data() }))
     .sort((a,b) => (b.createdAt?.seconds||0) - (a.createdAt?.seconds||0));
@@ -155,8 +218,11 @@ export const getMyFollowUps = async (staffEmail) => {
   }
 };
 
-export const getAllFollowUps = async () => {
-  const snap = await getDocs(query(collection(db,'followups'), limit(100)));
+export const getAllFollowUps = async (scope = null) => {
+  const q = (scope && !isCeoScope(scope))
+    ? query(collection(db,'followups'), where('assignedToEmail','==',scope.email), limit(200))
+    : query(collection(db,'followups'), limit(200));
+  const snap = await getDocs(q);
   return snap.docs.map(d => ({ id: d.id, ...d.data() }))
     .sort((a,b) => (b.createdAt?.seconds||0) - (a.createdAt?.seconds||0));
 };
@@ -179,16 +245,22 @@ export const getBatch = async (id) => {
   return snap.exists() ? { id: snap.id, ...snap.data() } : null;
 };
 
-export const getBatchStudents = async (batchId) => {
-  const q = query(studentsRef(), where('batchId','==',batchId), limit(200));
+export const getBatchStudents = async (batchId, scope = null) => {
+  // Staff must include the membership clause the rules check.
+  const q = (scope && !isCeoScope(scope))
+    ? query(studentsRef(), where('batchId','==',batchId), where('staffIds','array-contains',scope.uid), limit(500))
+    : query(studentsRef(), where('batchId','==',batchId), limit(500));
   const snap = await getDocs(q);
   const students = snap.docs.map(d => ({ id: d.id, ...d.data() }))
     .sort((a,b) => (a.name||'').localeCompare(b.name||''));
   return { students, lastDoc: snap.docs[snap.docs.length-1]||null, hasMore: false };
 };
 
-export const getBatchStudentCount = async (batchId) => {
-  const snap = await getCountFromServer(query(studentsRef(), where('batchId','==',batchId)));
+export const getBatchStudentCount = async (batchId, scope = null) => {
+  const q = (scope && !isCeoScope(scope))
+    ? query(studentsRef(), where('batchId','==',batchId), where('staffIds','array-contains',scope.uid))
+    : query(studentsRef(), where('batchId','==',batchId));
+  const snap = await getCountFromServer(q);
   return snap.data().count;
 };
 
@@ -288,7 +360,14 @@ export const saveAssessmentResults = async (results) =>
   Promise.all(results.map(r => addDoc(collection(db,'assessmentResults'), { ...r, savedAt: serverTimestamp() })));
 
 // ── Tasks ──────────────────────────────────────────────────────
-export const getTasks = async () => {
+export const getTasks = async (scope = null) => {
+  // Staff: only their own tasks are readable — query must prove it.
+  if (scope && !isCeoScope(scope)) {
+    const q = query(collection(db,'tasks'), where('assignedToEmail','==',scope.email), limit(200));
+    const snap = await getDocs(q);
+    return snap.docs.map(d => ({ id: d.id, ...d.data() }))
+      .sort((a,b) => (b.createdAt?.seconds||0) - (a.createdAt?.seconds||0));
+  }
   const q = query(collection(db,'tasks'), orderBy('createdAt','desc'), limit(100));
   const snap = await getDocs(q);
   return snap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -333,41 +412,12 @@ export const saveFCMToken = async (userId, token) => {
   } catch {}
 };
 
-export const sendPushNotification = async ({ toEmail, title, body }) => {
-  // Fetch target staff's FCM token
-  try {
-    const snap = await getDocs(query(collection(db,'staff'), where('email','==',toEmail)));
-    if (snap.empty) return;
-    const staffDoc = snap.docs[0].data();
-    const token = staffDoc.fcmToken;
-    if (!token) return;
-
-    const serverKey = import.meta.env.VITE_FCM_SERVER_KEY;
-    if (!serverKey) {
-      console.warn('FCM server key not set. Add VITE_FCM_SERVER_KEY to .env');
-      return;
-    }
-
-    await fetch('https://fcm.googleapis.com/fcm/send', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `key=${serverKey}`,
-      },
-      body: JSON.stringify({
-        to: token,
-        notification: { title, body },
-        data: { click_action: 'FLUTTER_NOTIFICATION_CLICK' },
-      }),
-    });
-  } catch (err) {
-    console.warn('Push notification failed:', err.message);
-  }
-};
-
 // ── Daily Reports ──────────────────────────────────────────────
-export const getDailyReports = async () => {
-  const snap = await getDocs(query(collection(db,'reports'), limit(200)));
+export const getDailyReports = async (scope = null) => {
+  const q = (scope && !isCeoScope(scope))
+    ? query(collection(db,'reports'), where('staffEmail','==',scope.email), limit(200))
+    : query(collection(db,'reports'), limit(200));
+  const snap = await getDocs(q);
   return snap.docs.map(d => ({ id: d.id, ...d.data() }));
 };
 
@@ -375,7 +425,16 @@ export const addReport = async (data) =>
   addDoc(collection(db,'reports'), { ...data, createdAt: serverTimestamp() });
 
 // ── Concerns ──────────────────────────────────────────────────
-export const getConcerns = async (filters = {}) => {
+export const getConcerns = async (filters = {}, scope = null) => {
+  // Staff: raised-by-me OR assigned-to-me (matches the rules exactly).
+  if (scope && !isCeoScope(scope)) {
+    const q = query(collection(db,'concerns'),
+      or(where('raisedByEmail','==',scope.email), where('assignedToEmail','==',scope.email)),
+      limit(200));
+    const snap = await getDocs(q);
+    return snap.docs.map(d => ({ id: d.id, ...d.data() }))
+      .sort((a,b) => (b.createdAt?.seconds||0) - (a.createdAt?.seconds||0));
+  }
   let q = query(collection(db,'concerns'), orderBy('createdAt','desc'), limit(100));
   if (filters.batchId)    q = query(collection(db,'concerns'), where('batchId','==',filters.batchId), orderBy('createdAt','desc'));
   if (filters.assignedTo) q = query(collection(db,'concerns'), where('assignedTo','==',filters.assignedTo), orderBy('createdAt','desc'));
@@ -404,10 +463,33 @@ export const updateLead = async (id, data) =>
   updateDoc(doc(db,'leads', id), data);
 
 // ── Staff profiles ─────────────────────────────────────────────
+// Pickers/dropdowns now read the safe staffDirectory mirror
+// (name, role, subjects, active, email — no fcmToken). Full /staff
+// docs are readable only by their owner and the CEO.
 export const getStaffProfiles = async () => {
+  const snap = await getDocs(collection(db,'staffDirectory'));
+  return snap.docs.map(d => ({ id: d.id, uid: d.id, ...d.data() }));
+};
+
+// CEO-only: full staff docs (Staff Management page).
+export const getStaffFull = async () => {
   const snap = await getDocs(collection(db,'staff'));
   return snap.docs.map(d => ({ id: d.id, ...d.data() }));
 };
+
+// ── Roles (authorization source of truth) + directory mirror ────
+// Written only by the CEO; rules enforce this.
+export const setRoleDoc = (uid, { role, active }) =>
+  setDoc(doc(db,'roles', uid), { role, active }, { merge: true });
+
+export const deleteRoleDoc = (uid) => deleteDoc(doc(db,'roles', uid));
+
+export const setDirectoryDoc = (uid, { name, role, subjects, active, email }) =>
+  setDoc(doc(db,'staffDirectory', uid),
+    { name: name || '', role: role || 'staff', subjects: subjects || [], active: active !== false, email: email || '' },
+    { merge: true });
+
+export const deleteDirectoryDoc = (uid) => deleteDoc(doc(db,'staffDirectory', uid));
 
 export const setStaffProfile = async (uid, data) =>
   setDoc(doc(db,'staff', uid), data, { merge: true });
@@ -421,7 +503,7 @@ export const updateStaffSubjects = async (staffId, subjects) =>
   updateDoc(doc(db,'staff', staffId), { subjects, updatedAt: serverTimestamp() });
 
 export const getStaffBySubject = async (subject) => {
-  const snap = await getDocs(collection(db,'staff'));
+  const snap = await getDocs(collection(db,'staffDirectory'));
   return snap.docs
     .map(d => ({ id: d.id, ...d.data() }))
     .filter(s => s.subjects?.includes(subject) && s.active !== false);
@@ -568,7 +650,12 @@ export const getTrashItems = async (type) => {
 
 export const restoreFromTrash = async (trashId, type, originalId, data) => {
   const colName = type === 'student' ? 'students' : 'batches';
-  await setDoc(doc(db, colName, originalId), data);
+  // Restored students get their scope recomputed — batch staffing may
+  // have changed while the record sat in trash.
+  const payload = (type === 'student')
+    ? { ...data, staffIds: await getBatchStaffIds(data.batchId) }
+    : data;
+  await setDoc(doc(db, colName, originalId), payload);
   await deleteDoc(doc(db,'trash', trashId));
 };
 

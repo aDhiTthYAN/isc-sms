@@ -56,6 +56,15 @@ export const createStaffAccount = async ({ name, email, role, subjects }) => {
       createdAt:      new Date().toISOString(),
     });
 
+    // Authorization source of truth — rules check /roles/{uid}, not the
+    // staff profile (which the user could otherwise self-edit).
+    await setDoc(doc(db, 'roles', uid), { role, active: true });
+
+    // Safe directory mirror for staff-facing pickers (no fcmToken).
+    await setDoc(doc(db, 'staffDirectory', uid), {
+      name, email, role, subjects: subjects || [], active: true,
+    });
+
     // Send password reset email — staff clicks link and sets own password
     const mainAuth = getAuth(getApp());
     await sendPasswordResetEmail(mainAuth, email);

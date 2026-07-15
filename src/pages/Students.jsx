@@ -34,18 +34,19 @@ export default function StudentsPage() {
     status:'active', notes:'',
   });
 
-  const isCEOorAdmin = profile?.role === 'ceo' || profile?.role === 'admin';
+  const isCEOorAdmin = profile?.role === 'ceo';
+  // Access scope: staff queries carry the staffIds clause the security
+  // rules require; CEO queries are unscoped.
+  const scope = { role: profile?.role, uid: profile?.uid, email: profile?.email };
 
   const loadPage = useCallback(async (reset = false) => {
     setLoading(true);
     const filters = {};
     if (batchFilter)  filters.batchId = batchFilter;
     if (statusFilter) filters.status  = statusFilter;
-    // Staff only see their students
-    if (profile?.role === 'staff') filters.staffAssigned = profile.name;
 
     const startDoc = reset ? null : lastDoc;
-    const result = await getStudentsPaged(filters, reset ? null : startDoc);
+    const result = await getStudentsPaged(filters, reset ? null : startDoc, scope);
     if (reset) {
       setStudents(result.students);
     } else {
@@ -55,7 +56,7 @@ export default function StudentsPage() {
     setHasMore(result.hasMore);
 
     if (reset) {
-      const count = await getStudentCount();
+      const count = await getStudentCount(scope);
       setTotalCount(count);
     }
     setLoading(false);
@@ -74,7 +75,7 @@ export default function StudentsPage() {
     if (!search.trim()) { loadPage(true); return; }
     const t = setTimeout(async () => {
       setSearching(true);
-      const results = await searchStudents(search);
+      const results = await searchStudents(search, scope);
       setStudents(results);
       setHasMore(false);
       setSearching(false);
@@ -116,9 +117,6 @@ export default function StudentsPage() {
         </h2>
         {isCEOorAdmin && (
           <div style={{ display: 'flex', gap: 8 }}>
-            <button className="btn btn-ghost" onClick={() => navigate('/bulk-import')}>
-              <Upload size={15} /> Bulk Import
-            </button>
             <button className="btn btn-primary" onClick={() => setShowModal(true)}>
               <Plus size={15} /> Add Student
             </button>

@@ -91,13 +91,13 @@ export default function StudentProfile() {
   const [flowValue,     setFlowValue]     = useState('');
   const [savingFlow,    setSavingFlow]    = useState(false);
 
-  const isCEOorAdmin = profile?.role === 'ceo' || profile?.role === 'admin';
+  const isCEOorAdmin = profile?.role === 'ceo';
 
   const load = async () => {
     try {
       const s  = await getStudent(id).catch(() => null);
       const b  = await getBatches().catch(() => []);
-      const f  = await getFollowUps(id).catch(() => []);
+      const f  = await getFollowUps(id, { role: profile?.role, uid: profile?.uid, email: profile?.email }).catch(() => []);
       const a  = await getAssessments(id).catch(() => []);       // student-level results added on this page
       const ba = s?.batchId ? await getStudentBatchAssessments(id, s.batchId).catch(() => []) : []; // batch/main-page assessments
       const st = await getStaffProfiles().catch(() => []);
@@ -198,7 +198,7 @@ export default function StudentProfile() {
     await addFollowUp({ studentId: id, studentName: student.name, note: newNote, addedBy: profile?.name || 'Staff' });
     setNewNote('');
     setToast({ message: 'Follow-up saved!', type: 'success' });
-    const upd = await getFollowUps(id);
+    const upd = await getFollowUps(id, { role: profile?.role, uid: profile?.uid, email: profile?.email });
     setFollowups(upd);
     setSavingNote(false);
   };

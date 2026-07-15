@@ -24,7 +24,7 @@ const TYPE_COLORS = {
 
 export default function Concerns() {
   const { profile, user } = useAuth();
-  const isCeo = profile?.role === 'ceo' || profile?.role === 'admin';
+  const isCeo = profile?.role === 'ceo';
   const [concerns, setConcerns]   = useState([]);
   const [students, setStudents]   = useState([]);
   const [staffList, setStaffList] = useState([]);
@@ -41,8 +41,9 @@ export default function Concerns() {
   });
 
   const load = async () => {
+    const scope = { role: profile?.role, uid: profile?.uid, email: user?.email };
     const [c, s, st] = await Promise.all([
-      getConcerns(), getStudents(), getStaffProfiles()
+      getConcerns({}, scope), getStudents(scope), getStaffProfiles()
     ]);
     setConcerns(c);
     setStudents(s);
