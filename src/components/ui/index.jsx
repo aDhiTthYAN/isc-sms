@@ -70,14 +70,15 @@ export function StatusBadge({ status }) {
 }
 
 // ── Confirm Dialog ─────────────────────────────────────────────
-export function Confirm({ message, onConfirm, onCancel }) {
+export function Confirm({ message, onConfirm, onCancel, confirmLabel = 'Confirm' }) {
   return (
-    <div className="modal-overlay">
-      <div className="modal" style={{ maxWidth: 380 }}>
-        <p style={{ marginBottom: 20, fontSize: 14, lineHeight: 1.6 }}>{message}</p>
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
+      onClick={e => { if (e.target === e.currentTarget) onCancel?.(); }}>
+      <div style={{ background: '#fff', borderRadius: 16, padding: 28, width: '100%', maxWidth: 420, boxShadow: '0 20px 60px rgba(0,0,0,0.35)' }}>
+        <p style={{ margin: '0 0 22px', fontSize: 15, lineHeight: 1.6, color: 'var(--text)', wordBreak: 'break-word' }}>{message}</p>
         <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
           <button className="btn btn-ghost" onClick={onCancel}>Cancel</button>
-          <button className="btn btn-danger" onClick={onConfirm}>Confirm</button>
+          <button className="btn btn-danger" onClick={onConfirm}>{confirmLabel}</button>
         </div>
       </div>
     </div>

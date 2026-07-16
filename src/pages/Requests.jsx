@@ -18,6 +18,8 @@ export default function Requests() {
   const [toast,    setToast]    = useState(null);
   const [busy,     setBusy]     = useState(false);
   const [filter,   setFilter]   = useState('pending');
+  const [staffFilter, setStaffFilter] = useState('');
+  const [dateFilter,  setDateFilter]  = useState('');
 
   const load = async () => {
     setLoading(true);
@@ -122,14 +124,29 @@ export default function Requests() {
         </div>
       </div>
 
-      {loading ? <Loading /> : (
+      {/* CEO filters: by staff + by date raised */}
+      <div style={{ display:'flex', gap:10, marginBottom:14, flexWrap:'wrap', alignItems:'center' }}>
+        <select className="form-input" style={{ width:'auto', height:36 }} value={staffFilter} onChange={e => setStaffFilter(e.target.value)}>
+          <option value="">All staff</option>
+          {[...new Set(requests.map(r => r.requestedByName).filter(Boolean))].sort().map(n => <option key={n} value={n}>{n}</option>)}
+        </select>
+        <input type="date" className="form-input" style={{ width:'auto', height:36 }} value={dateFilter} onChange={e => setDateFilter(e.target.value)}/>
+        {(staffFilter || dateFilter) && <button className="btn btn-ghost btn-sm" onClick={() => { setStaffFilter(''); setDateFilter(''); }}>Clear</button>}
+      </div>
+
+      {loading ? <Loading /> : (() => {
+        const dstr = (ts) => { if (!ts) return ''; const d = ts.toDate ? ts.toDate() : new Date(ts.seconds ? ts.seconds*1000 : ts); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; };
+        const shown = requests
+          .filter(r => !staffFilter || r.requestedByName === staffFilter)
+          .filter(r => !dateFilter || dstr(r.createdAt) === dateFilter);
+        return (
         <div style={{ display:'flex', flexDirection:'column', gap:12, maxWidth:860 }}>
-          {requests.length === 0 && (
+          {shown.length === 0 && (
             <div style={{ padding:'48px 20px', textAlign:'center', color:'var(--text-muted)', fontSize:13.5, background:'var(--surface)', border:'1px solid var(--border)', borderRadius:14 }}>
               No requests in this view.
             </div>
           )}
-          {requests.map(req => {
+          {shown.map(req => {
             const meta = TYPE_META[req.type] || { label: req.type || 'Request', cls:'badge-gray', Icon: Inbox };
             const Icon = meta.Icon;
             const st = STATUS[req.status] || STATUS.pending;
@@ -167,7 +184,8 @@ export default function Requests() {
             );
           })}
         </div>
-      )}
+        );
+      })()}
 
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
     </div>

@@ -2248,13 +2248,6 @@ export default function Batches() {
                   </div>
                 ))}
                 <div className="form-group">
-                  <label className="form-label">Staff Assigned</label>
-                  <select className="form-input" value={studentForm.staffAssigned||''} onChange={e => setStudentForm({...studentForm,staffAssigned:e.target.value})}>
-                    <option value="">Select</option>
-                    {staffList.filter(s=>s.active!==false).map(s=><option key={s.id}>{s.name}</option>)}
-                  </select>
-                </div>
-                <div className="form-group">
                   <label className="form-label">Join Date</label>
                   <input className="form-input" type="date" value={studentForm.joinDate||''} onChange={e => setStudentForm({...studentForm,joinDate:e.target.value})}/>
                 </div>
@@ -2280,12 +2273,6 @@ export default function Batches() {
               <button className="btn btn-ghost btn-sm" onClick={() => downloadTemplate(selectedBatch.name, batchFields)}>
                 <Download size={13}/> Download CSV Template
               </button>
-              <div className="form-group" style={{ flex:1, margin:0 }}>
-                <select className="form-input" style={{ fontSize:12 }} value={bulkStaffAssign} onChange={e => setBulkStaffAssign(e.target.value)}>
-                  <option value="">Assign all to staff (optional)</option>
-                  {staffList.filter(s=>s.active!==false).map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
-                </select>
-              </div>
             </div>
             <input ref={fileRef} type="file" accept=".csv" style={{ display:'none' }}
               onChange={async e => { const t = await e.target.files[0]?.text(); if(t) setCsvPreview(parseCSV(t, selectedBatch.studentFields || DEFAULT_STUDENT_FIELDS)); }}/>

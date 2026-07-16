@@ -102,6 +102,9 @@ export default function FollowUps() {
 
   const handleComplete = async () => {
     await completeFollowUp(completing.id, completionNote);
+    // NOTE: notifying the assigner on completion is intentionally NOT done here —
+    // notifications are owned by the notification workstream. The completion note
+    // itself is stored and shown on the row below.
     setCompleting(null);
     setCompletionNote('');
     setToast({ message: 'Follow-up completed!', type: 'success' });
@@ -202,7 +205,14 @@ export default function FollowUps() {
                   </div>
                 </td>
                 {isCEOorAdmin && <td style={{ fontSize: 13 }}>{f.assignedTo || '—'}</td>}
-                <td style={{ fontSize: 13, maxWidth: 220 }}>{f.note}</td>
+                <td style={{ fontSize: 13, maxWidth: 260 }}>
+                  {f.note}
+                  {f.completed && f.completionNote && (
+                    <div style={{ marginTop: 5, padding: '5px 9px', background: 'var(--green-soft)', color: 'var(--green-ink)', borderRadius: 7, fontSize: 11.5, lineHeight: 1.4 }}>
+                      <strong>Outcome:</strong> {f.completionNote}
+                    </div>
+                  )}
+                </td>
                 <td>
                   {f.priority === 'urgent' ? <span className="badge badge-red">Urgent</span>
                    : f.priority === 'high' ? <span className="badge badge-amber">High</span>
