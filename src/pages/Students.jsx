@@ -261,11 +261,6 @@ export default function StudentsPage() {
             </FormRow>
             <FormRow>
               <div className="form-group"><label className="form-label">Location</label><input className="form-input" value={form.location} onChange={e => setForm({...form, location: e.target.value})} /></div>
-              <div className="form-group"><label className="form-label">Staff Assigned</label>
-                <select className="form-input" value={form.staffAssigned} onChange={e => setForm({...form, staffAssigned: e.target.value})}>
-                  <option value="">Select staff</option>{staffList.filter(s=>s.active!==false).map(s=><option key={s.id}>{s.name}</option>)}
-                </select>
-              </div>
             </FormRow>
             <FormRow>
               <div className="form-group"><label className="form-label">ClassPlus ID</label><input className="form-input" value={form.classplusId} onChange={e => setForm({...form, classplusId: e.target.value})} /></div>

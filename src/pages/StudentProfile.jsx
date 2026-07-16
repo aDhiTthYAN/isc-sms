@@ -61,6 +61,7 @@ export default function StudentProfile() {
   const [perfTo,      setPerfTo]      = useState('');
   const [asgStatus,   setAsgStatus]   = useState(''); // '', 'done', 'pending', 'overdue'
   const [asgStaff,    setAsgStaff]    = useState('');
+  const [reportStaff, setReportStaff] = useState(''); // progress-report faculty filter
   const [staffList,   setStaffList]   = useState([]);
   const [loading,     setLoading]     = useState(true);
   const [activeTab,   setActiveTab]   = useState('overview');
@@ -677,7 +678,8 @@ export default function StudentProfile() {
           if (perfTo && dateStr > perfTo) return false;
           return true;
         };
-        const shownReports = classReports.filter(r => inRange(r.sessionDate));
+        const shownReports = classReports.filter(r => inRange(r.sessionDate)).filter(r => !reportStaff || r.facultyName === reportStaff);
+        const reportStaffNames = [...new Set(classReports.map(r => r.facultyName).filter(Boolean))];
         const taskState = (t) => {
           if (t.submittedBy?.some(x => x.studentId === id)) return 'done';
           if (t.dueDate && new Date(t.dueDate) < new Date()) return 'overdue';
@@ -739,15 +741,22 @@ export default function StudentProfile() {
             {(perfFrom || perfTo) && <button className="btn btn-ghost btn-sm" onClick={() => { setPerfFrom(''); setPerfTo(''); }}>Clear</button>}
           </div>
 
-          {/* Class progress reports timeline — ABOVE assignments */}
+          {/* Class progress reports timeline — ABOVE assignments, capped-scroll so the assignments below stay reachable */}
           <div className="card" style={{ padding:'16px 20px', marginBottom:16 }}>
-            <div style={{ fontSize:14, fontWeight:700, marginBottom:12 }}>Progress Reports from Faculty ({shownReports.length})</div>
+            <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:12, flexWrap:'wrap' }}>
+              <div style={{ fontSize:14, fontWeight:700 }}>Progress Reports from Faculty ({shownReports.length})</div>
+              <div style={{ flex:1 }}/>
+              <select className="form-input" style={{ width:'auto', height:32, fontSize:12 }} value={reportStaff} onChange={e => setReportStaff(e.target.value)}>
+                <option value="">All faculty</option>
+                {reportStaffNames.map(n => <option key={n} value={n}>{n}</option>)}
+              </select>
+            </div>
             {shownReports.length === 0 ? (
               <div style={{ fontSize:13, color:'var(--text-muted)', padding:'20px 0', textAlign:'center' }}>
-                {classReports.length === 0 ? 'No class reports yet. Faculty add these from the Schedule → Progress Reports after a class.' : 'No reports in the selected date range.'}
+                {classReports.length === 0 ? 'No class reports yet. Faculty add these from the Schedule → Progress Reports after a class.' : 'No reports for the selected filters.'}
               </div>
             ) : (
-              <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+              <div style={{ display:'flex', flexDirection:'column', gap:10, maxHeight:360, overflowY:'auto', paddingRight:4 }}>
                 {shownReports.map(r => (
                   <div key={r.id} style={{ borderLeft:'3px solid var(--brand)', paddingLeft:12 }}>
                     <div style={{ display:'flex', gap:8, alignItems:'center', flexWrap:'wrap', marginBottom:2 }}>
