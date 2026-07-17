@@ -474,6 +474,8 @@ export default function Batches() {
 
   const [studentSearch, setStudentSearch] = useState('');
   const [studentStatusFilter, setStudentStatusFilter] = useState('');
+  const [studentJoinFrom, setStudentJoinFrom] = useState('');
+  const [studentJoinTo,   setStudentJoinTo]   = useState('');
   const [studentPage, setStudentPage] = useState(0);
   const [batchFilter, setBatchFilter] = useState('all');
 
@@ -885,10 +887,11 @@ export default function Batches() {
     };
     if (fieldValue !== undefined && fieldValue !== '') {
       update[`courseFlow.${stepKey}.value`] = fieldValue;
-      // Keep top-level varkResult for backward compat with student list
-      if (step?.displayInTable && stepKey === 'vark_analysis') {
-        update.varkResult = fieldValue;
-      }
+      // Mirror the captured value to a top-level field so it shows in the
+      // student list. VARK keeps its legacy `varkResult` key; any other
+      // dropdown step mirrors to a field named after its key.
+      if (stepKey === 'vark_analysis') update.varkResult = fieldValue;
+      else update[stepKey] = fieldValue;
     }
     await updateStudent(studentId, update);
     loadBatchDetail(selectedBatch);
@@ -1277,8 +1280,11 @@ export default function Batches() {
           // Columns to show (configurable via "Show in list"); Name/Status/Onboarding/View are permanent.
           const listFields = batchFields.filter(f => f.key !== 'name' &&
             (f.showInList !== undefined ? f.showInList : DEFAULT_LIST_KEYS.includes(f.key)));
+          const joinDateOf = (s) => s.joiningDate || (s.createdAt?.seconds ? new Date(s.createdAt.seconds*1000).toISOString().slice(0,10) : '');
           const filtered = batchStudents.filter(s => {
             if (studentStatusFilter && s.status !== studentStatusFilter) return false;
+            if (studentJoinFrom && joinDateOf(s) < studentJoinFrom) return false;
+            if (studentJoinTo   && joinDateOf(s) > studentJoinTo)   return false;
             if (!studentSearch) return true;
             const q = studentSearch.toLowerCase();
             return (
@@ -1314,6 +1320,13 @@ export default function Batches() {
                   <option value="at-risk">At Risk</option>
                   <option value="dropped">Dropped</option>
                 </select>
+                <div style={{ display:'flex', alignItems:'center', gap:6 }} title="Filter by joining date">
+                  <span style={{ fontSize:11.5, color:'#6B7280' }}>Joined</span>
+                  <input type="date" className="form-input" style={{ width:'auto' }} value={studentJoinFrom} onChange={e => { setStudentJoinFrom(e.target.value); setStudentPage(0); }}/>
+                  <span style={{ fontSize:11.5, color:'#6B7280' }}>→</span>
+                  <input type="date" className="form-input" style={{ width:'auto' }} value={studentJoinTo} onChange={e => { setStudentJoinTo(e.target.value); setStudentPage(0); }}/>
+                  {(studentJoinFrom || studentJoinTo) && <button className="btn btn-ghost btn-sm" onClick={() => { setStudentJoinFrom(''); setStudentJoinTo(''); }}>Clear</button>}
+                </div>
                 <div style={{ display:'flex', alignItems:'center', fontSize:12, color:'#6B7280', whiteSpace:'nowrap' }}>
                   {filtered.length} of {batchStudents.length} students
                 </div>
@@ -1374,17 +1387,27 @@ export default function Batches() {
                           </td>
                           {listFields.map(f => (
                             <td key={f.key} style={{ fontSize:12.5 }}>
-                              <input
-                                defaultValue={s[f.key] ?? ''}
-                                onBlur={async e => {
-                                  const val = e.target.value.trim();
-                                  if (val !== (s[f.key] ?? '')) await updateStudent(s.id, { [f.key]: val });
-                                }}
-                                style={{ border:'1px solid transparent', borderRadius:6, padding:'2px 6px', fontSize:12.5, width:'100%', minWidth:80, background:'transparent', cursor:'text' }}
-                                onFocus={e => { e.target.style.borderColor='#E5E7EB'; e.target.style.background='#fff'; }}
-                                onBlurCapture={e => { e.target.style.borderColor='transparent'; e.target.style.background='transparent'; }}
-                                placeholder="—"
-                              />
+                              {f.type === 'select' ? (
+                                <select
+                                  value={s[f.key] ?? ''}
+                                  onChange={async e => { await updateStudent(s.id, { [f.key]: e.target.value }); }}
+                                  className="form-input" style={{ fontSize:12, height:30, padding:'0 6px', minWidth:110 }}>
+                                  <option value="">—</option>
+                                  {(f.options || []).map(o => <option key={o} value={o}>{o}</option>)}
+                                </select>
+                              ) : (
+                                <input
+                                  defaultValue={s[f.key] ?? ''}
+                                  onBlur={async e => {
+                                    const val = e.target.value.trim();
+                                    if (val !== (s[f.key] ?? '')) await updateStudent(s.id, { [f.key]: val });
+                                  }}
+                                  style={{ border:'1px solid transparent', borderRadius:6, padding:'2px 6px', fontSize:12.5, width:'100%', minWidth:80, background:'transparent', cursor:'text' }}
+                                  onFocus={e => { e.target.style.borderColor='#E5E7EB'; e.target.style.background='#fff'; }}
+                                  onBlurCapture={e => { e.target.style.borderColor='transparent'; e.target.style.background='transparent'; }}
+                                  placeholder="—"
+                                />
+                              )}
                             </td>
                           ))}
                           <td>
@@ -2370,23 +2393,34 @@ export default function Batches() {
             </div>
             <div style={{ display:'flex', flexDirection:'column', gap:8, marginBottom:16 }}>
               {editFields.map((field, idx) => (
-                <div key={idx} style={{ display:'flex', gap:8, alignItems:'center', padding:'8px 12px', background:'#F9FAFB', borderRadius:8 }}>
-                  <input className="form-input" style={{ flex:2 }} placeholder="Label" value={field.label}
-                    onChange={e => { const u=[...editFields]; u[idx]={...u[idx],label:e.target.value}; setEditFields(u); }}/>
-                  <select className="form-input" style={{ flex:1 }} value={field.type||'text'}
-                    onChange={e => { const u=[...editFields]; u[idx]={...u[idx],type:e.target.value}; setEditFields(u); }}>
-                    {['text','email','tel','number','date'].map(t=><option key={t}>{t}</option>)}
-                  </select>
-                  <label style={{ display:'flex', alignItems:'center', gap:4, fontSize:12, whiteSpace:'nowrap' }}>
-                    <input type="checkbox" checked={field.required||false}
-                      onChange={e => { const u=[...editFields]; u[idx]={...u[idx],required:e.target.checked}; setEditFields(u); }}/> Required
-                  </label>
-                  <label style={{ display:'flex', alignItems:'center', gap:4, fontSize:12, whiteSpace:'nowrap' }}>
-                    <input type="checkbox" checked={field.key==='name' ? true : (field.showInList !== undefined ? field.showInList : DEFAULT_LIST_KEYS.includes(field.key))}
-                      disabled={field.key==='name'}
-                      onChange={e => { const u=[...editFields]; u[idx]={...u[idx],showInList:e.target.checked}; setEditFields(u); }}/> Show in list
-                  </label>
-                  <button className="btn btn-ghost btn-sm" style={{ color:'#EF4444' }} onClick={() => setEditFields(editFields.filter((_,i)=>i!==idx))}><Trash2 size={13}/></button>
+                <div key={idx} style={{ display:'flex', flexDirection:'column', gap:6, padding:'8px 12px', background:'#F9FAFB', borderRadius:8 }}>
+                  <div style={{ display:'flex', gap:8, alignItems:'center' }}>
+                    <input className="form-input" style={{ flex:2 }} placeholder="Label" value={field.label}
+                      onChange={e => { const u=[...editFields]; u[idx]={...u[idx],label:e.target.value}; setEditFields(u); }}/>
+                    <select className="form-input" style={{ flex:1 }} value={field.type||'text'}
+                      onChange={e => { const u=[...editFields]; u[idx]={...u[idx],type:e.target.value}; setEditFields(u); }}>
+                      {['text','email','tel','number','date','select'].map(t=><option key={t} value={t}>{t === 'select' ? 'select (dropdown)' : t}</option>)}
+                    </select>
+                    <label style={{ display:'flex', alignItems:'center', gap:4, fontSize:12, whiteSpace:'nowrap' }}>
+                      <input type="checkbox" checked={field.required||false}
+                        onChange={e => { const u=[...editFields]; u[idx]={...u[idx],required:e.target.checked}; setEditFields(u); }}/> Required
+                    </label>
+                    <label style={{ display:'flex', alignItems:'center', gap:4, fontSize:12, whiteSpace:'nowrap' }}>
+                      <input type="checkbox" checked={field.key==='name' ? true : (field.showInList !== undefined ? field.showInList : DEFAULT_LIST_KEYS.includes(field.key))}
+                        disabled={field.key==='name'}
+                        onChange={e => { const u=[...editFields]; u[idx]={...u[idx],showInList:e.target.checked}; setEditFields(u); }}/> Show in list
+                    </label>
+                    <button className="btn btn-ghost btn-sm" style={{ color:'#EF4444' }} onClick={() => setEditFields(editFields.filter((_,i)=>i!==idx))}><Trash2 size={13}/></button>
+                  </div>
+                  {field.type === 'select' && (
+                    <div style={{ paddingLeft:2 }}>
+                      <div style={{ fontSize:11, color:'#6B7280', marginBottom:3 }}>Dropdown options (one per line):</div>
+                      <textarea className="form-input" rows={3} style={{ fontSize:12 }}
+                        value={(field.options||[]).join('\n')}
+                        onChange={e => { const u=[...editFields]; u[idx]={...u[idx], options: e.target.value.split('\n').map(s=>s.trim()).filter(Boolean)}; setEditFields(u); }}
+                        placeholder={'Option 1\nOption 2\nOption 3'}/>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

@@ -791,7 +791,7 @@ export default function StudentProfile() {
             {shownTasks.length === 0 ? (
               <div style={{ fontSize:13, color:'var(--text-muted)', padding:'16px 0', textAlign:'center' }}>{batchTasks.length === 0 ? 'No assignments for this student yet.' : 'No assignments in the selected date range.'}</div>
             ) : (
-              <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+              <div style={{ display:'flex', flexDirection:'column', gap:8, maxHeight:400, overflowY:'auto', paddingRight:4 }}>
                 {shownTasks.map(t => {
                   const sub = t.submittedBy?.find(x => x.studentId === id);
                   const overdue = !sub && t.dueDate && new Date(t.dueDate) < new Date();

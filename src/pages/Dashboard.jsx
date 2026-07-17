@@ -5,7 +5,7 @@ import {
   getRequests, addNotification, updateRequest, markNotificationRead,
   getBatchSchedules, getAssessments, getBatchTasks,
 } from '../firebase/services';
-import { query, collection, where, limit, getDocs, getCountFromServer } from 'firebase/firestore';
+import { query, collection, where, limit, orderBy, getDocs, getCountFromServer } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import { Loading } from '../components/ui';
 import { useAuth } from '../context/AuthContext';
@@ -169,6 +169,7 @@ export default function Dashboard() {
   const [batches, setBatches]             = useState([]);
   const [batchRows, setBatchRows]         = useState([]);
   const [recentActivity, setRecentActivity] = useState([]);
+  const [recentStudents, setRecentStudents] = useState([]);
   const [pendingTasks, setPendingTasks]   = useState([]);
   const [atRiskStudents, setAtRiskStudents] = useState([]);
   const [actFilter, setActFilter]         = useState('all');
@@ -200,6 +201,12 @@ export default function Dashboard() {
 
         const arStudentsSnap = await getDocs(query(collection(db,'students'), where('status','==','at-risk'), limit(10)));
         setAtRiskStudents(arStudentsSnap.docs.map(d => ({ id:d.id, ...d.data() })));
+
+        // Recently joined students (newest first) for the intake feed.
+        try {
+          const recentSnap = await getDocs(query(collection(db,'students'), orderBy('createdAt','desc'), limit(50)));
+          setRecentStudents(recentSnap.docs.map(d => ({ id:d.id, ...d.data() })));
+        } catch {}
 
         const allBatches = await getBatches();
         const uid = profile?.uid;
@@ -526,6 +533,33 @@ export default function Dashboard() {
             </div>
             <div style={{ fontFamily:'var(--font-display)', fontSize:30, fontWeight:700, color:'var(--text)', letterSpacing:'-.02em', lineHeight:1, marginTop:10 }}>{recentActivity.length}</div>
             <div style={{ fontSize:12, color:'var(--text-muted)', marginTop:8 }}>Follow-ups + tasks</div>
+          </div>
+        </div>
+      )}
+
+      {/* Recently joined students — intake feed (CEO) */}
+      {isCEOorAdmin && recentStudents.length > 0 && (
+        <div style={{ background:'var(--surface)', border:'1px solid var(--border)', borderRadius:16, padding:'16px 20px', boxShadow:'var(--shadow-sm)', marginBottom:18 }}>
+          <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:12 }}>
+            <Users size={16} style={{ color:'var(--brand)' }} />
+            <h3 style={{ fontSize:15, fontWeight:700 }}>Recently Joined Students</h3>
+            <span className="badge badge-green" style={{ marginLeft:2 }}>{recentStudents.length} newest</span>
+          </div>
+          <div style={{ display:'flex', flexDirection:'column', gap:6, maxHeight:300, overflowY:'auto', paddingRight:4 }}>
+            {recentStudents.map(s => (
+              <div key={s.id} onClick={() => navigate(`/students/${s.id}`)}
+                style={{ display:'flex', alignItems:'center', gap:12, padding:'9px 12px', borderRadius:10, border:'1px solid var(--border)', cursor:'pointer', transition:'background .12s' }}
+                onMouseEnter={e => e.currentTarget.style.background='var(--surface-hover)'}
+                onMouseLeave={e => e.currentTarget.style.background='transparent'}>
+                <div style={{ width:30, height:30, borderRadius:'50%', background:avatarColor(s.name||''), display:'flex', alignItems:'center', justifyContent:'center', fontSize:11, fontWeight:700, color:'#fff', flexShrink:0 }}>{initials(s.name||'?')}</div>
+                <div style={{ flex:1, minWidth:0 }}>
+                  <div style={{ fontSize:13, fontWeight:600 }}>{s.name || 'Unnamed'}</div>
+                  <div style={{ fontSize:11.5, color:'var(--text-muted)' }}>{s.batchName || '—'}{s.phone ? ` · ${s.phone}` : ''}</div>
+                </div>
+                <span style={{ fontSize:11, color:'var(--text-muted)', whiteSpace:'nowrap' }}>{timeAgo(s.createdAt)}</span>
+                <ChevronRight size={15} style={{ color:'var(--text-muted)', flexShrink:0 }} />
+              </div>
+            ))}
           </div>
         </div>
       )}
