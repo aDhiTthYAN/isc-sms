@@ -204,7 +204,7 @@ export default function Dashboard() {
 
         // Recently joined students (newest first) for the intake feed.
         try {
-          const recentSnap = await getDocs(query(collection(db,'students'), orderBy('createdAt','desc'), limit(8)));
+          const recentSnap = await getDocs(query(collection(db,'students'), orderBy('createdAt','desc'), limit(50)));
           setRecentStudents(recentSnap.docs.map(d => ({ id:d.id, ...d.data() })));
         } catch {}
 
@@ -545,7 +545,7 @@ export default function Dashboard() {
             <h3 style={{ fontSize:15, fontWeight:700 }}>Recently Joined Students</h3>
             <span className="badge badge-green" style={{ marginLeft:2 }}>{recentStudents.length} newest</span>
           </div>
-          <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+          <div style={{ display:'flex', flexDirection:'column', gap:6, maxHeight:300, overflowY:'auto', paddingRight:4 }}>
             {recentStudents.map(s => (
               <div key={s.id} onClick={() => navigate(`/students/${s.id}`)}
                 style={{ display:'flex', alignItems:'center', gap:12, padding:'9px 12px', borderRadius:10, border:'1px solid var(--border)', cursor:'pointer', transition:'background .12s' }}

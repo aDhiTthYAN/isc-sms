@@ -285,6 +285,15 @@ export default function StaffDashboard() {
     return (nowMs - ts) <= RECENT_WINDOW_MS;
   }).slice(0, 6);
 
+  // Students in my batches who joined in the last 6 days.
+  const SIX_DAYS_MS = 6 * 24 * 60 * 60 * 1000;
+  const newStudents = students.filter(s => {
+    const ts = s.createdAt?.toDate ? s.createdAt.toDate().getTime()
+      : s.createdAt?.seconds ? s.createdAt.seconds * 1000
+      : (s.joiningDate ? new Date(s.joiningDate).getTime() : null);
+    return ts && (nowMs - ts) <= SIX_DAYS_MS;
+  }).sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+
   return (
     <div>
       {/* Welcome */}
@@ -313,6 +322,33 @@ export default function StaffDashboard() {
           </button>
         </div>
       </div>
+
+      {/* Newly joined students in my batches (last 6 days) */}
+      {newStudents.length > 0 && (
+        <div style={{ background:'#fff', border:'1px solid #E5E7EB', borderRadius:14, padding:'16px 20px', marginBottom:20, boxShadow:'0 1px 3px rgba(0,0,0,0.06)' }}>
+          <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:12 }}>
+            <Users size={16} style={{ color:'var(--brand)' }}/>
+            <h3 style={{ fontSize:15, fontWeight:700 }}>New Students (last 6 days)</h3>
+            <span className="badge badge-green" style={{ marginLeft:2 }}>{newStudents.length}</span>
+          </div>
+          <div style={{ display:'flex', flexDirection:'column', gap:6, maxHeight:280, overflowY:'auto', paddingRight:4 }}>
+            {newStudents.map(s => (
+              <div key={s.id} onClick={() => navigate(`/students/${s.id}`)}
+                style={{ display:'flex', alignItems:'center', gap:12, padding:'9px 12px', borderRadius:10, border:'1px solid #E5E7EB', cursor:'pointer' }}
+                onMouseEnter={e => e.currentTarget.style.background='#F8FAFC'}
+                onMouseLeave={e => e.currentTarget.style.background='#fff'}>
+                <div style={{ width:30, height:30, borderRadius:'50%', background:avatarColor(s.name||''), display:'flex', alignItems:'center', justifyContent:'center', fontSize:11, fontWeight:700, color:'#fff', flexShrink:0 }}>{initials(s.name||'?')}</div>
+                <div style={{ flex:1, minWidth:0 }}>
+                  <div style={{ fontSize:13, fontWeight:600 }}>{s.name || 'Unnamed'}</div>
+                  <div style={{ fontSize:11.5, color:'#9CA3AF' }}>{s.batchName || '—'}{s.phone ? ` · ${s.phone}` : ''}</div>
+                </div>
+                <span style={{ fontSize:11, color:'#9CA3AF', whiteSpace:'nowrap' }}>{timeAgo(s.createdAt)}</span>
+                <ChevronRight size={15} style={{ color:'#D1D5DB', flexShrink:0 }}/>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Notifications + Requests Sidebar */}
       {showSidebar && (

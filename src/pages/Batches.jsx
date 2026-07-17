@@ -474,6 +474,8 @@ export default function Batches() {
 
   const [studentSearch, setStudentSearch] = useState('');
   const [studentStatusFilter, setStudentStatusFilter] = useState('');
+  const [studentJoinFrom, setStudentJoinFrom] = useState('');
+  const [studentJoinTo,   setStudentJoinTo]   = useState('');
   const [studentPage, setStudentPage] = useState(0);
   const [batchFilter, setBatchFilter] = useState('all');
 
@@ -1278,8 +1280,11 @@ export default function Batches() {
           // Columns to show (configurable via "Show in list"); Name/Status/Onboarding/View are permanent.
           const listFields = batchFields.filter(f => f.key !== 'name' &&
             (f.showInList !== undefined ? f.showInList : DEFAULT_LIST_KEYS.includes(f.key)));
+          const joinDateOf = (s) => s.joiningDate || (s.createdAt?.seconds ? new Date(s.createdAt.seconds*1000).toISOString().slice(0,10) : '');
           const filtered = batchStudents.filter(s => {
             if (studentStatusFilter && s.status !== studentStatusFilter) return false;
+            if (studentJoinFrom && joinDateOf(s) < studentJoinFrom) return false;
+            if (studentJoinTo   && joinDateOf(s) > studentJoinTo)   return false;
             if (!studentSearch) return true;
             const q = studentSearch.toLowerCase();
             return (
@@ -1315,6 +1320,13 @@ export default function Batches() {
                   <option value="at-risk">At Risk</option>
                   <option value="dropped">Dropped</option>
                 </select>
+                <div style={{ display:'flex', alignItems:'center', gap:6 }} title="Filter by joining date">
+                  <span style={{ fontSize:11.5, color:'#6B7280' }}>Joined</span>
+                  <input type="date" className="form-input" style={{ width:'auto' }} value={studentJoinFrom} onChange={e => { setStudentJoinFrom(e.target.value); setStudentPage(0); }}/>
+                  <span style={{ fontSize:11.5, color:'#6B7280' }}>→</span>
+                  <input type="date" className="form-input" style={{ width:'auto' }} value={studentJoinTo} onChange={e => { setStudentJoinTo(e.target.value); setStudentPage(0); }}/>
+                  {(studentJoinFrom || studentJoinTo) && <button className="btn btn-ghost btn-sm" onClick={() => { setStudentJoinFrom(''); setStudentJoinTo(''); }}>Clear</button>}
+                </div>
                 <div style={{ display:'flex', alignItems:'center', fontSize:12, color:'#6B7280', whiteSpace:'nowrap' }}>
                   {filtered.length} of {batchStudents.length} students
                 </div>
