@@ -196,14 +196,26 @@ export default function Dashboard() {
         const totalSnap = await getCountFromServer(collection(db, 'students'));
         setTotalStudents(totalSnap.data().count);
 
-        const arSnap = await getCountFromServer(query(collection(db,'students'), where('status','==','at-risk')));
-        setAtRiskCount(arSnap.data().count);
-
-        const arStudentsSnap = await getDocs(query(collection(db,'students'), where('status','==','at-risk'), limit(10)));
-        setAtRiskStudents(arStudentsSnap.docs.map(d => ({ id:d.id, ...d.data() })));
-
         const uid = profile?.uid;
         const isStaff = !isCEOorAdmin;
+
+        // At-risk students — full list shown in-section (scroll-capped), no
+        // "view all" redirect. Staff: rules reject unscoped student queries,
+        // so scope by staffIds (array-contains, auto-indexed) and filter the
+        // status client-side. CEO: unscoped query is allowed.
+        try {
+          let atRisk;
+          if (isStaff) {
+            const snap = await getDocs(query(collection(db,'students'), where('staffIds','array-contains',uid), limit(500)));
+            atRisk = snap.docs.map(d => ({ id:d.id, ...d.data() })).filter(s => s.status === 'at-risk');
+          } else {
+            const snap = await getDocs(query(collection(db,'students'), where('status','==','at-risk'), limit(500)));
+            atRisk = snap.docs.map(d => ({ id:d.id, ...d.data() }));
+          }
+          atRisk.sort((a,b) => (a.name||'').localeCompare(b.name||''));
+          setAtRiskStudents(atRisk);
+          setAtRiskCount(atRisk.length);
+        } catch {}
 
         // Recently joined students for the intake feed.
         // CEO: newest 50 across all students (rules allow the unscoped query).
@@ -737,11 +749,6 @@ export default function Dashboard() {
               </div>
             ))}
           </div>
-          {atRiskCount > 10 && (
-            <Link to="/students" style={{ display:'block', textAlign:'center', marginTop:12, fontSize:12, color:'var(--brand)', fontWeight:500 }}>
-              +{atRiskCount - 10} more at-risk students
-            </Link>
-          )}
         </div>
       </div>
 
