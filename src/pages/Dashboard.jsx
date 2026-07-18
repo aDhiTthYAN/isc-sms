@@ -217,22 +217,18 @@ export default function Dashboard() {
           setAtRiskCount(atRisk.length);
         } catch {}
 
-        // Recently joined students for the intake feed.
-        // CEO: newest 50 across all students (rules allow the unscoped query).
-        // Staff: rules reject unscoped student queries, so scope by staffIds
-        // (array-contains, single-field auto-index) and keep only the last 7 days.
+        // Recently joined students — identical on both dashboards: students
+        // who joined in the last 7 days, newest first. CEO sees all; staff are
+        // scoped by staffIds (rules reject the unscoped query for staff).
         try {
-          if (isStaff) {
-            const recentSnap = await getDocs(query(collection(db,'students'), where('staffIds','array-contains',uid), limit(200)));
-            const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
-            const rows = recentSnap.docs.map(d => ({ id:d.id, ...d.data() }))
-              .filter(s => (s.createdAt?.seconds ? s.createdAt.seconds * 1000 : 0) >= cutoff)
-              .sort((a,b) => (b.createdAt?.seconds||0) - (a.createdAt?.seconds||0));
-            setRecentStudents(rows);
-          } else {
-            const recentSnap = await getDocs(query(collection(db,'students'), orderBy('createdAt','desc'), limit(50)));
-            setRecentStudents(recentSnap.docs.map(d => ({ id:d.id, ...d.data() })));
-          }
+          const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
+          const recentSnap = isStaff
+            ? await getDocs(query(collection(db,'students'), where('staffIds','array-contains',uid), limit(500)))
+            : await getDocs(query(collection(db,'students'), orderBy('createdAt','desc'), limit(200)));
+          const rows = recentSnap.docs.map(d => ({ id:d.id, ...d.data() }))
+            .filter(s => (s.createdAt?.seconds ? s.createdAt.seconds * 1000 : 0) >= cutoff)
+            .sort((a,b) => (b.createdAt?.seconds||0) - (a.createdAt?.seconds||0));
+          setRecentStudents(rows);
         } catch {}
 
         const allBatches = await getBatches();
@@ -562,14 +558,18 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* Recently joined students — intake feed (CEO: newest 50 · Staff: last 7 days in their batches) */}
-      {recentStudents.length > 0 && (
-        <div style={{ background:'var(--surface)', border:'1px solid var(--border)', borderRadius:16, padding:'16px 20px', boxShadow:'var(--shadow-sm)', marginBottom:18 }}>
-          <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:12 }}>
-            <Users size={16} style={{ color:'var(--brand)' }} />
-            <h3 style={{ fontSize:15, fontWeight:700 }}>Recently Joined Students</h3>
-            <span className="badge badge-green" style={{ marginLeft:2 }}>{isCEOorAdmin ? `${recentStudents.length} newest` : `${recentStudents.length} · last 7 days`}</span>
+      {/* Recently joined students — last 7 days, identical for CEO and staff */}
+      <div style={{ background:'var(--surface)', border:'1px solid var(--border)', borderRadius:16, padding:'16px 20px', boxShadow:'var(--shadow-sm)', marginBottom:18 }}>
+        <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:12 }}>
+          <Users size={16} style={{ color:'var(--brand)' }} />
+          <h3 style={{ fontSize:15, fontWeight:700 }}>Recently Joined Students</h3>
+          <span className="badge badge-green" style={{ marginLeft:2 }}>{recentStudents.length} · last 7 days</span>
+        </div>
+        {recentStudents.length === 0 ? (
+          <div style={{ color:'var(--text-muted)', fontSize:13, textAlign:'center', padding:'24px 0' }}>
+            No students joined in the last 7 days.
           </div>
+        ) : (
           <div style={{ display:'flex', flexDirection:'column', gap:6, maxHeight:300, overflowY:'auto', paddingRight:4 }}>
             {recentStudents.map(s => (
               <div key={s.id} onClick={() => navigate(`/students/${s.id}`)}
@@ -586,8 +586,8 @@ export default function Dashboard() {
               </div>
             ))}
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* Staff: Batch Activity Hub */}
       {!isCEOorAdmin && (
