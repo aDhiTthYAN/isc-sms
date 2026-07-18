@@ -202,15 +202,28 @@ export default function Dashboard() {
         const arStudentsSnap = await getDocs(query(collection(db,'students'), where('status','==','at-risk'), limit(10)));
         setAtRiskStudents(arStudentsSnap.docs.map(d => ({ id:d.id, ...d.data() })));
 
-        // Recently joined students (newest first) for the intake feed.
+        const uid = profile?.uid;
+        const isStaff = !isCEOorAdmin;
+
+        // Recently joined students for the intake feed.
+        // CEO: newest 50 across all students (rules allow the unscoped query).
+        // Staff: rules reject unscoped student queries, so scope by staffIds
+        // (array-contains, single-field auto-index) and keep only the last 7 days.
         try {
-          const recentSnap = await getDocs(query(collection(db,'students'), orderBy('createdAt','desc'), limit(50)));
-          setRecentStudents(recentSnap.docs.map(d => ({ id:d.id, ...d.data() })));
+          if (isStaff) {
+            const recentSnap = await getDocs(query(collection(db,'students'), where('staffIds','array-contains',uid), limit(200)));
+            const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
+            const rows = recentSnap.docs.map(d => ({ id:d.id, ...d.data() }))
+              .filter(s => (s.createdAt?.seconds ? s.createdAt.seconds * 1000 : 0) >= cutoff)
+              .sort((a,b) => (b.createdAt?.seconds||0) - (a.createdAt?.seconds||0));
+            setRecentStudents(rows);
+          } else {
+            const recentSnap = await getDocs(query(collection(db,'students'), orderBy('createdAt','desc'), limit(50)));
+            setRecentStudents(recentSnap.docs.map(d => ({ id:d.id, ...d.data() })));
+          }
         } catch {}
 
         const allBatches = await getBatches();
-        const uid = profile?.uid;
-        const isStaff = !isCEOorAdmin;
         const batchList = isStaff
           ? allBatches.filter(b => b.mentorId === uid || (b.staffIds || []).includes(uid))
           : allBatches;
@@ -537,13 +550,13 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* Recently joined students — intake feed (CEO) */}
-      {isCEOorAdmin && recentStudents.length > 0 && (
+      {/* Recently joined students — intake feed (CEO: newest 50 · Staff: last 7 days in their batches) */}
+      {recentStudents.length > 0 && (
         <div style={{ background:'var(--surface)', border:'1px solid var(--border)', borderRadius:16, padding:'16px 20px', boxShadow:'var(--shadow-sm)', marginBottom:18 }}>
           <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:12 }}>
             <Users size={16} style={{ color:'var(--brand)' }} />
             <h3 style={{ fontSize:15, fontWeight:700 }}>Recently Joined Students</h3>
-            <span className="badge badge-green" style={{ marginLeft:2 }}>{recentStudents.length} newest</span>
+            <span className="badge badge-green" style={{ marginLeft:2 }}>{isCEOorAdmin ? `${recentStudents.length} newest` : `${recentStudents.length} · last 7 days`}</span>
           </div>
           <div style={{ display:'flex', flexDirection:'column', gap:6, maxHeight:300, overflowY:'auto', paddingRight:4 }}>
             {recentStudents.map(s => (

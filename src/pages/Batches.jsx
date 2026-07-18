@@ -1287,6 +1287,12 @@ export default function Batches() {
           // Columns to show (configurable via "Show in list"); Name/Status/Onboarding/View are permanent.
           const listFields = batchFields.filter(f => f.key !== 'name' &&
             (f.showInList !== undefined ? f.showInList : DEFAULT_LIST_KEYS.includes(f.key)));
+          // Course-flow steps flagged "Show selected value in student table".
+          // Rendered as read-only columns that pull the captured onboarding
+          // value straight from courseFlow — works for custom steps and shows
+          // already-marked values retroactively. The default VARK step is
+          // skipped here because it already mirrors to the varkResult field.
+          const flowCols = batchFlow.filter(step => step.displayInTable && step.key !== 'vark_analysis');
           const joinDateOf = (s) => s.joiningDate || (s.createdAt?.seconds ? new Date(s.createdAt.seconds*1000).toISOString().slice(0,10) : '');
           const filtered = batchStudents.filter(s => {
             if (studentStatusFilter && s.status !== studentStatusFilter) return false;
@@ -1364,6 +1370,7 @@ export default function Batches() {
                     <tr>
                       <th>Kids Name</th>
                       {listFields.map(f => <th key={f.key}>{f.label}</th>)}
+                      {flowCols.map(step => <th key={step.key}>{step.fieldLabel || step.label}</th>)}
                       <th>Status</th>
                       <th>Onboarding</th>
                       <th></th>
@@ -1371,7 +1378,7 @@ export default function Batches() {
                   </thead>
                   <tbody>
                     {paginated.length === 0 && (
-                      <tr><td colSpan={listFields.length + 4} style={{ textAlign:'center', padding:40, color:'#6B7280' }}>
+                      <tr><td colSpan={listFields.length + flowCols.length + 4} style={{ textAlign:'center', padding:40, color:'#6B7280' }}>
                         {studentSearch || studentStatusFilter ? 'No students match your filter.' : 'No students yet.'}
                         {!studentSearch && !studentStatusFilter && (
                           <div style={{ display:'flex', gap:8, justifyContent:'center', marginTop:12 }}>
@@ -1415,6 +1422,11 @@ export default function Batches() {
                                   placeholder="—"
                                 />
                               )}
+                            </td>
+                          ))}
+                          {flowCols.map(step => (
+                            <td key={step.key} style={{ fontSize:12.5, color:'var(--text-sub)' }}>
+                              {s.courseFlow?.[step.key]?.value || '—'}
                             </td>
                           ))}
                           <td>
