@@ -196,21 +196,42 @@ export default function Dashboard() {
         const totalSnap = await getCountFromServer(collection(db, 'students'));
         setTotalStudents(totalSnap.data().count);
 
-        const arSnap = await getCountFromServer(query(collection(db,'students'), where('status','==','at-risk')));
-        setAtRiskCount(arSnap.data().count);
+        const uid = profile?.uid;
+        const isStaff = !isCEOorAdmin;
 
-        const arStudentsSnap = await getDocs(query(collection(db,'students'), where('status','==','at-risk'), limit(10)));
-        setAtRiskStudents(arStudentsSnap.docs.map(d => ({ id:d.id, ...d.data() })));
-
-        // Recently joined students (newest first) for the intake feed.
+        // At-risk students — full list shown in-section (scroll-capped), no
+        // "view all" redirect. Staff: rules reject unscoped student queries,
+        // so scope by staffIds (array-contains, auto-indexed) and filter the
+        // status client-side. CEO: unscoped query is allowed.
         try {
-          const recentSnap = await getDocs(query(collection(db,'students'), orderBy('createdAt','desc'), limit(50)));
-          setRecentStudents(recentSnap.docs.map(d => ({ id:d.id, ...d.data() })));
+          let atRisk;
+          if (isStaff) {
+            const snap = await getDocs(query(collection(db,'students'), where('staffIds','array-contains',uid), limit(500)));
+            atRisk = snap.docs.map(d => ({ id:d.id, ...d.data() })).filter(s => s.status === 'at-risk');
+          } else {
+            const snap = await getDocs(query(collection(db,'students'), where('status','==','at-risk'), limit(500)));
+            atRisk = snap.docs.map(d => ({ id:d.id, ...d.data() }));
+          }
+          atRisk.sort((a,b) => (a.name||'').localeCompare(b.name||''));
+          setAtRiskStudents(atRisk);
+          setAtRiskCount(atRisk.length);
+        } catch {}
+
+        // Recently joined students — identical on both dashboards: students
+        // who joined in the last 7 days, newest first. CEO sees all; staff are
+        // scoped by staffIds (rules reject the unscoped query for staff).
+        try {
+          const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
+          const recentSnap = isStaff
+            ? await getDocs(query(collection(db,'students'), where('staffIds','array-contains',uid), limit(500)))
+            : await getDocs(query(collection(db,'students'), orderBy('createdAt','desc'), limit(200)));
+          const rows = recentSnap.docs.map(d => ({ id:d.id, ...d.data() }))
+            .filter(s => (s.createdAt?.seconds ? s.createdAt.seconds * 1000 : 0) >= cutoff)
+            .sort((a,b) => (b.createdAt?.seconds||0) - (a.createdAt?.seconds||0));
+          setRecentStudents(rows);
         } catch {}
 
         const allBatches = await getBatches();
-        const uid = profile?.uid;
-        const isStaff = !isCEOorAdmin;
         const batchList = isStaff
           ? allBatches.filter(b => b.mentorId === uid || (b.staffIds || []).includes(uid))
           : allBatches;
@@ -537,14 +558,18 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* Recently joined students — intake feed (CEO) */}
-      {isCEOorAdmin && recentStudents.length > 0 && (
-        <div style={{ background:'var(--surface)', border:'1px solid var(--border)', borderRadius:16, padding:'16px 20px', boxShadow:'var(--shadow-sm)', marginBottom:18 }}>
-          <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:12 }}>
-            <Users size={16} style={{ color:'var(--brand)' }} />
-            <h3 style={{ fontSize:15, fontWeight:700 }}>Recently Joined Students</h3>
-            <span className="badge badge-green" style={{ marginLeft:2 }}>{recentStudents.length} newest</span>
+      {/* Recently joined students — last 7 days, identical for CEO and staff */}
+      <div style={{ background:'var(--surface)', border:'1px solid var(--border)', borderRadius:16, padding:'16px 20px', boxShadow:'var(--shadow-sm)', marginBottom:18 }}>
+        <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:12 }}>
+          <Users size={16} style={{ color:'var(--brand)' }} />
+          <h3 style={{ fontSize:15, fontWeight:700 }}>Recently Joined Students</h3>
+          <span className="badge badge-green" style={{ marginLeft:2 }}>{recentStudents.length} · last 7 days</span>
+        </div>
+        {recentStudents.length === 0 ? (
+          <div style={{ color:'var(--text-muted)', fontSize:13, textAlign:'center', padding:'24px 0' }}>
+            No students joined in the last 7 days.
           </div>
+        ) : (
           <div style={{ display:'flex', flexDirection:'column', gap:6, maxHeight:300, overflowY:'auto', paddingRight:4 }}>
             {recentStudents.map(s => (
               <div key={s.id} onClick={() => navigate(`/students/${s.id}`)}
@@ -561,8 +586,8 @@ export default function Dashboard() {
               </div>
             ))}
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* Staff: Batch Activity Hub */}
       {!isCEOorAdmin && (
@@ -660,7 +685,7 @@ export default function Dashboard() {
               ))}
             </div>
           </div>
-          <div style={{ display:'flex', flexDirection:'column', gap:2 }}>
+          <div style={{ display:'flex', flexDirection:'column', gap:2, maxHeight:420, overflowY:'auto', paddingRight:4 }}>
             {filteredActivity.length === 0 && (
               <div style={{ color:'var(--text-muted)', fontSize:13, textAlign:'center', paddingTop:40 }}>No activity yet.</div>
             )}
@@ -706,7 +731,7 @@ export default function Dashboard() {
               No at-risk students
             </div>
           )}
-          <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
+          <div style={{ display:'flex', flexDirection:'column', gap:4, maxHeight:420, overflowY:'auto', paddingRight:4 }}>
             {atRiskStudents.map(s => (
               <div key={s.id}
                 onClick={() => navigate(`/students/${s.id}`)}
@@ -724,11 +749,6 @@ export default function Dashboard() {
               </div>
             ))}
           </div>
-          {atRiskCount > 10 && (
-            <Link to="/students" style={{ display:'block', textAlign:'center', marginTop:12, fontSize:12, color:'var(--brand)', fontWeight:500 }}>
-              +{atRiskCount - 10} more at-risk students
-            </Link>
-          )}
         </div>
       </div>
 

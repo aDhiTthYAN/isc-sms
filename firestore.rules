@@ -132,13 +132,19 @@ service cloud.firestore {
             && onlyChanges(['status', 'completionNote', 'completedBy', 'completedAt']));
     }
 
-    // ── followups — assignee-scoped ──────────────────────────────
+    // ── followups — visible to assignee AND assigner ─────────────
+    // (staff can assign follow-ups to each other; both parties see it)
     match /followups/{id} {
       allow read: if isCEO()
-        || (isActiveStaff() && resource.data.assignedToEmail == myEmail());
-      allow create: if isActiveStaff();
+        || (isActiveStaff()
+            && (resource.data.assignedToEmail == myEmail()
+                || resource.data.assignedByEmail == myEmail()));
+      allow create: if isActiveStaff()
+        && request.resource.data.assignedByEmail == myEmail();
       allow update: if isCEO()
-        || (isActiveStaff() && resource.data.assignedToEmail == myEmail());
+        || (isActiveStaff()
+            && (resource.data.assignedToEmail == myEmail()
+                || resource.data.assignedByEmail == myEmail()));
       allow delete: if isCEO();
     }
 

@@ -45,7 +45,7 @@ function getMonthDates(anchor) {
 }
 
 function getSlotsForDate(date, calendarSlots = []) {
-  const dateStr = date.toISOString().slice(0, 10);
+  const dateStr = localDateStr(date); // local, not UTC — avoids month-view off-by-one in ahead-of-UTC timezones
   const dayName = date.toLocaleDateString('default', { weekday: 'long' });
   return calendarSlots.filter(s => {
     if (s.scheduledDate) return s.scheduledDate === dateStr;

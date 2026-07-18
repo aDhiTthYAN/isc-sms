@@ -285,13 +285,13 @@ export default function StaffDashboard() {
     return (nowMs - ts) <= RECENT_WINDOW_MS;
   }).slice(0, 6);
 
-  // Students in my batches who joined in the last 6 days.
-  const SIX_DAYS_MS = 6 * 24 * 60 * 60 * 1000;
+  // Students in my batches who joined in the last 7 days (matches CEO dashboard).
+  const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
   const newStudents = students.filter(s => {
     const ts = s.createdAt?.toDate ? s.createdAt.toDate().getTime()
       : s.createdAt?.seconds ? s.createdAt.seconds * 1000
       : (s.joiningDate ? new Date(s.joiningDate).getTime() : null);
-    return ts && (nowMs - ts) <= SIX_DAYS_MS;
+    return ts && (nowMs - ts) <= SEVEN_DAYS_MS;
   }).sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
 
   return (
@@ -322,33 +322,6 @@ export default function StaffDashboard() {
           </button>
         </div>
       </div>
-
-      {/* Newly joined students in my batches (last 6 days) */}
-      {newStudents.length > 0 && (
-        <div style={{ background:'#fff', border:'1px solid #E5E7EB', borderRadius:14, padding:'16px 20px', marginBottom:20, boxShadow:'0 1px 3px rgba(0,0,0,0.06)' }}>
-          <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:12 }}>
-            <Users size={16} style={{ color:'var(--brand)' }}/>
-            <h3 style={{ fontSize:15, fontWeight:700 }}>New Students (last 6 days)</h3>
-            <span className="badge badge-green" style={{ marginLeft:2 }}>{newStudents.length}</span>
-          </div>
-          <div style={{ display:'flex', flexDirection:'column', gap:6, maxHeight:280, overflowY:'auto', paddingRight:4 }}>
-            {newStudents.map(s => (
-              <div key={s.id} onClick={() => navigate(`/students/${s.id}`)}
-                style={{ display:'flex', alignItems:'center', gap:12, padding:'9px 12px', borderRadius:10, border:'1px solid #E5E7EB', cursor:'pointer' }}
-                onMouseEnter={e => e.currentTarget.style.background='#F8FAFC'}
-                onMouseLeave={e => e.currentTarget.style.background='#fff'}>
-                <div style={{ width:30, height:30, borderRadius:'50%', background:avatarColor(s.name||''), display:'flex', alignItems:'center', justifyContent:'center', fontSize:11, fontWeight:700, color:'#fff', flexShrink:0 }}>{initials(s.name||'?')}</div>
-                <div style={{ flex:1, minWidth:0 }}>
-                  <div style={{ fontSize:13, fontWeight:600 }}>{s.name || 'Unnamed'}</div>
-                  <div style={{ fontSize:11.5, color:'#9CA3AF' }}>{s.batchName || '—'}{s.phone ? ` · ${s.phone}` : ''}</div>
-                </div>
-                <span style={{ fontSize:11, color:'#9CA3AF', whiteSpace:'nowrap' }}>{timeAgo(s.createdAt)}</span>
-                <ChevronRight size={15} style={{ color:'#D1D5DB', flexShrink:0 }}/>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
 
       {/* Notifications + Requests Sidebar */}
       {showSidebar && (
@@ -468,6 +441,37 @@ export default function StaffDashboard() {
         })}
       </div>
 
+      {/* Recently joined students in my batches (last 7 days) — always visible, below KPIs */}
+      <div style={{ background:'#fff', border:'1px solid #E5E7EB', borderRadius:14, padding:'16px 20px', marginBottom:20, boxShadow:'0 1px 3px rgba(0,0,0,0.06)' }}>
+        <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:12 }}>
+          <Users size={16} style={{ color:'var(--brand)' }}/>
+          <h3 style={{ fontSize:15, fontWeight:700 }}>Recently Joined Students</h3>
+          <span className="badge badge-green" style={{ marginLeft:2 }}>{newStudents.length} · last 7 days</span>
+        </div>
+        {newStudents.length === 0 ? (
+          <div style={{ color:'#9CA3AF', fontSize:13, textAlign:'center', padding:'24px 0' }}>
+            No students joined in the last 7 days.
+          </div>
+        ) : (
+          <div style={{ display:'flex', flexDirection:'column', gap:6, maxHeight:280, overflowY:'auto', paddingRight:4 }}>
+            {newStudents.map(s => (
+              <div key={s.id} onClick={() => navigate(`/students/${s.id}`)}
+                style={{ display:'flex', alignItems:'center', gap:12, padding:'9px 12px', borderRadius:10, border:'1px solid #E5E7EB', cursor:'pointer' }}
+                onMouseEnter={e => e.currentTarget.style.background='#F8FAFC'}
+                onMouseLeave={e => e.currentTarget.style.background='#fff'}>
+                <div style={{ width:30, height:30, borderRadius:'50%', background:avatarColor(s.name||''), display:'flex', alignItems:'center', justifyContent:'center', fontSize:11, fontWeight:700, color:'#fff', flexShrink:0 }}>{initials(s.name||'?')}</div>
+                <div style={{ flex:1, minWidth:0 }}>
+                  <div style={{ fontSize:13, fontWeight:600 }}>{s.name || 'Unnamed'}</div>
+                  <div style={{ fontSize:11.5, color:'#9CA3AF' }}>{s.batchName || '—'}{s.phone ? ` · ${s.phone}` : ''}</div>
+                </div>
+                <span style={{ fontSize:11, color:'#9CA3AF', whiteSpace:'nowrap' }}>{timeAgo(s.createdAt)}</span>
+                <ChevronRight size={15} style={{ color:'#D1D5DB', flexShrink:0 }}/>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
       {/* ── Batch Activity Hub ── */}
       {(() => {
         const kindColor = {
@@ -500,7 +504,7 @@ export default function StaffDashboard() {
               <h3 style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>Batch Activity Hub <span style={{ fontSize: 12, color: '#9CA3AF', fontWeight: 400 }}>(active only)</span></h3>
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                 {myBatches.map(b => (
-                  <button key={b.id} onClick={() => { setHubBatch(b.id); setHubFilter('all'); setHubTypeFilter(''); setHubSearch(''); setHubPage(0); }}
+                  <button key={b.id} onClick={() => { setHubBatch(prev => prev === b.id ? '' : b.id); setHubFilter('all'); setHubTypeFilter(''); setHubSearch(''); setHubPage(0); }}
                     style={{ padding: '5px 14px', borderRadius: 20, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 600, transition: 'all 0.15s',
                       background: hubBatch === b.id ? 'var(--brand)' : '#F3F4F6',
                       color:      hubBatch === b.id ? '#fff'    : '#374151' }}>
@@ -585,7 +589,9 @@ export default function StaffDashboard() {
 
             {/* Content */}
             {!hubBatch && (
-              <div style={{ textAlign: 'center', color: '#9CA3AF', padding: '28px 0', fontSize: 13 }}>No batches assigned yet.</div>
+              <div style={{ textAlign: 'center', color: '#9CA3AF', padding: '28px 0', fontSize: 13 }}>
+                {myBatches.length === 0 ? 'No batches assigned yet.' : 'Select a batch above to view its classes, assessments and tasks.'}
+              </div>
             )}
             {hubBatch && hubLoading && (
               <div style={{ textAlign: 'center', color: '#9CA3AF', padding: '20px 0', fontSize: 13 }}>Loading…</div>
@@ -751,8 +757,8 @@ export default function StaffDashboard() {
               No at-risk students in your batches.
             </div>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              {atRisk.slice(0, 5).map(s => (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 300, overflowY: 'auto', paddingRight: 4 }}>
+              {atRisk.map(s => (
                 <div
                   key={s.id}
                   style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', borderRadius: 8, cursor: 'pointer', transition: 'background 0.12s' }}
@@ -770,10 +776,6 @@ export default function StaffDashboard() {
                   <ChevronRight size={13} style={{ color: '#D1D5DB', flexShrink: 0 }} />
                 </div>
               ))}
-              {atRisk.length > 5 && (
-                <Link to="/students" style={{ fontSize: 12, color: 'var(--brand)', textAlign: 'center', padding: '6px 0', fontWeight: 500 }}>
-                  +{atRisk.length - 5} more                 </Link>
-              )}
             </div>
           )}
         </div>
@@ -784,8 +786,8 @@ export default function StaffDashboard() {
           {pendingFollowups.length === 0 && (
             <p style={{ fontSize: 13, color: '#9CA3AF', textAlign: 'center', padding: '20px 0' }}>No open follow-ups.</p>
           )}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {pendingFollowups.slice(0, 5).map(f => (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 300, overflowY: 'auto', paddingRight: 4 }}>
+            {pendingFollowups.map(f => (
               <div key={f.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '9px 10px', borderRadius: 8, transition: 'background 0.12s' }}
                 onMouseEnter={e => e.currentTarget.style.background = '#F8FAFC'}
                 onMouseLeave={e => e.currentTarget.style.background = 'transparent'}

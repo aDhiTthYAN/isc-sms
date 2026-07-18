@@ -219,8 +219,11 @@ export const getMyFollowUps = async (staffEmail) => {
 };
 
 export const getAllFollowUps = async (scope = null) => {
+  // Staff see follow-ups assigned TO them or assigned BY them.
   const q = (scope && !isCeoScope(scope))
-    ? query(collection(db,'followups'), where('assignedToEmail','==',scope.email), limit(200))
+    ? query(collection(db,'followups'),
+        or(where('assignedToEmail','==',scope.email), where('assignedByEmail','==',scope.email)),
+        limit(300))
     : query(collection(db,'followups'), limit(200));
   const snap = await getDocs(q);
   return snap.docs.map(d => ({ id: d.id, ...d.data() }))

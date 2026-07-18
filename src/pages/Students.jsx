@@ -8,6 +8,7 @@ import { useNavigate as useNav } from 'react-router-dom';
 
 const COURSES = ['Python','Data Science','Web Development','Machine Learning','Digital Marketing','UI/UX Design','Cyber Security','Other'];
 const STATUSES = ['active','moderate','at-risk','dropped'];
+const todayStr = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; };
 
 export default function StudentsPage() {
   const { profile }    = useAuth();
@@ -29,7 +30,7 @@ export default function StudentsPage() {
   const [saving, setSaving]           = useState(false);
   const [form, setForm] = useState({
     name:'', phone:'', parentPhone:'', email:'',
-    course:'', batchId:'', joiningDate:'', location:'',
+    course:'', batchId:'', joiningDate:todayStr(), location:'',
     education:'', staffAssigned:'', classplusId:'',
     status:'active', notes:'',
   });
@@ -90,7 +91,7 @@ export default function StudentsPage() {
       await addStudent(form);
       setToast({ message: 'Student added!', type: 'success' });
       setShowModal(false);
-      setForm({ name:'',phone:'',parentPhone:'',email:'',course:'',batchId:'',joiningDate:'',location:'',education:'',staffAssigned:'',classplusId:'',status:'active',notes:'' });
+      setForm({ name:'',phone:'',parentPhone:'',email:'',course:'',batchId:'',joiningDate:todayStr(),location:'',education:'',staffAssigned:'',classplusId:'',status:'active',notes:'' });
       loadPage(true);
     } catch {
       setToast({ message: 'Failed to add student.', type: 'error' });

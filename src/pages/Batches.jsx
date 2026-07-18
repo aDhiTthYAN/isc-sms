@@ -53,6 +53,7 @@ const DEFAULT_COURSE_FLOW = [
 // Timestamp(joinDate), Name of Father, Name of Mother, Email, Address,
 // Phone number, Whatsapp Number, Occupation, Kids Name(name), Gender, Age, Class, School Name
 // Columns shown in the students table by default (when a field has no explicit showInList)
+const todayStr = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; };
 const DEFAULT_LIST_KEYS = ['fatherName','motherName','phone','whatsappNumber','classStd','varkResult','syllabus'];
 
 const DEFAULT_STUDENT_FIELDS = [
@@ -544,7 +545,7 @@ export default function Batches() {
     const initForm = {};
     fields.forEach(f => { initForm[f.key] = ''; });
     initForm.staffAssigned = '';
-    initForm.joinDate = '';
+    initForm.joinDate = todayStr();
     initForm.status = 'active';
     setStudentForm(initForm);
     await loadBatchDetail(batch);
@@ -577,7 +578,7 @@ export default function Batches() {
     const fields = selectedBatch.studentFields || DEFAULT_STUDENT_FIELDS;
     const initForm = {};
     fields.forEach(f => { initForm[f.key] = ''; });
-    initForm.staffAssigned = ''; initForm.joinDate = ''; initForm.status = 'active';
+    initForm.staffAssigned = ''; initForm.joinDate = todayStr(); initForm.status = 'active';
     setStudentForm(initForm);
     await loadBatchDetail(selectedBatch);
     const c = await getBatchStudentCount(selectedBatch.id, scope);
@@ -611,16 +612,22 @@ export default function Batches() {
 
   const handleSaveFlowConfig = async () => {
     setSaving(true);
-    await updateBatch(selectedBatch.id, { courseFlow:editFlow });
-    const updated = { ...selectedBatch, courseFlow:editFlow };
+    // Clean dropdown options (trim + drop blank lines) only at save time,
+    // so typing new lines works while editing.
+    const cleanFlow = editFlow.map(s => s.fieldOptions
+      ? { ...s, fieldOptions: s.fieldOptions.map(o => o.trim()).filter(Boolean) } : s);
+    await updateBatch(selectedBatch.id, { courseFlow:cleanFlow });
+    const updated = { ...selectedBatch, courseFlow:cleanFlow };
     setSelectedBatch(updated); setBatches(prev => prev.map(b => b.id===selectedBatch.id?updated:b));
     setShowFlowConfig(false); setToast({ message:'Course flow updated!', type:'success' }); setSaving(false);
   };
 
   const handleSaveFieldConfig = async () => {
     setSaving(true);
-    await updateBatch(selectedBatch.id, { studentFields:editFields });
-    const updated = { ...selectedBatch, studentFields:editFields };
+    const cleanFields = editFields.map(f => f.options
+      ? { ...f, options: f.options.map(o => o.trim()).filter(Boolean) } : f);
+    await updateBatch(selectedBatch.id, { studentFields:cleanFields });
+    const updated = { ...selectedBatch, studentFields:cleanFields };
     setSelectedBatch(updated); setBatches(prev => prev.map(b => b.id===selectedBatch.id?updated:b));
     setShowFieldConfig(false); setToast({ message:'Student fields updated!', type:'success' }); setSaving(false);
   };
@@ -1280,6 +1287,12 @@ export default function Batches() {
           // Columns to show (configurable via "Show in list"); Name/Status/Onboarding/View are permanent.
           const listFields = batchFields.filter(f => f.key !== 'name' &&
             (f.showInList !== undefined ? f.showInList : DEFAULT_LIST_KEYS.includes(f.key)));
+          // Course-flow steps flagged "Show selected value in student table".
+          // Rendered as read-only columns that pull the captured onboarding
+          // value straight from courseFlow — works for custom steps and shows
+          // already-marked values retroactively. The default VARK step is
+          // skipped here because it already mirrors to the varkResult field.
+          const flowCols = batchFlow.filter(step => step.displayInTable && step.key !== 'vark_analysis');
           const joinDateOf = (s) => s.joiningDate || (s.createdAt?.seconds ? new Date(s.createdAt.seconds*1000).toISOString().slice(0,10) : '');
           const filtered = batchStudents.filter(s => {
             if (studentStatusFilter && s.status !== studentStatusFilter) return false;
@@ -1357,6 +1370,7 @@ export default function Batches() {
                     <tr>
                       <th>Kids Name</th>
                       {listFields.map(f => <th key={f.key}>{f.label}</th>)}
+                      {flowCols.map(step => <th key={step.key}>{step.fieldLabel || step.label}</th>)}
                       <th>Status</th>
                       <th>Onboarding</th>
                       <th></th>
@@ -1364,7 +1378,7 @@ export default function Batches() {
                   </thead>
                   <tbody>
                     {paginated.length === 0 && (
-                      <tr><td colSpan={listFields.length + 4} style={{ textAlign:'center', padding:40, color:'#6B7280' }}>
+                      <tr><td colSpan={listFields.length + flowCols.length + 4} style={{ textAlign:'center', padding:40, color:'#6B7280' }}>
                         {studentSearch || studentStatusFilter ? 'No students match your filter.' : 'No students yet.'}
                         {!studentSearch && !studentStatusFilter && (
                           <div style={{ display:'flex', gap:8, justifyContent:'center', marginTop:12 }}>
@@ -1408,6 +1422,11 @@ export default function Batches() {
                                   placeholder="—"
                                 />
                               )}
+                            </td>
+                          ))}
+                          {flowCols.map(step => (
+                            <td key={step.key} style={{ fontSize:12.5, color:'var(--text-sub)' }}>
+                              {s.courseFlow?.[step.key]?.value || '—'}
                             </td>
                           ))}
                           <td>
@@ -2358,7 +2377,7 @@ export default function Batches() {
                             <div style={{ fontSize:11, color:'#6B7280' }}>Options (one per line):</div>
                             <textarea className="form-input" rows={3} style={{ fontSize:11 }}
                               value={(step.fieldOptions||[]).join('\n')}
-                              onChange={e => upd({ fieldOptions: e.target.value.split('\n').map(s=>s.trim()).filter(Boolean) })}
+                              onChange={e => upd({ fieldOptions: e.target.value.split('\n') })}
                               placeholder={'Option 1\nOption 2\nOption 3'}/>
                             <label style={{ display:'flex', alignItems:'center', gap:6, fontSize:12, cursor:'pointer' }}>
                               <input type="checkbox" checked={!!step.displayInTable}
@@ -2417,7 +2436,7 @@ export default function Batches() {
                       <div style={{ fontSize:11, color:'#6B7280', marginBottom:3 }}>Dropdown options (one per line):</div>
                       <textarea className="form-input" rows={3} style={{ fontSize:12 }}
                         value={(field.options||[]).join('\n')}
-                        onChange={e => { const u=[...editFields]; u[idx]={...u[idx], options: e.target.value.split('\n').map(s=>s.trim()).filter(Boolean)}; setEditFields(u); }}
+                        onChange={e => { const u=[...editFields]; u[idx]={...u[idx], options: e.target.value.split('\n')}; setEditFields(u); }}
                         placeholder={'Option 1\nOption 2\nOption 3'}/>
                     </div>
                   )}
