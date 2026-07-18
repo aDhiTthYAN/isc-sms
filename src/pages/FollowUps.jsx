@@ -130,11 +130,10 @@ export default function FollowUps() {
             ({pendingCount} pending)
           </span>
         </h2>
-        {isCEOorAdmin && (
-          <button className="btn btn-primary" onClick={() => setShowModal(true)}>
-            <Plus size={16} /> Assign Follow-Up
-          </button>
-        )}
+        {/* Staff can now assign follow-ups to each other (both parties see it). */}
+        <button className="btn btn-primary" onClick={() => setShowModal(true)}>
+          <Plus size={16} /> Assign Follow-Up
+        </button>
       </div>
 
       {isCEOorAdmin && (

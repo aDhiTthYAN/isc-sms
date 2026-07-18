@@ -660,7 +660,7 @@ export default function Dashboard() {
               ))}
             </div>
           </div>
-          <div style={{ display:'flex', flexDirection:'column', gap:2 }}>
+          <div style={{ display:'flex', flexDirection:'column', gap:2, maxHeight:420, overflowY:'auto', paddingRight:4 }}>
             {filteredActivity.length === 0 && (
               <div style={{ color:'var(--text-muted)', fontSize:13, textAlign:'center', paddingTop:40 }}>No activity yet.</div>
             )}
@@ -706,7 +706,7 @@ export default function Dashboard() {
               No at-risk students
             </div>
           )}
-          <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
+          <div style={{ display:'flex', flexDirection:'column', gap:4, maxHeight:420, overflowY:'auto', paddingRight:4 }}>
             {atRiskStudents.map(s => (
               <div key={s.id}
                 onClick={() => navigate(`/students/${s.id}`)}
