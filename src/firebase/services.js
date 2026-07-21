@@ -113,7 +113,12 @@ export const getStudent = async (id) => {
 // batch's staff (and mentor) can access the record under the rules.
 export const addStudent = async (data) => {
   const staffIds = await getBatchStaffIds(data.batchId);
-  return addDoc(studentsRef(), { ...data, staffIds, createdAt: serverTimestamp() });
+  // Join date has historically been written as `joinDate` (Batches page) or
+  // `joiningDate` (Students page). Keep both in sync on create so every reader
+  // works regardless of which field it looks at.
+  const joined = data.joinDate || data.joiningDate;
+  const dates = joined ? { joinDate: joined, joiningDate: joined } : {};
+  return addDoc(studentsRef(), { ...data, ...dates, staffIds, createdAt: serverTimestamp() });
 };
 
 export const updateStudent = async (id, data) => {

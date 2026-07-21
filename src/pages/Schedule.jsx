@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   getBatches, getStaffBatches, getBatchSchedules, getAllSchedules, addBatchSchedule,
   deleteBatchSchedule, updateScheduleStatus, updateBatchSchedule, saveAttendance,
@@ -10,7 +11,7 @@ import { Modal, Toast, Loading } from '../components/ui';
 import { useAuth } from '../context/AuthContext';
 import {
   Plus, Calendar, ChevronLeft, ChevronRight, Users, Download,
-  CheckCircle, XCircle, Trash2, X, Search, MessageSquare, FileText, ChevronDown,
+  CheckCircle, XCircle, Trash2, X, Search, MessageSquare, FileText, ChevronDown, AlertTriangle,
 } from 'lucide-react';
 
 // ── Helpers ────────────────────────────────────────────────────
@@ -131,6 +132,7 @@ function computeDayLayout(slots) {
 // ── Component ───────────────────────────────────────────────────
 export default function Schedule() {
   const { profile } = useAuth();
+  const navigate = useNavigate();
   const isCEO = profile?.role === 'ceo';
 
   const [batches,       setBatches]       = useState([]);
@@ -182,6 +184,13 @@ export default function Schedule() {
   const [attDateFilter, setAttDateFilter] = useState(localDateStr(new Date())); // default: today
   const [attStaffFilter, setAttStaffFilter] = useState('');
 
+  // Schedule Coverage (tab) — which students got a class scheduled vs missed
+  const [covBatch,     setCovBatch]     = useState('');
+  const [covWindow,    setCovWindow]    = useState('7');   // 'today' | '7' | '30'
+  const [covStudents,  setCovStudents]  = useState([]);
+  const [covSchedules, setCovSchedules] = useState([]);
+  const [covLoading,   setCovLoading]   = useState(false);
+
   function blankForm() {
     return { title: '', batchId: '', day: 'Monday', scheduledDate: '', recurring: false, time: '', duration: '60', type: 'live-class', facultyName: '', meetLink: '', notes: '', participantType: 'all', participantIds: [] };
   }
@@ -200,6 +209,21 @@ export default function Schedule() {
       return list;
     } catch { return []; }
   };
+
+  // ── Coverage tab: load students + schedules for the chosen batch ──
+  useEffect(() => {
+    if (activeTab !== 'coverage' || !covBatch) { setCovStudents([]); setCovSchedules([]); return; }
+    let cancelled = false;
+    (async () => {
+      setCovLoading(true);
+      const [studs, scheds] = await Promise.all([
+        loadStudents(covBatch),
+        getBatchSchedules(covBatch).catch(() => []),
+      ]);
+      if (!cancelled) { setCovStudents(studs); setCovSchedules(scheds); setCovLoading(false); }
+    })();
+    return () => { cancelled = true; };
+  }, [activeTab, covBatch]);
 
   // ── Load batches + all schedules ──────────────────────────────
   const reloadSchedules = async (batchList) => {
@@ -534,7 +558,7 @@ export default function Schedule() {
 
       {/* ── Tab bar ── */}
       <div className="tab-bar" style={{ marginBottom:16 }}>
-        {[{ key:'calendar', label:'Calendar View' }, { key:'attendance', label:'Attendance Report' }].map(t => (
+        {[{ key:'calendar', label:'Calendar View' }, { key:'attendance', label:'Attendance Report' }, { key:'coverage', label:'Schedule Coverage' }].map(t => (
           <div key={t.key} className={`tab ${activeTab===t.key?'active':''}`} onClick={() => setActiveTab(t.key)}>{t.label}</div>
         ))}
       </div>
@@ -859,6 +883,140 @@ export default function Schedule() {
                 </div>
               );
             }).filter(Boolean)}
+          </div>
+        );
+      })()}
+
+      {/* ── SCHEDULE COVERAGE TAB ── */}
+      {activeTab === 'coverage' && (() => {
+        const today   = new Date();
+        const toStr   = localDateStr(today);
+        const days    = covWindow === 'today' ? 1 : parseInt(covWindow, 10);
+        const from    = new Date(today); from.setDate(today.getDate() - (days - 1));
+        const fromStr = localDateStr(from);
+        // Which weekdays occur inside the window (for recurring classes).
+        const weekdaysInWindow = new Set();
+        for (let d = new Date(from); localDateStr(d) <= toStr; d.setDate(d.getDate() + 1)) {
+          weekdaysInWindow.add(d.toLocaleDateString('en-US', { weekday: 'long' }));
+        }
+        const active = covSchedules.filter(s => {
+          if (s.status === 'cancelled') return false;
+          if (s.recurring) return weekdaysInWindow.has(s.day);
+          return s.scheduledDate && s.scheduledDate >= fromStr && s.scheduledDate <= toStr;
+        });
+        const allIds = covStudents.map(s => s.id);
+        const countBy = {};
+        active.forEach(s => {
+          const ids = (s.participantType === 'specific' && Array.isArray(s.participantIds) && s.participantIds.length)
+            ? s.participantIds : allIds;
+          ids.forEach(id => { countBy[id] = (countBy[id] || 0) + 1; });
+        });
+        const covered = covStudents.filter(s => countBy[s.id]);
+        const missed  = covStudents.filter(s => !countBy[s.id]);
+        const pct = covStudents.length ? Math.round((covered.length / covStudents.length) * 100) : 0;
+        const windowLabel = covWindow === 'today' ? 'today' : `last ${days} days`;
+
+        return (
+          <div>
+            {/* Controls */}
+            <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:14, flexWrap:'wrap' }}>
+              <select className="form-input" style={{ height:36, width:'auto' }} value={covBatch} onChange={e => setCovBatch(e.target.value)}>
+                <option value="">Select a batch…</option>
+                {batches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+              </select>
+              <div style={{ display:'flex', background:'var(--surface)', border:'1px solid var(--border)', borderRadius:9, padding:3 }}>
+                {[{ key:'today', label:'Today' }, { key:'7', label:'Last 7 days' }, { key:'30', label:'Last 30 days' }].map(w => (
+                  <span key={w.key} onClick={() => setCovWindow(w.key)}
+                    style={{ padding:'6px 14px', borderRadius:7, fontSize:12.5, fontWeight:600, cursor:'pointer',
+                      background: covWindow===w.key ? 'var(--accent-50)' : 'transparent',
+                      color: covWindow===w.key ? 'var(--accent-ink)' : 'var(--muted)' }}>{w.label}</span>
+                ))}
+              </div>
+              <div style={{ flex:1 }}/>
+              {covBatch && !covLoading && (
+                <div style={{ fontSize:13, color:'var(--muted)' }}>{active.length} class{active.length!==1?'es':''} scheduled · {windowLabel}</div>
+              )}
+            </div>
+
+            {!covBatch && (
+              <div className="card" style={{ textAlign:'center', padding:48, color:'var(--muted)' }}>
+                Select a batch to see which students were included in scheduled classes and who was missed.
+              </div>
+            )}
+            {covBatch && covLoading && <Loading/>}
+            {covBatch && !covLoading && covStudents.length === 0 && (
+              <div className="card" style={{ textAlign:'center', padding:48, color:'var(--muted)' }}>No students in this batch.</div>
+            )}
+
+            {covBatch && !covLoading && covStudents.length > 0 && (
+              <>
+                {/* Summary tiles */}
+                <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(150px,1fr))', gap:12, marginBottom:16 }}>
+                  {[
+                    { label:'Coverage',      value:`${pct}%`,          col:pct>=90?'var(--green-ink)':pct>=60?'var(--amber-ink)':'var(--red-ink)', bg:pct>=90?'var(--pos-50)':pct>=60?'var(--warn-50)':'var(--neg-50)' },
+                    { label:'Covered',       value:covered.length,     col:'var(--green-ink)', bg:'var(--pos-50)' },
+                    { label:'Missed',        value:missed.length,      col:'var(--red-ink)',   bg:'var(--neg-50)' },
+                    { label:'Classes',       value:active.length,      col:'var(--brand)',     bg:'var(--surface-sunken)' },
+                  ].map(k => (
+                    <div key={k.label} style={{ padding:'14px 16px', borderRadius:12, background:k.bg }}>
+                      <div style={{ fontSize:11, color:'var(--text-muted)', fontWeight:600, textTransform:'uppercase', letterSpacing:'.04em' }}>{k.label}</div>
+                      <div style={{ fontSize:26, fontWeight:700, fontFamily:'var(--font-display)', color:k.col }}>{k.value}</div>
+                    </div>
+                  ))}
+                </div>
+
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:16 }}>
+                  {/* Missed — the important list */}
+                  <div className="card" style={{ padding:'16px 18px' }}>
+                    <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:12 }}>
+                      <AlertTriangle size={16} style={{ color:'var(--red-ink)' }}/>
+                      <h3 style={{ fontSize:14, fontWeight:700 }}>Missed — no class scheduled ({missed.length})</h3>
+                    </div>
+                    {missed.length === 0 ? (
+                      <div style={{ color:'var(--green-ink)', fontSize:13, textAlign:'center', padding:'20px 0' }}>Everyone was scheduled at least once. 🎉</div>
+                    ) : (
+                      <div style={{ display:'flex', flexDirection:'column', gap:6, maxHeight:360, overflowY:'auto', paddingRight:4 }}>
+                        {missed.map(s => (
+                          <div key={s.id} onClick={() => navigate(`/students/${s.id}`)}
+                            style={{ display:'flex', alignItems:'center', gap:10, padding:'8px 10px', borderRadius:8, cursor:'pointer', background:'var(--neg-50)' }}>
+                            <div style={{ width:28, height:28, borderRadius:'50%', background:'#FEE2E2', display:'flex', alignItems:'center', justifyContent:'center', fontSize:11, fontWeight:700, color:'var(--red-ink)', flexShrink:0 }}>{(s.name||'?').charAt(0).toUpperCase()}</div>
+                            <div style={{ flex:1, minWidth:0 }}>
+                              <div style={{ fontSize:13, fontWeight:600, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{s.name}</div>
+                              {s.phone && <div style={{ fontSize:11, color:'var(--text-muted)' }}>{s.phone}</div>}
+                            </div>
+                            <ChevronRight size={13} style={{ color:'var(--text-muted)', flexShrink:0 }}/>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Covered */}
+                  <div className="card" style={{ padding:'16px 18px' }}>
+                    <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:12 }}>
+                      <CheckCircle size={16} style={{ color:'var(--green-ink)' }}/>
+                      <h3 style={{ fontSize:14, fontWeight:700 }}>Scheduled ({covered.length})</h3>
+                    </div>
+                    {covered.length === 0 ? (
+                      <div style={{ color:'var(--text-muted)', fontSize:13, textAlign:'center', padding:'20px 0' }}>No student was scheduled in this window.</div>
+                    ) : (
+                      <div style={{ display:'flex', flexDirection:'column', gap:6, maxHeight:360, overflowY:'auto', paddingRight:4 }}>
+                        {covered.map(s => (
+                          <div key={s.id} onClick={() => navigate(`/students/${s.id}`)}
+                            style={{ display:'flex', alignItems:'center', gap:10, padding:'8px 10px', borderRadius:8, cursor:'pointer' }}>
+                            <div style={{ width:28, height:28, borderRadius:'50%', background:'var(--pos-50)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:11, fontWeight:700, color:'var(--green-ink)', flexShrink:0 }}>{(s.name||'?').charAt(0).toUpperCase()}</div>
+                            <div style={{ flex:1, minWidth:0 }}>
+                              <div style={{ fontSize:13, fontWeight:600, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{s.name}</div>
+                            </div>
+                            <span className="badge badge-green" style={{ fontSize:10.5 }}>{countBy[s.id]} class{countBy[s.id]!==1?'es':''}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         );
       })()}

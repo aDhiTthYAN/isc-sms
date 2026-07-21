@@ -609,7 +609,7 @@ export default function StaffDashboard() {
                 {pageList.length === 0 ? (
                   <div style={{ textAlign: 'center', color: '#9CA3AF', padding: '20px 0', fontSize: 13 }}>No active items match your filters.</div>
                 ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 420, overflowY: 'auto', paddingRight: 4 }}>
                     {pageList.map((item, i) => {
                       const c = kindColor[item._kind] || kindColor.task;
                       const tab = item._kind === 'assessment' ? 'assessments' : 'tasks';
