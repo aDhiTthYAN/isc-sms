@@ -139,10 +139,14 @@ export default function StudentProfile() {
     return d.toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric' });
   };
 
+  // Join date is stored as `joinDate` (added via Batches) or `joiningDate`
+  // (added via Students page). Read both so the profile works either way.
+  const joinedOn = student?.joinDate || student?.joiningDate || '';
+
   // Subscription validity
   const subInfo = () => {
-    if (!student?.joinDate || !student?.courseDurationMonths) return null;
-    const exp = new Date(student.joinDate);
+    if (!joinedOn || !student?.courseDurationMonths) return null;
+    const exp = new Date(joinedOn);
     exp.setMonth(exp.getMonth() + Number(student.courseDurationMonths));
     const days = Math.ceil((exp - Date.now()) / 86400000);
     return { exp, days, expired: days < 0, expiringSoon: days >= 0 && days <= 30 };
@@ -351,7 +355,7 @@ export default function StudentProfile() {
                   { icon:BookOpen, label:'Class/Std',    val:student.classStd    },
                   { icon:MapPin,   label:'Location',     val:student.location    },
                   { icon:User,     label:'Staff',        val:student.staffAssigned},
-                  { icon:Calendar, label:'Joined',       val:student.joinDate    },
+                  { icon:Calendar, label:'Joined',       val:joinedOn            },
                   { icon:Calendar, label:'Education',    val:student.education   },
                   { icon:User,     label:'Father',       val:student.fatherName     },
                   { icon:User,     label:'Mother',       val:student.motherName     },
@@ -388,7 +392,7 @@ export default function StudentProfile() {
                     Subscription {sub.expired?'EXPIRED':sub.expiringSoon?'Expiring Soon':'Active'}
                   </div>
                   <div style={{ fontSize:12, color:'#6B7280' }}>
-                    {student.courseDurationMonths}mo course · Joined {student.joinDate} · Expires {sub.exp.toLocaleDateString('en-IN')} · {sub.expired?`Expired ${Math.abs(sub.days)} days ago`:`${sub.days} days left`}
+                    {student.courseDurationMonths}mo course · Joined {joinedOn} · Expires {sub.exp.toLocaleDateString('en-IN')} · {sub.expired?`Expired ${Math.abs(sub.days)} days ago`:`${sub.days} days left`}
                   </div>
                 </div>
               )}
@@ -685,11 +689,27 @@ export default function StudentProfile() {
           if (t.dueDate && new Date(t.dueDate) < new Date()) return 'overdue';
           return 'pending';
         };
-        const shownTasks = batchTasks
+        // Assignments this student is actually accountable for. A batch-wide
+        // assignment created before the student joined was never meant for them,
+        // so it must not count as "not done" in their report. Assignments
+        // targeted specifically at this student always count.
+        const joinTs = student?.joinDate ? new Date(student.joinDate).getTime()
+          : student?.joiningDate ? new Date(student.joiningDate).getTime() : null;
+        const relevantTasks = batchTasks.filter(t => {
+          const targeted = Array.isArray(t.assignedStudentIds) && t.assignedStudentIds.length > 0;
+          if (targeted) return t.assignedStudentIds.includes(id);
+          if (!joinTs) return true;
+          const createdTs = t.createdAt?.seconds ? t.createdAt.seconds * 1000
+            : t.createdAt ? new Date(t.createdAt).getTime() : null;
+          const dueTs = t.dueDate ? new Date(t.dueDate).getTime() : null;
+          const whenTs = createdTs ?? dueTs;
+          return whenTs == null || whenTs >= joinTs;
+        });
+        const shownTasks = relevantTasks
           .filter(t => inRange(t.dueDate) || (!t.dueDate && !perfFrom && !perfTo))
           .filter(t => !asgStatus || taskState(t) === asgStatus)
           .filter(t => !asgStaff || t.assignedFaculty === asgStaff);
-        const asgStaffNames = [...new Set(batchTasks.map(t => t.assignedFaculty).filter(Boolean))];
+        const asgStaffNames = [...new Set(relevantTasks.map(t => t.assignedFaculty).filter(Boolean))];
         const absent = attendance ? attendance.total - attendance.present : 0;
         return (
         <div>
@@ -714,7 +734,7 @@ export default function StudentProfile() {
             <div className="card" style={{ padding:'14px 16px' }}>
               <div style={{ fontSize:11, color:'var(--text-muted)', fontWeight:600, textTransform:'uppercase', letterSpacing:'.04em' }}>Assignments Done</div>
               <div style={{ fontSize:26, fontWeight:700, fontFamily:'var(--font-display)', color:'var(--pos)' }}>
-                {batchTasks.filter(t => t.submittedBy?.some(x => x.studentId === id)).length}/{batchTasks.length}
+                {relevantTasks.filter(t => t.submittedBy?.some(x => x.studentId === id)).length}/{relevantTasks.length}
               </div>
               <div style={{ fontSize:11.5, color:'var(--text-muted)' }}>submitted</div>
             </div>

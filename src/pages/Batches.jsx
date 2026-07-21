@@ -1293,7 +1293,7 @@ export default function Batches() {
           // already-marked values retroactively. The default VARK step is
           // skipped here because it already mirrors to the varkResult field.
           const flowCols = batchFlow.filter(step => step.displayInTable && step.key !== 'vark_analysis');
-          const joinDateOf = (s) => s.joiningDate || (s.createdAt?.seconds ? new Date(s.createdAt.seconds*1000).toISOString().slice(0,10) : '');
+          const joinDateOf = (s) => s.joiningDate || s.joinDate || (s.createdAt?.seconds ? new Date(s.createdAt.seconds*1000).toISOString().slice(0,10) : '');
           const filtered = batchStudents.filter(s => {
             if (studentStatusFilter && s.status !== studentStatusFilter) return false;
             if (studentJoinFrom && joinDateOf(s) < studentJoinFrom) return false;
