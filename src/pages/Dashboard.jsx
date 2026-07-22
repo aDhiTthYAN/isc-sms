@@ -18,6 +18,10 @@ const ACCENTS = ['#E81620','#F4683B','#F5A623','#16A974','#11B4C6','#3B6EF6','#6
 function avatarColor(name=''){let h=0;for(const c of name)h=(h*31+c.charCodeAt(0))>>>0;return ACCENTS[h%ACCENTS.length];}
 function initials(name=''){const p=name.trim().split(/\s+/);return((p[0]?.[0]||'')+(p[1]?.[0]||'')).toUpperCase()||'?';}
 
+// Local calendar date (YYYY-MM-DD) — NOT toISOString(), which is UTC and
+// shifts the day backward in ahead-of-UTC timezones (e.g. IST after ~6:30pm).
+const localDateStr = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+
 function timeAgo(ts){
   if(!ts) return '';
   const d = ts.seconds ? new Date(ts.seconds*1000) : new Date(ts);
@@ -310,7 +314,7 @@ export default function Dashboard() {
   const loadBatchActivity = async (batchId) => {
     if (!batchId) return setSchedItems([]);
     setSchedLoading(true);
-    const today = new Date().toISOString().slice(0,10);
+    const today = localDateStr();
     try {
       const [scheds, asmts, bTasks] = await Promise.all([
         getBatchSchedules(batchId).catch(() => []),

@@ -199,7 +199,10 @@ export default function StaffDashboard() {
   useEffect(() => {
     if (!hubBatch) return setHubItems([]);
     setHubLoading(true);
-    const today = new Date().toISOString().slice(0, 10);
+    // Local calendar date — toISOString() is UTC and rolls to tomorrow in
+    // IST after ~6:30pm, mislabelling today's classes as past/upcoming.
+    const now = new Date();
+    const today = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
     Promise.all([
       getBatchSchedules(hubBatch).catch(() => []),
       getAssessments(hubBatch).catch(() => []),
