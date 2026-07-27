@@ -149,6 +149,7 @@ export default function Schedule() {
 
   // Calendar
   const [view,          setView]          = useState('week'); // 'week' | 'month'
+  const [myOnly,        setMyOnly]        = useState(false);   // staff: show only my classes
   const [calDate,       setCalDate]       = useState(new Date());
   const [slotDetail,    setSlotDetail]    = useState(null);
   const [reschedule,    setReschedule]    = useState(null); // { slot, date, time }
@@ -204,7 +205,7 @@ export default function Schedule() {
     if (studentsCache[batchId]) return studentsCache[batchId];
     try {
       const res = await getBatchStudents(batchId, { role: profile?.role, uid: profile?.uid, email: profile?.email });
-      const list = (res.students || []).map(s => ({ id: s.id, name: s.name, phone: s.phone || '', course: s.course || '', education: s.education || '' }));
+      const list = (res.students || []).map(s => ({ id: s.id, name: s.name, phone: s.phone || '', course: s.course || '', education: s.education || '', std: s.classStd || s.std || s.class || '' }));
       setStudentsCache(prev => ({ ...prev, [batchId]: list }));
       return list;
     } catch { return []; }
@@ -541,7 +542,11 @@ export default function Schedule() {
       facultyName: (a.conductingStaff || []).map(s => s.name).join(', '),
       totalMarks: a.totalMarks, status: a.status,
     }));
-  const calendarSlots = [...schedules, ...assessmentSlots];
+  // "My Schedule" filter — staff can hide other faculties' classes so they
+  // don't miss their own. Matches on uid / email / name for older docs.
+  const isMine = (s) => s.facultyUid === profile?.uid || (profile?.email && s.facultyEmail === profile?.email) || (profile?.name && s.facultyName === profile?.name);
+  const visibleSchedules = myOnly ? schedules.filter(isMine) : schedules;
+  const calendarSlots = [...visibleSchedules, ...(myOnly ? [] : assessmentSlots)];
 
   const filteredParticipants = attParticipants.filter(s => !attSearch || s.name?.toLowerCase().includes(attSearch.toLowerCase()));
   const presentCount = Object.values(attData).filter(v => v.present).length;
@@ -603,6 +608,14 @@ export default function Schedule() {
                 </span>
               ))}
             </div>
+            {/* Staff: show only my classes so I don't miss my own across batches */}
+            {!isCEO && (
+              <button onClick={() => setMyOnly(v => !v)}
+                style={{ padding:'6px 14px', borderRadius:9, border:'1px solid var(--border)', cursor:'pointer', fontSize:12.5, fontWeight:600,
+                  background: myOnly ? 'var(--accent)' : 'var(--surface)', color: myOnly ? '#fff' : 'var(--sub)' }}>
+                {myOnly ? '✓ My classes' : 'My classes'}
+              </button>
+            )}
             <div style={{ display:'flex', alignItems:'center', gap:8 }}>
               <span onClick={navPrev} style={{ width:32, height:32, border:'1px solid var(--border)', borderRadius:8, background:'var(--surface)', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', color:'var(--sub)' }}><ChevronLeft size={15}/></span>
               <span style={{ fontSize:14, fontWeight:600, color:'var(--ink)', fontFamily:'var(--font-display)' }}>{curLabel}</span>
@@ -1156,14 +1169,15 @@ export default function Schedule() {
                     {modalStudents.length === 0 && <div style={{ fontSize:12, color:'var(--muted)' }}>{(selectedBatch===ALL && !form.batchId) ? 'Choose a batch first.' : 'No students in batch.'}</div>}
                     {modalStudents
                       .filter(s => !studentSearch || s.name?.toLowerCase().includes(studentSearch.toLowerCase()) || (s.phone||'').includes(studentSearch))
-                      .map(s => (
+                      .map((s, i) => (
                         <label key={s.id} style={{ display:'flex', alignItems:'center', gap:8, padding:'5px 0', cursor:'pointer', fontSize:13 }}>
                           <input type="checkbox" checked={form.participantIds.includes(s.id)}
                             onChange={e => setForm(prev => ({ ...prev, participantIds: e.target.checked ? [...prev.participantIds, s.id] : prev.participantIds.filter(id => id !== s.id) }))}/>
+                          <span style={{ fontSize:11, color:'var(--muted)', width:20, textAlign:'right', flexShrink:0 }}>{i + 1}.</span>
                           <div style={{ width:24, height:24, borderRadius:'50%', background:avatarColor(s.name), display:'flex', alignItems:'center', justifyContent:'center', fontSize:9, fontWeight:700, color:'#fff', flexShrink:0 }}>{initials(s.name)}</div>
                           <div style={{ flex:1, minWidth:0 }}>
-                            <div>{s.name}</div>
-                            <div style={{ fontSize:10.5, color:'var(--muted)' }}>{s.phone || 'no phone'}{s.course ? ` · ${s.course}` : ''}{s.education ? ` · ${s.education}` : ''}</div>
+                            <div>{s.name}{s.std ? <span style={{ fontSize:10.5, color:'var(--brand)', fontWeight:600, marginLeft:6 }}>Std {s.std}</span> : null}</div>
+                            <div style={{ fontSize:10.5, color:'var(--muted)' }}>{s.phone || 'no phone'}{s.course ? ` · ${s.course}` : ''}</div>
                           </div>
                         </label>
                       ))}
@@ -1314,7 +1328,7 @@ export default function Schedule() {
           <div style={{ fontSize:12.5, color:'var(--text-sub)', marginBottom:14 }}>Pick the new date and time for this class.</div>
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
             <div className="form-group"><label className="form-label">New Date *</label>
-              <input type="date" className="form-input" value={reschedule.date} onChange={e => setReschedule(r => ({ ...r, date: e.target.value }))}/></div>
+              <input type="date" className="form-input" min={localDateStr()} value={reschedule.date} onChange={e => setReschedule(r => ({ ...r, date: e.target.value }))}/></div>
             <div className="form-group"><label className="form-label">New Time *</label>
               <input type="time" className="form-input" value={reschedule.time} onChange={e => setReschedule(r => ({ ...r, time: e.target.value }))}/></div>
           </div>
@@ -1322,6 +1336,7 @@ export default function Schedule() {
             <button className="btn btn-ghost" onClick={() => setReschedule(null)}>Cancel</button>
             <button className="btn btn-primary" disabled={saving || !reschedule.date || !reschedule.time}
               onClick={async () => {
+                if (reschedule.date < localDateStr()) { setToast({ message:'Cannot reschedule to a past date.', type:'error' }); return; }
                 setSaving(true);
                 try {
                   await updateBatchSchedule(reschedule.slot.id, { status:'rescheduled', scheduledDate: reschedule.date, time: reschedule.time });

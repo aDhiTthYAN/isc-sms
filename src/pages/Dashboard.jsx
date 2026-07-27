@@ -716,7 +716,8 @@ export default function Dashboard() {
               const isFollowup = item._type === 'followup';
               return (
                 <div key={item.id || i}
-                  style={{ display:'flex', alignItems:'flex-start', gap:11, padding:10, borderRadius:10, transition:'background .12s' }}
+                  onClick={() => navigate(isFollowup ? '/followups' : '/tasks')}
+                  style={{ display:'flex', alignItems:'flex-start', gap:11, padding:10, borderRadius:10, cursor:'pointer', transition:'background .12s' }}
                   onMouseEnter={e => e.currentTarget.style.background='var(--surface-hover)'}
                   onMouseLeave={e => e.currentTarget.style.background='transparent'}>
                   <div style={{ width:30, height:30, borderRadius:9, flexShrink:0, display:'flex', alignItems:'center', justifyContent:'center', background: isFollowup ? 'var(--teal-soft)' : 'var(--amber-soft)' }}>
