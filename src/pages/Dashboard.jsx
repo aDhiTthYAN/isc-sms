@@ -98,35 +98,29 @@ function BatchActivityHub({ batches, schedBatch, setSchedBatch, schedFilter, set
 
         {schedBatch && (
           <div style={{ display:'flex', gap:8, flexWrap:'wrap', alignItems:'center', marginBottom:12, padding:'10px 12px', background:'var(--surface-sunken)', borderRadius:10, border:'1px solid var(--border)' }}>
-            <div style={{ display:'flex', gap:4, flexWrap:'wrap' }}>
-              {[{key:'all',label:'All'},{key:'schedule',label:'Classes'},{key:'assessment',label:'Assessments'},{key:'task',label:'Tasks'}].map(f => (
-                <button key={f.key} onClick={() => { setSchedFilter(f.key); setSchedTypeFilter(''); }}
-                  style={{ padding:'4px 12px', borderRadius:20, border:'none', cursor:'pointer', fontSize:11, fontWeight:600,
-                    background: schedFilter === f.key ? 'var(--brand)' : 'var(--border)',
-                    color:      schedFilter === f.key ? '#fff'         : 'var(--text-sub)' }}>
-                  {f.label}
-                </button>
-              ))}
-            </div>
-            <div style={{ display:'flex', gap:4, flexWrap:'wrap', borderLeft:'1px solid var(--border)', paddingLeft:8 }}>
-              {[{key:'active',label:'Active'},{key:'upcoming',label:'Upcoming'},{key:'past',label:'Past'},{key:'all',label:'All Time'}].map(f => (
-                <button key={f.key} onClick={() => setSchedTimeFilter(f.key)}
-                  style={{ padding:'4px 10px', borderRadius:20, border:'none', cursor:'pointer', fontSize:11, fontWeight:600,
-                    background: schedTimeFilter === f.key ? 'var(--brand)' : 'var(--border)',
-                    color:      schedTimeFilter === f.key ? '#fff'         : 'var(--text-sub)' }}>
-                  {f.label}
-                </button>
-              ))}
-            </div>
+            <select value={schedFilter} onChange={e => { setSchedFilter(e.target.value); setSchedTypeFilter(''); }}
+              style={{ padding:'6px 12px', borderRadius:8, border:'1px solid var(--border)', fontSize:12, fontWeight:600, background:'var(--surface)', color:'var(--text)', cursor:'pointer' }}>
+              <option value="all">All types</option>
+              <option value="schedule">Classes</option>
+              <option value="assessment">Assessments</option>
+              <option value="task">Tasks</option>
+            </select>
+            <select value={schedTimeFilter} onChange={e => setSchedTimeFilter(e.target.value)}
+              style={{ padding:'6px 12px', borderRadius:8, border:'1px solid var(--border)', fontSize:12, fontWeight:600, background:'var(--surface)', color:'var(--text)', cursor:'pointer' }}>
+              <option value="active">Active</option>
+              <option value="upcoming">Upcoming</option>
+              <option value="past">Past</option>
+              <option value="all">All time</option>
+            </select>
             {courseOptions.length > 0 && (
               <select value={schedCourse} onChange={e => setSchedCourse(e.target.value)}
-                style={{ padding:'4px 10px', borderRadius:8, border:'1px solid var(--border)', fontSize:12, background:'var(--surface)', color:'var(--text)' }}>
+                style={{ padding:'6px 12px', borderRadius:8, border:'1px solid var(--border)', fontSize:12, fontWeight:600, background:'var(--surface)', color:'var(--text)', cursor:'pointer' }}>
                 <option value="">All Courses</option>
                 {courseOptions.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
             )}
             <input placeholder="Search…" value={search} onChange={e => setSearch(e.target.value)}
-              style={{ padding:'4px 10px', borderRadius:8, border:'1px solid var(--border)', fontSize:12, background:'var(--surface)', color:'var(--text)', minWidth:120, flex:1 }} />
+              style={{ padding:'6px 12px', borderRadius:8, border:'1px solid var(--border)', fontSize:12, background:'var(--surface)', color:'var(--text)', minWidth:140, flex:1 }} />
           </div>
         )}
       </div>

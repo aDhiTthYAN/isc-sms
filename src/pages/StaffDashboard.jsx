@@ -536,39 +536,23 @@ export default function StaffDashboard() {
             {/* Filter bar */}
             {hubBatch && (
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: 12, padding: '10px 12px', background: '#F8FAFC', borderRadius: 10, border: '1px solid #E5E7EB' }}>
-                {/* Category pills */}
-                <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                  {[
-                    { key: 'all',        label: 'All'            },
-                    { key: 'schedule',   label: 'Classes'     },
-                    { key: 'assessment', label: 'Assessments' },
-                    { key: 'task',       label: 'Assignments'  },
-                  ].map(f => (
-                    <button key={f.key} onClick={() => { setHubFilter(f.key); setHubTypeFilter(''); setHubPage(0); }}
-                      style={{ padding: '4px 12px', borderRadius: 20, border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 600,
-                        background: hubFilter === f.key ? 'var(--brand)' : '#E5E7EB',
-                        color:      hubFilter === f.key ? '#fff'    : '#374151' }}>
-                      {f.label}
-                    </button>
-                  ))}
-                </div>
+                {/* Type dropdown */}
+                <select value={hubFilter} onChange={e => { setHubFilter(e.target.value); setHubTypeFilter(''); setHubPage(0); }}
+                  style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid #E5E7EB', fontSize: 12, fontWeight: 600, background: '#fff', color: '#374151', cursor: 'pointer' }}>
+                  <option value="all">All types</option>
+                  <option value="schedule">Classes</option>
+                  <option value="assessment">Assessments</option>
+                  <option value="task">Assignments</option>
+                </select>
 
-                {/* Time filter pills */}
-                <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', borderLeft: '1px solid #E5E7EB', paddingLeft: 8 }}>
-                  {[
-                    { key: 'active',   label: 'Active'   },
-                    { key: 'upcoming', label: 'Upcoming' },
-                    { key: 'past',     label: 'Past'     },
-                    { key: 'all',      label: 'All Time'    },
-                  ].map(f => (
-                    <button key={f.key} onClick={() => { setHubTimeFilter(f.key); setHubPage(0); }}
-                      style={{ padding: '4px 10px', borderRadius: 20, border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 600,
-                        background: hubTimeFilter === f.key ? '#E53935' : '#E5E7EB',
-                        color:      hubTimeFilter === f.key ? '#fff'    : '#374151' }}>
-                      {f.label}
-                    </button>
-                  ))}
-                </div>
+                {/* When dropdown */}
+                <select value={hubTimeFilter} onChange={e => { setHubTimeFilter(e.target.value); setHubPage(0); }}
+                  style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid #E5E7EB', fontSize: 12, fontWeight: 600, background: '#fff', color: '#374151', cursor: 'pointer' }}>
+                  <option value="active">Active</option>
+                  <option value="upcoming">Upcoming</option>
+                  <option value="past">Past</option>
+                  <option value="all">All time</option>
+                </select>
 
                 {/* Course dropdown */}
                 {courseOptions.length > 0 && (
