@@ -7,7 +7,7 @@ import {
   saveClassReport, updateClassReport, getSessionReports, getStudentReports,
   getAllAssessments, notifyStaff,
 } from '../firebase/services';
-import { Modal, Toast, Loading } from '../components/ui';
+import { Modal, Toast, Loading, Confirm } from '../components/ui';
 import { useAuth } from '../context/AuthContext';
 import {
   Plus, Calendar, ChevronLeft, ChevronRight, Users, Download,
@@ -143,6 +143,9 @@ export default function Schedule() {
   const [loading,       setLoading]       = useState(true);
   const [toast,         setToast]         = useState(null);
   const [saving,        setSaving]        = useState(false);
+  // In-app confirm dialog (replaces native window.confirm)
+  const [confirmBox,    setConfirmBox]    = useState(null); // { message, onConfirm, confirmLabel }
+  const askConfirm = (message, onConfirm, confirmLabel = 'Delete') => setConfirmBox({ message, onConfirm, confirmLabel });
 
   // students cache per batch (for attendance / participant lists)
   const [studentsCache, setStudentsCache] = useState({}); // batchId -> [{id,name}]
@@ -395,9 +398,13 @@ export default function Schedule() {
     setSaving(false);
   };
 
-  const handleClearAttendance = async () => {
+  const handleClearAttendance = () => {
     if (!attSession) return;
-    if (!window.confirm('Clear all saved attendance for this class? This cannot be undone.')) return;
+    askConfirm('Clear all saved attendance for this class? This cannot be undone.', doClearAttendance, 'Clear');
+  };
+
+  const doClearAttendance = async () => {
+    if (!attSession) return;
     setSaving(true);
     try {
       await deleteSessionAttendance(attSession.id);
@@ -853,7 +860,7 @@ export default function Schedule() {
                 </select>
                 <div style={{ flex:1 }}/>
                 <button className="btn btn-sm" style={{ background:'var(--neg-50)', color:'var(--red-ink)', border:'none' }}
-                  onClick={async () => { if (!window.confirm('Delete this entry?')) return; await deleteBatchSchedule(slotDetail.id); await reloadSchedules(); setSlotDetail(null); }}>
+                  onClick={() => askConfirm('Delete this entry?', async () => { await deleteBatchSchedule(slotDetail.id); await reloadSchedules(); setSlotDetail(null); })}>
                   <Trash2 size={12}/> Delete
                 </button>
               </div>
@@ -1353,6 +1360,11 @@ export default function Schedule() {
       )}
 
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)}/>}
+      {confirmBox && (
+        <Confirm message={confirmBox.message} confirmLabel={confirmBox.confirmLabel}
+          onCancel={() => setConfirmBox(null)}
+          onConfirm={async () => { const fn = confirmBox.onConfirm; setConfirmBox(null); await fn(); }} />
+      )}
     </div>
   );
 }

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { getRequests, updateRequest, updateBatch, addNotification, getBatch } from '../firebase/services';
-import { Loading, Toast } from '../components/ui';
+import { Loading, Toast, Confirm } from '../components/ui';
 import { Inbox, UserMinus, CalendarDays, ClipboardCheck, KeyRound } from 'lucide-react';
 
 const TYPE_META = {
@@ -17,6 +17,8 @@ export default function Requests() {
   const [loading,  setLoading]  = useState(true);
   const [toast,    setToast]    = useState(null);
   const [busy,     setBusy]     = useState(false);
+  const [confirmBox, setConfirmBox] = useState(null); // in-app confirm (replaces window.confirm)
+  const askConfirm = (message, onConfirm, confirmLabel = 'Confirm') => setConfirmBox({ message, onConfirm, confirmLabel });
   const [filter,   setFilter]   = useState('pending');
   const [staffFilter, setStaffFilter] = useState('');
   const [dateFilter,  setDateFilter]  = useState('');
@@ -31,8 +33,9 @@ export default function Requests() {
 
   useEffect(() => { load(); }, [filter]);
 
-  const handleAccept = async (req) => {
-    if (!window.confirm('Accept this removal request?')) return;
+  const handleAccept = (req) => askConfirm('Accept this removal request?', () => doAccept(req), 'Accept');
+
+  const doAccept = async (req) => {
     setBusy(true);
     try {
       // Remove staff from batch if targetType === 'batch'
@@ -188,6 +191,11 @@ export default function Requests() {
       })()}
 
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
+      {confirmBox && (
+        <Confirm message={confirmBox.message} confirmLabel={confirmBox.confirmLabel}
+          onCancel={() => setConfirmBox(null)}
+          onConfirm={async () => { const fn = confirmBox.onConfirm; setConfirmBox(null); await fn(); }} />
+      )}
     </div>
   );
 }

@@ -7,7 +7,7 @@ import {
 } from '../firebase/services';
 import { collection, getDocs, query, where } from 'firebase/firestore';
 import { db } from '../firebase/config';
-import { Loading } from '../components/ui';
+import { Loading, Toast } from '../components/ui';
 import { useAuth } from '../context/AuthContext';
 import {
   Users, CheckSquare, PhoneCall, School,
@@ -65,6 +65,7 @@ export default function StaffDashboard() {
   const [showSidebar,     setShowSidebar]     = useState(false);
   const [sidebarTab,      setSidebarTab]      = useState('notif'); // 'notif' | 'requests'
   const [reminding,       setReminding]       = useState({});
+  const [toast,           setToast]           = useState(null);
   const [actFilter,       setActFilter]       = useState('all'); // 'all' | 'followup' | 'task'
 
   // Batch Activity Hub
@@ -412,7 +413,7 @@ export default function StaffDashboard() {
                                 });
                               }
                               setReminding(p => ({ ...p, [req.id]: false }));
-                              alert('Reminder sent to CEO!');
+                              setToast({ message: 'Reminder sent to CEO!', type: 'success' });
                             }}
                             style={{ fontSize:11, padding:'4px 10px', borderRadius:6, border:'1px solid #E5E7EB', background:'#fff', cursor:'pointer', fontWeight:500 }}>
                             {reminding[req.id] ? 'Sending...' : 'Remind CEO'}
@@ -813,6 +814,7 @@ export default function StaffDashboard() {
           </div>
         </div>
       </div>
+      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
     </div>
   );
 }

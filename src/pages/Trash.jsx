@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { getTrashItems, restoreFromTrash, permanentDelete } from '../firebase/services';
-import { Loading, Toast } from '../components/ui';
+import { Loading, Toast, Confirm } from '../components/ui';
 import { Trash2, RotateCcw, AlertCircle, User, School } from 'lucide-react';
 
 const TAB_META = {
@@ -14,6 +14,8 @@ export default function Trash() {
   const [loading, setLoading] = useState(true);
   const [toast, setToast]     = useState(null);
   const [busy, setBusy]       = useState(false);
+  const [confirmBox, setConfirmBox] = useState(null); // in-app confirm (replaces window.confirm)
+  const askConfirm = (message, onConfirm, confirmLabel = 'Delete') => setConfirmBox({ message, onConfirm, confirmLabel });
 
   const load = async (type) => {
     setLoading(true);
@@ -25,8 +27,9 @@ export default function Trash() {
 
   useEffect(() => { load(tab); }, [tab]);
 
-  const handleRestore = async (item) => {
-    if (!window.confirm('Restore this item?')) return;
+  const handleRestore = (item) => askConfirm('Restore this item?', () => doRestore(item), 'Restore');
+
+  const doRestore = async (item) => {
     setBusy(true);
     try {
       await restoreFromTrash(item.id, item.type, item.originalId, item.data);
@@ -38,8 +41,9 @@ export default function Trash() {
     setBusy(false);
   };
 
-  const handlePermDelete = async (item) => {
-    if (!window.confirm('Permanently delete? This cannot be undone.')) return;
+  const handlePermDelete = (item) => askConfirm('Permanently delete? This cannot be undone.', () => doPermDelete(item), 'Delete');
+
+  const doPermDelete = async (item) => {
     setBusy(true);
     try {
       await permanentDelete(item.id);
@@ -51,9 +55,12 @@ export default function Trash() {
     setBusy(false);
   };
 
-  const handleDeleteAll = async () => {
+  const handleDeleteAll = () => {
     if (items.length === 0) return;
-    if (!window.confirm(`Permanently delete all ${items.length} item(s) in ${tab}s? This cannot be undone.`)) return;
+    askConfirm(`Permanently delete all ${items.length} item(s) in ${tab}s? This cannot be undone.`, doDeleteAll, 'Delete all');
+  };
+
+  const doDeleteAll = async () => {
     setBusy(true);
     try {
       await Promise.all(items.map(item => permanentDelete(item.id)));
@@ -144,6 +151,11 @@ export default function Trash() {
       )}
 
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
+      {confirmBox && (
+        <Confirm message={confirmBox.message} confirmLabel={confirmBox.confirmLabel}
+          onCancel={() => setConfirmBox(null)}
+          onConfirm={async () => { const fn = confirmBox.onConfirm; setConfirmBox(null); await fn(); }} />
+      )}
     </div>
   );
 }
