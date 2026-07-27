@@ -211,30 +211,13 @@ export default function Tasks() {
           <input placeholder="Search board by task or assignee…" value={search} onChange={e => setSearch(e.target.value)} />
         </div>
 
-        {/* Assignee avatar filter */}
+        {/* Assignee dropdown filter (clear, name-based) */}
         {teamNames.length > 0 && (
-          <div style={{ display:'flex', alignItems:'center', gap:6 }}>
-            <span style={{ fontSize:12, color:'var(--text-muted)' }}>Assignee</span>
-            <div style={{ display:'flex', alignItems:'center' }}>
-              {teamNames.slice(0,6).map((name, i) => (
-                <div
-                  key={name}
-                  title={name}
-                  onClick={() => setAssigneeFilter(f => f === name ? '' : name)}
-                  style={{
-                    width:28, height:28, borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center',
-                    fontFamily:'var(--font-display)', fontWeight:700, fontSize:10.5, color:'#fff', cursor:'pointer',
-                    boxShadow: assigneeFilter === name
-                      ? '0 0 0 2px var(--surface), 0 0 0 4px var(--brand)'
-                      : '0 0 0 2px var(--surface)',
-                    background:avatarColor(name), marginLeft: i === 0 ? 0 : -6,
-                  }}
-                >
-                  {initials(name)}
-                </div>
-              ))}
-            </div>
-          </div>
+          <select className="form-input" value={assigneeFilter} onChange={e => setAssigneeFilter(e.target.value)}
+            style={{ width:'auto', height:36, minWidth:150 }}>
+            <option value="">All staff</option>
+            {teamNames.map(n => <option key={n} value={n}>{n}</option>)}
+          </select>
         )}
 
         <select className="form-input" value={prioFilter} onChange={e => setPrioFilter(e.target.value)}
@@ -336,12 +319,18 @@ export default function Tasks() {
                               </span>
                             )}
                           </div>
-                          <div title={task.assignedTo} style={{
-                            width:26, height:26, borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center',
-                            fontFamily:'var(--font-display)', fontWeight:700, fontSize:10, color:'#fff', flexShrink:0,
-                            background:avatarColor(task.assignedTo||''),
-                          }}>
-                            {initials(task.assignedTo||'')}
+                          {/* Assignee: avatar + name so it is clear who owns the card */}
+                          <div style={{ display:'flex', alignItems:'center', gap:6, minWidth:0 }}>
+                            <div title={task.assignedTo} style={{
+                              width:26, height:26, borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center',
+                              fontFamily:'var(--font-display)', fontWeight:700, fontSize:10, color:'#fff', flexShrink:0,
+                              background:avatarColor(task.assignedTo||''),
+                            }}>
+                              {initials(task.assignedTo||'')}
+                            </div>
+                            <span style={{ fontSize:11.5, fontWeight:600, color:'var(--text-sub)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', maxWidth:96 }}>
+                              {task.assignedTo || '—'}
+                            </span>
                           </div>
                         </div>
 
