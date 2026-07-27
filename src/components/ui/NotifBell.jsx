@@ -3,11 +3,12 @@ import { useNavigate } from 'react-router-dom';
 import { useNotifs } from '../../context/NotifContext';
 import {
   Bell, CheckCheck, AlertCircle, PhoneCall, ClipboardList,
-  FileText, UserCheck, BookOpen, Users, Star
+  FileText, UserCheck, BookOpen, Users, Star, CalendarClock
 } from 'lucide-react';
 
 const TYPE_META = {
   task:               { icon: <ClipboardList size={14} />, color: 'var(--amber-ink)',  bg: 'var(--amber-soft)',  route: '/tasks' },
+  schedule:           { icon: <CalendarClock size={14} />, color: 'var(--teal-ink)',   bg: 'var(--teal-soft)',   route: '/schedule' },
   followup:           { icon: <PhoneCall size={14} />,     color: 'var(--blue-ink)',   bg: 'var(--blue-soft)',   route: '/followups' },
   concern:            { icon: <AlertCircle size={14} />,   color: 'var(--red-ink)',    bg: 'var(--red-soft)',    route: '/concerns' },
   request_update:     { icon: <FileText size={14} />,      color: 'var(--teal-ink)',   bg: 'var(--teal-soft)',   route: '/requests' },
@@ -26,6 +27,7 @@ function getMeta(type) {
   // Prefix match so variants (assessment_added, assessment_assignment,
   // task_completed, request_update, …) route to the right page.
   if (key.startsWith('assessment')) return TYPE_META.assessment;
+  if (key.startsWith('schedule'))   return TYPE_META.schedule;
   if (key.startsWith('task'))       return TYPE_META.task;
   if (key.startsWith('followup'))   return TYPE_META.followup;
   if (key.startsWith('concern'))    return TYPE_META.concern;
@@ -46,7 +48,7 @@ function timeAgo(ts) {
 }
 
 export default function NotifBell() {
-  const { notifications, unreadCount, markRead, markAllRead, refresh } = useNotifs();
+  const { notifications, unreadCount, markRead, markAllRead } = useNotifs();
   const [open, setOpen] = useState(false);
   const ref = useRef();
   const navigate = useNavigate();
@@ -56,12 +58,6 @@ export default function NotifBell() {
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, []);
-
-  useEffect(() => {
-    if (!refresh) return;
-    const id = setInterval(() => { refresh(); }, 60000);
-    return () => clearInterval(id);
-  }, [refresh]);
 
   const handleClick = (n) => {
     markRead(n.id);
@@ -184,6 +180,16 @@ export default function NotifBell() {
                 </div>
               );
             })}
+          </div>
+
+          {/* Footer — full history */}
+          <div style={{ padding: '10px 16px', borderTop: '1px solid var(--border)', textAlign: 'center' }}>
+            <button
+              onClick={() => { setOpen(false); navigate('/notifications'); }}
+              style={{ background: 'none', border: 'none', color: 'var(--accent-ink)', fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }}
+            >
+              View all notifications
+            </button>
           </div>
         </div>
       )}

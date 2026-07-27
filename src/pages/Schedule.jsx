@@ -5,7 +5,7 @@ import {
   deleteBatchSchedule, updateScheduleStatus, updateBatchSchedule, saveAttendance,
   getSessionAttendance, deleteSessionAttendance, getBatchStudents, getStaffProfiles,
   saveClassReport, updateClassReport, getSessionReports, getStudentReports,
-  getAllAssessments,
+  getAllAssessments, notifyStaff,
 } from '../firebase/services';
 import { Modal, Toast, Loading } from '../components/ui';
 import { useAuth } from '../context/AuthContext';
@@ -293,6 +293,18 @@ export default function Schedule() {
     if (activeTab === 'attendance') loadAttReport();
   }, [activeTab, schedules]); // eslint-disable-line
 
+  // Notify a schedule's assigned faculty (in-app + email). Resolves the
+  // recipient from the stored facultyEmail, falling back to a name match
+  // for older schedule docs created before facultyEmail was persisted.
+  const notifyFacultyOfSchedule = (slot, title, body) => {
+    const email = slot.facultyEmail || staffList.find(s => s.name === slot.facultyName)?.email;
+    if (!email) return;
+    notifyStaff({
+      toEmail: email, fromName: profile?.name || 'ISC SMS',
+      title, body, type: 'schedule', route: '/schedule',
+    }).catch(() => {});
+  };
+
   // ── Add class ─────────────────────────────────────────────────
   const handleAdd = async (e) => {
     e.preventDefault();
@@ -300,8 +312,13 @@ export default function Schedule() {
     if (!targetBatch) { setToast({ message: 'Please choose a batch for this entry.', type: 'error' }); return; }
     setSaving(true);
     try {
+      const faculty = form.facultyName
+        ? staffList.find(s => s.name === form.facultyName)
+        : null;
       await addBatchSchedule({
         ...form,
+        facultyEmail: faculty?.email || '',
+        facultyUid:   faculty?.uid || '',
         batchId: targetBatch,
         batchName: batchName(targetBatch),
         participantStudents: form.type === 'meeting'
@@ -310,6 +327,17 @@ export default function Schedule() {
             ? modalStudents.map(s => ({ id: s.id, name: s.name }))
             : modalStudents.filter(s => form.participantIds.includes(s.id)).map(s => ({ id: s.id, name: s.name })),
       });
+      // Notify the assigned faculty (in-app + email together)
+      if (faculty?.email) {
+        const when = form.recurring
+          ? `Every ${form.day} at ${form.time}`
+          : `${form.scheduledDate} at ${form.time}`;
+        notifyStaff({
+          toEmail: faculty.email, fromName: profile?.name || 'ISC SMS',
+          title: 'Class Scheduled', type: 'schedule', route: '/schedule',
+          body: `You have been assigned to "${form.title}" — ${when} (${batchName(targetBatch)})`,
+        }).catch(()=>{});
+      }
       setToast({ message: 'Added to schedule!', type: 'success' });
       setShowAdd(false);
       setForm(blankForm()); setStudentSearch('');
@@ -800,6 +828,10 @@ export default function Schedule() {
                     const ns = e.target.value; if (!ns) return;
                     if (ns === 'rescheduled') { setReschedule({ slot: slotDetail, date: slotDetail.scheduledDate || '', time: slotDetail.time || '' }); return; }
                     await updateScheduleStatus(slotDetail.id, ns); await reloadSchedules(); setSlotDetail({ ...slotDetail, status: ns });
+                    if (ns === 'cancelled') {
+                      notifyFacultyOfSchedule(slotDetail, 'Class Cancelled',
+                        `"${slotDetail.title}"${slotDetail.batchName ? ` (${slotDetail.batchName})` : ''} has been cancelled.`);
+                    }
                   }}>
                   <option value="">Update status…</option>
                   <option value="completed">Completed</option>
@@ -1277,6 +1309,8 @@ export default function Schedule() {
                 setSaving(true);
                 try {
                   await updateBatchSchedule(reschedule.slot.id, { status:'rescheduled', scheduledDate: reschedule.date, time: reschedule.time });
+                  notifyFacultyOfSchedule(reschedule.slot, 'Class Rescheduled',
+                    `"${reschedule.slot.title}"${reschedule.slot.batchName ? ` (${reschedule.slot.batchName})` : ''} moved to ${reschedule.date} at ${reschedule.time}.`);
                   setToast({ message:'Class rescheduled.', type:'success' });
                   const ns = { ...reschedule.slot, status:'rescheduled', scheduledDate: reschedule.date, time: reschedule.time };
                   setReschedule(null); setSlotDetail(ns); await reloadSchedules();

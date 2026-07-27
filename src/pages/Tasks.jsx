@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
-import { getTasks, addTask, updateTask, addNotification, getStaffProfiles } from '../firebase/services';
-import { sendTaskEmail } from '../firebase/emailService';
+import { getTasks, addTask, updateTask, addNotification, notifyStaff, getStaffProfiles } from '../firebase/services';
 import { Modal, Toast, Loading, FormRow } from '../components/ui';
 import { useAuth } from '../context/AuthContext';
 import { Plus, Search, Flag, Calendar, LayoutGrid, List, Mail } from 'lucide-react';
@@ -82,20 +81,14 @@ export default function Tasks() {
         assignedByEmail: user?.email,
       };
       await addTask(taskData);
-      await addNotification({
+      // In-app + email together (email best-effort via /api/send-email)
+      await notifyStaff({
         toEmail:  selectedStaff.email,
-        toName:   selectedStaff.name,
-        fromName: profile?.name,
         type:     'task',
-        message:  `New task: "${form.title}"${form.dueDate ? ` — due ${form.dueDate}` : ''}`,
-      });
-      await sendTaskEmail({
-        toEmail:    selectedStaff.email,
-        toName:     selectedStaff.name,
-        taskTitle:  form.title,
-        dueDate:    form.dueDate,
-        priority:   form.priority,
-        assignedBy: profile?.name,
+        title:    'New Task Assigned',
+        body:     `New task: "${form.title}"${form.dueDate ? ` — due ${form.dueDate}` : ''}`,
+        route:    '/tasks',
+        fromName: profile?.name,
       });
       setToast({ message:`Task assigned to ${selectedStaff.name}!`, type:'success' });
       setShowModal(false);

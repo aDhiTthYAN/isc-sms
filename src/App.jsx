@@ -23,6 +23,7 @@ import StaffManagement from './pages/StaffManagement';
 import Trash           from './pages/Trash';
 import Requests        from './pages/Requests';
 import Schedule        from './pages/Schedule';
+import Notifications   from './pages/Notifications';
 import ErrorBoundary   from './components/ErrorBoundary';
 
 const NAV_BY_ROLE = {
@@ -33,6 +34,7 @@ const NAV_BY_ROLE = {
     { to: '/followups',   label: 'Follow-Ups',        icon: 'PhoneCall'      },
     { to: '/batches',     label: 'Batches',           icon: 'School'         },
     { to: '/schedule',    label: 'Schedule',          icon: 'CalendarDays'   },
+    { to: '/notifications', label: 'Notifications',   icon: 'Bell'           },
     { section: 'ACADEMIC' },
     { to: '/assessments', label: 'Assessments',       icon: 'ClipboardList'  },
     { to: '/concerns',    label: 'Concerns',          icon: 'AlertCircle'    },
@@ -57,6 +59,7 @@ const NAV_BY_ROLE = {
     { to: '/tasks',       label: 'My Tasks',         icon: 'CheckSquare'     },
     { to: '/assessments', label: 'Assessments',      icon: 'ClipboardList'   },
     { to: '/concerns',    label: 'Concerns',         icon: 'AlertCircle'     },
+    { to: '/notifications', label: 'Notifications',  icon: 'Bell'            },
     { section: 'Reports' },
     { to: '/reports',     label: 'Daily Report',     icon: 'FileText'        },
     { section: 'Resources' },
@@ -129,6 +132,7 @@ export default function App() {
             <Route path="/trash"         element={<Trash />}           />
             <Route path="/requests"      element={<Requests />}        />
             <Route path="/schedule"      element={<Schedule />}        />
+            <Route path="/notifications" element={<Notifications />}    />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

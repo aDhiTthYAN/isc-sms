@@ -4,7 +4,7 @@ import {
   serverTimestamp, setDoc, limit, startAfter,
   getCountFromServer
 } from 'firebase/firestore';
-import { db } from './config';
+import { db, auth } from './config';
 
 const PAGE_SIZE = 50;
 
@@ -403,6 +403,53 @@ export const updateTask = async (id, data) =>
 // ── Notifications (in-app) ─────────────────────────────────────
 export const addNotification = async (data) =>
   addDoc(collection(db,'notifications'), { ...data, read: false, createdAt: serverTimestamp() });
+
+// ── Email channel (server-side, free) ──────────────────────────
+// Sends an email via the Vercel serverless function at /api/send-email.
+// The mail credentials live ONLY in Vercel env vars (never in the
+// browser bundle). We authenticate the caller with their Firebase ID
+// token so only signed-in staff can trigger a send. Best-effort: any
+// failure (offline, function absent in local dev, mail creds unset) is
+// swallowed so the in-app notification is never blocked. When the
+// endpoint is missing or mail env is unset, email is simply a no-op —
+// this is the feature flag (email "turns on" once Vercel env is set).
+const NOTIFY_API = import.meta.env.VITE_NOTIFY_API_BASE ?? '';
+export const sendNotificationEmail = async ({ toEmail, subject, text, fromName }) => {
+  if (!toEmail) return { status: 'skipped' };
+  try {
+    const current = auth.currentUser;
+    if (!current) return { status: 'no-auth' };
+    const token = await current.getIdToken();
+    const res = await fetch(`${NOTIFY_API}/api/send-email`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ toEmail, subject, text, fromName }),
+    });
+    if (!res.ok) return { status: 'failed', code: res.status };
+    return await res.json().catch(() => ({ status: 'sent' }));
+  } catch {
+    return { status: 'error' };
+  }
+};
+
+// notifyStaff — the single entry point for BOTH channels. Writes the
+// in-app notification (always) and fires the email (best-effort, unless
+// sendEmail:false). All task/schedule trigger sites call this so the two
+// channels stay in lock-step. `body` is the canonical message field;
+// `message` is accepted for back-compat with older call sites.
+export const notifyStaff = async ({
+  toEmail, type, title, body, message, route, fromName, sendEmail = true,
+}) => {
+  if (!toEmail) return;
+  const text = body ?? message ?? '';
+  const inApp = addNotification({ toEmail, type, title, body: text, route, fromName });
+  if (sendEmail) {
+    sendNotificationEmail({
+      toEmail, subject: title || 'ISC SMS Notification', text, fromName,
+    }).catch(() => {});
+  }
+  return inApp;
+};
 
 export const getMyNotifications = async (email) => {
   const q = query(collection(db,'notifications'), where('toEmail','==',email), limit(20));

@@ -6,7 +6,7 @@ import {
   getStaffProfiles, getBatchSchedules, addBatchSchedule, deleteBatchSchedule,
   getBatchTasks, addBatchTask, markTaskSubmitted, updateBatchTask, deleteBatchTask,
   updateScheduleStatus, saveAttendance, getSessionAttendance,
-  addNotification, getTrashItems, permanentDelete,
+  addNotification, notifyStaff, getTrashItems, permanentDelete,
   createRequest,
   getAssessments, addAssessment, deleteAssessment, getAssessmentResults, saveAssessmentResults,
 } from '../firebase/services';
@@ -911,27 +911,27 @@ export default function Batches() {
 
   const handleAddSchedule = async (e) => {
     e.preventDefault(); setSaving(true);
-    await addBatchSchedule({ ...scheduleForm, batchId:selectedBatch.id, batchName:selectedBatch.name });
-    // Notify assigned faculty (in-app + email)
-    if (scheduleForm.facultyName) {
-      const faculty = staffList.find(s => s.name === scheduleForm.facultyName);
-      if (faculty?.email) {
-        const when = scheduleForm.recurring
-          ? `Every ${scheduleForm.day} at ${scheduleForm.time}`
-          : `${scheduleForm.scheduledDate} at ${scheduleForm.time}`;
-        addNotification({
-          toEmail: faculty.email, fromName: profile?.name || 'ISC SMS',
-          title: 'Class Scheduled', type: 'task',
-          message: `You have been assigned to "${scheduleForm.title}" — ${when} (${selectedBatch.name})`,
-          read: false,
-        }).catch(()=>{});
-        sendAssignmentEmail({
-          toEmail: faculty.email, toName: faculty.name,
-          title: `Class Scheduled: ${scheduleForm.title}`,
-          detail: `${when} — Batch: ${selectedBatch.name}`,
-          assignedBy: profile?.name || 'ISC SMS',
-        }).catch(()=>{});
-      }
+    const faculty = scheduleForm.facultyName
+      ? staffList.find(s => s.name === scheduleForm.facultyName)
+      : null;
+    // Persist faculty email/uid on the schedule so future notifications
+    // don't have to match on the (fragile) name string.
+    await addBatchSchedule({
+      ...scheduleForm,
+      facultyEmail: faculty?.email || '',
+      facultyUid:   faculty?.uid || '',
+      batchId:selectedBatch.id, batchName:selectedBatch.name,
+    });
+    // Notify assigned faculty (in-app + email together)
+    if (faculty?.email) {
+      const when = scheduleForm.recurring
+        ? `Every ${scheduleForm.day} at ${scheduleForm.time}`
+        : `${scheduleForm.scheduledDate} at ${scheduleForm.time}`;
+      notifyStaff({
+        toEmail: faculty.email, fromName: profile?.name || 'ISC SMS',
+        title: 'Class Scheduled', type: 'schedule', route: '/schedule',
+        body: `You have been assigned to "${scheduleForm.title}" — ${when} (${selectedBatch.name})`,
+      }).catch(()=>{});
     }
     setToast({ message:'Schedule added!', type:'success' });
     setShowSchedule(false);
@@ -947,20 +947,14 @@ export default function Batches() {
       assignedStudentIds: taskForm.assignedType === 'specific' ? taskForm.assignedStudentIds : [],
       batchId:selectedBatch.id, batchName:selectedBatch.name, createdBy:profile?.name,
     });
-    // Notify the assigned faculty (in-app + email)
+    // Notify the assigned faculty (in-app + email together)
     if (taskForm.assignedFaculty) {
       const staff = staffList.find(s => s.name === taskForm.assignedFaculty);
       if (staff?.email) {
-        await addNotification({
-          toEmail: staff.email, title: 'New Task Assigned',
+        await notifyStaff({
+          toEmail: staff.email, fromName: profile?.name || 'ISC SMS',
+          title: 'New Task Assigned', type: 'task_assigned', route: '/batches',
           body: `${profile?.name} assigned you "${taskForm.title}" in batch ${selectedBatch.name}${taskForm.dueDate ? ` (due ${taskForm.dueDate})` : ''}`,
-          type: 'task_assigned', read: false,
-        }).catch(()=>{});
-        sendAssignmentEmail({
-          toEmail: staff.email, toName: staff.name,
-          title: `New Task: ${taskForm.title}`,
-          detail: `Batch ${selectedBatch.name}${taskForm.dueDate ? ` — due ${taskForm.dueDate}` : ''}`,
-          assignedBy: profile?.name || 'ISC SMS',
         }).catch(()=>{});
       }
     }
