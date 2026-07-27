@@ -25,6 +25,22 @@ const CARD = {
 const ACCENTS = ['#E81620','#F4683B','#F5A623','#16A974','#11B4C6','#3B6EF6','#6366F1','#8B5CF6','#EC4899','#6E7488'];
 function avatarColor(name = '') { let h = 0; for (const c of name) h = (h * 31 + c.charCodeAt(0)) >>> 0; return ACCENTS[h % ACCENTS.length]; }
 function initials(name = '') { const p = name.trim().split(/\s+/); return ((p[0]?.[0] || '') + (p[1]?.[0] || '')).toUpperCase() || '?'; }
+// A class needs a completion mark if it started >2h ago and is still pending.
+const GRACE_MS = 2 * 60 * 60 * 1000;
+function classNeedsCompletion(s) {
+  if (['completed', 'cancelled', 'rescheduled'].includes(s.status)) return false;
+  const WD = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  const pad = n => String(n).padStart(2, '0');
+  const ld = (d = new Date()) => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+  let dateStr = null;
+  if (s.recurring) { if (s.day === WD[new Date().getDay()]) dateStr = ld(); }
+  else dateStr = s.scheduledDate || null;
+  if (!dateStr) return false;
+  const start = new Date(`${dateStr}T${(s.time && /^\d{1,2}:\d{2}$/.test(s.time)) ? s.time : '00:00'}`);
+  if (isNaN(start)) return false;
+  return (Date.now() - start.getTime()) > GRACE_MS;
+}
+
 function timeAgo(ts) {
   if (!ts) return '';
   const d = ts.toDate ? ts.toDate() : new Date(ts);
@@ -199,7 +215,10 @@ export default function StaffDashboard() {
   useEffect(() => {
     if (!hubBatch) return setHubItems([]);
     setHubLoading(true);
-    const today = new Date().toISOString().slice(0, 10);
+    // Local calendar date — toISOString() is UTC and rolls to tomorrow in
+    // IST after ~6:30pm, mislabelling today's classes as past/upcoming.
+    const now = new Date();
+    const today = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
     Promise.all([
       getBatchSchedules(hubBatch).catch(() => []),
       getAssessments(hubBatch).catch(() => []),
@@ -211,7 +230,7 @@ export default function StaffDashboard() {
             : !s.scheduledDate ? 'active'
             : s.scheduledDate > today ? 'upcoming'
             : s.scheduledDate < today ? 'past' : 'active';
-          return { ...s, _kind: 'schedule', _timeStatus,
+          return { ...s, _kind: 'schedule', _timeStatus, _needsCompletion: classNeedsCompletion(s),
             _label: s.title || 'Class',
             _sub: s.recurring ? `Every ${s.day} at ${s.time}` : `${s.scheduledDate || ''} at ${s.time}`,
             _type: s.type || 'live-class', _course: s.course || '' };
@@ -615,14 +634,17 @@ export default function StaffDashboard() {
                       const tab = item._kind === 'assessment' ? 'assessments' : 'tasks';
                       return (
                         <div key={item.id || i} onClick={() => item._kind === 'schedule' ? navigate('/schedule') : navigate('/batches', { state: { batchId: hubBatch, tab } })}
-                          style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', borderRadius: 10, border: '1px solid #E5E7EB', cursor: 'pointer', background: '#fff', transition: 'background 0.12s' }}
+                          style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', borderRadius: 10, border: '1px solid #E5E7EB', borderLeft: item._needsCompletion ? '3px solid #F59E0B' : '1px solid #E5E7EB', cursor: 'pointer', background: item._needsCompletion ? '#FEF3C7' : '#fff', transition: 'background 0.12s' }}
                           onMouseEnter={e => e.currentTarget.style.background = '#F8FAFC'}
-                          onMouseLeave={e => e.currentTarget.style.background = '#fff'}>
+                          onMouseLeave={e => e.currentTarget.style.background = item._needsCompletion ? '#FEF3C7' : '#fff'}>
                           <div style={{ width: 9, height: 9, borderRadius: '50%', background: c.dot, flexShrink: 0 }} />
                           <div style={{ flex: 1, minWidth: 0 }}>
                             <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item._label}</div>
                             {item._sub && <div style={{ fontSize: 11, color: '#6B7280', marginTop: 1 }}>{item._sub}</div>}
                           </div>
+                          {item._needsCompletion && (
+                            <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 20, background: '#F59E0B', color: '#fff', fontWeight: 700, flexShrink: 0, whiteSpace: 'nowrap' }}>Not marked</span>
+                          )}
                           {item._type && (
                             <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 20, background: '#F3F4F6', color: '#374151', fontWeight: 500, flexShrink: 0, whiteSpace: 'nowrap' }}>{item._type}</span>
                           )}

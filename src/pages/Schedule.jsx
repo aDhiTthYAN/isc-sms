@@ -852,9 +852,14 @@ export default function Schedule() {
       {/* ── ATTENDANCE REPORT TAB ── */}
       {activeTab === 'attendance' && (() => {
         const dateOf = (r) => {
+          // The class's own date is the truth: a one-time class carries
+          // scheduledDate, so attendance belongs to THAT day even if it was
+          // marked later. Only recurring classes (no scheduledDate) fall back
+          // to the date attendance was actually recorded.
+          if (r.session?.scheduledDate) return r.session.scheduledDate;
           const ts = r.attendance?.createdAt || r.attendance?.savedAt;
           if (ts?.seconds) return localDateStr(new Date(ts.seconds * 1000));
-          return r.session?.scheduledDate || '';
+          return '';
         };
         const facultyNames = [...new Set(attReport.map(r => r.session?.facultyName).filter(Boolean))];
         const shown = attReport.filter(r => {
@@ -933,14 +938,25 @@ export default function Schedule() {
         }
         const active = covSchedules.filter(s => {
           if (s.status === 'cancelled') return false;
+          if (s.type === 'meeting') return false; // meetings are staff-only, not student classes
           if (s.recurring) return weekdaysInWindow.has(s.day);
           return s.scheduledDate && s.scheduledDate >= fromStr && s.scheduledDate <= toStr;
         });
         const allIds = covStudents.map(s => s.id);
         const countBy = {};
         active.forEach(s => {
-          const ids = (s.participantType === 'specific' && Array.isArray(s.participantIds) && s.participantIds.length)
-            ? s.participantIds : allIds;
+          // Source of truth is participantStudents — the roster snapshot taken
+          // when the class was created. A student who joined later isn't in it,
+          // so they are correctly counted as missed for that class. Only fall
+          // back to "all current students" for legacy classes with no snapshot.
+          let ids;
+          if (Array.isArray(s.participantStudents) && s.participantStudents.length) {
+            ids = s.participantStudents.map(p => p.id);
+          } else if (s.participantType === 'specific' && Array.isArray(s.participantIds) && s.participantIds.length) {
+            ids = s.participantIds;
+          } else {
+            ids = allIds;
+          }
           ids.forEach(id => { countBy[id] = (countBy[id] || 0) + 1; });
         });
         const covered = covStudents.filter(s => countBy[s.id]);

@@ -596,7 +596,7 @@ export default function Batches() {
       if (ts) {
         try {
           const d = new Date(ts);
-          if (!isNaN(d)) obj.joinDate = d.toISOString().split('T')[0];
+          if (!isNaN(d)) obj.joinDate = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
         } catch {}
       }
       fields.forEach(f => { obj[f.key] = row[f.key] || ''; });
@@ -1287,7 +1287,7 @@ export default function Batches() {
           // already-marked values retroactively. The default VARK step is
           // skipped here because it already mirrors to the varkResult field.
           const flowCols = batchFlow.filter(step => step.displayInTable && step.key !== 'vark_analysis');
-          const joinDateOf = (s) => s.joiningDate || s.joinDate || (s.createdAt?.seconds ? new Date(s.createdAt.seconds*1000).toISOString().slice(0,10) : '');
+          const joinDateOf = (s) => { if (s.joiningDate) return s.joiningDate; if (s.joinDate) return s.joinDate; if (!s.createdAt?.seconds) return ''; const d = new Date(s.createdAt.seconds*1000); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; };
           const filtered = batchStudents.filter(s => {
             if (studentStatusFilter && s.status !== studentStatusFilter) return false;
             if (studentJoinFrom && joinDateOf(s) < studentJoinFrom) return false;

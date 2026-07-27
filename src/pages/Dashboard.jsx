@@ -18,6 +18,26 @@ const ACCENTS = ['#E81620','#F4683B','#F5A623','#16A974','#11B4C6','#3B6EF6','#6
 function avatarColor(name=''){let h=0;for(const c of name)h=(h*31+c.charCodeAt(0))>>>0;return ACCENTS[h%ACCENTS.length];}
 function initials(name=''){const p=name.trim().split(/\s+/);return((p[0]?.[0]||'')+(p[1]?.[0]||'')).toUpperCase()||'?';}
 
+// Local calendar date (YYYY-MM-DD) — NOT toISOString(), which is UTC and
+// shifts the day backward in ahead-of-UTC timezones (e.g. IST after ~6:30pm).
+const localDateStr = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+
+// A class needs a completion mark if it started >2h ago and is still pending
+// (not completed/cancelled/rescheduled). Returns true only for a concrete
+// occurrence that has passed. Recurring classes are checked against today.
+const GRACE_MS = 2 * 60 * 60 * 1000;
+function classNeedsCompletion(s) {
+  if (['completed', 'cancelled', 'rescheduled'].includes(s.status)) return false;
+  const WD = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  let dateStr = null;
+  if (s.recurring) { if (s.day === WD[new Date().getDay()]) dateStr = localDateStr(); }
+  else dateStr = s.scheduledDate || null;
+  if (!dateStr) return false;
+  const start = new Date(`${dateStr}T${(s.time && /^\d{1,2}:\d{2}$/.test(s.time)) ? s.time : '00:00'}`);
+  if (isNaN(start)) return false;
+  return (Date.now() - start.getTime()) > GRACE_MS;
+}
+
 function timeAgo(ts){
   if(!ts) return '';
   const d = ts.seconds ? new Date(ts.seconds*1000) : new Date(ts);
@@ -135,14 +155,17 @@ function BatchActivityHub({ batches, schedBatch, setSchedBatch, schedFilter, set
                     onClick={() => item._kind === 'schedule'
                       ? navigate('/schedule')
                       : navigate('/batches', { state:{ batchId:schedBatch, tab } })}
-                    style={{ display:'flex', alignItems:'center', gap:12, padding:'11px 14px', borderRadius:10, border:'1px solid var(--border)', cursor:'pointer', background:'var(--surface)', transition:'background .12s' }}
+                    style={{ display:'flex', alignItems:'center', gap:12, padding:'11px 14px', borderRadius:10, border:'1px solid var(--border)', borderLeft: item._needsCompletion ? '3px solid var(--amber)' : '1px solid var(--border)', cursor:'pointer', background: item._needsCompletion ? 'var(--amber-soft)' : 'var(--surface)', transition:'background .12s' }}
                     onMouseEnter={e => e.currentTarget.style.background='var(--surface-hover)'}
-                    onMouseLeave={e => e.currentTarget.style.background='var(--surface)'}>
+                    onMouseLeave={e => e.currentTarget.style.background = item._needsCompletion ? 'var(--amber-soft)' : 'var(--surface)'}>
                     <span style={{ width:10, height:10, borderRadius:'50%', background:c.dot, flexShrink:0 }} />
                     <div style={{ flex:1, minWidth:0 }}>
                       <div style={{ fontSize:13, fontWeight:600, color:'var(--text)', marginBottom:2, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{item._label}</div>
                       {item._sub && <div style={{ fontSize:12, color:'var(--text-muted)' }}>{item._sub}</div>}
                     </div>
+                    {item._needsCompletion && (
+                      <span style={{ fontSize:10, padding:'2px 8px', borderRadius:20, background:'var(--amber)', color:'#fff', fontWeight:700, flexShrink:0, whiteSpace:'nowrap' }}>Not marked</span>
+                    )}
                     {item._course && (
                       <span style={{ fontSize:10, padding:'2px 8px', borderRadius:20, background:'var(--surface-sunken)', color:'var(--text-sub)', fontWeight:500, flexShrink:0 }}>{item._course}</span>
                     )}
@@ -310,7 +333,7 @@ export default function Dashboard() {
   const loadBatchActivity = async (batchId) => {
     if (!batchId) return setSchedItems([]);
     setSchedLoading(true);
-    const today = new Date().toISOString().slice(0,10);
+    const today = localDateStr();
     try {
       const [scheds, asmts, bTasks] = await Promise.all([
         getBatchSchedules(batchId).catch(() => []),
@@ -321,7 +344,7 @@ export default function Dashboard() {
         ...scheds.map(s => {
           const _timeStatus = s.recurring ? 'active' : !s.scheduledDate ? 'active'
             : s.scheduledDate > today ? 'upcoming' : s.scheduledDate < today ? 'past' : 'active';
-          return { ...s, _kind:'schedule', _timeStatus, _label:s.title||'Class', _sub:s.recurring?`Every ${s.day} at ${s.time}`:`${s.scheduledDate} at ${s.time}`, _type:s.type||'live-class', _course:s.course||'' };
+          return { ...s, _kind:'schedule', _timeStatus, _needsCompletion:classNeedsCompletion(s), _label:s.title||'Class', _sub:s.recurring?`Every ${s.day} at ${s.time}`:`${s.scheduledDate} at ${s.time}`, _type:s.type||'live-class', _course:s.course||'' };
         }),
         ...asmts.map(a => {
           const _timeStatus = a.status==='completed' ? 'completed' : a.date>today ? 'upcoming' : a.date<today ? 'past' : 'active';
