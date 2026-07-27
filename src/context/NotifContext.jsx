@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import {
-  collection, query, where, orderBy, limit,
+  collection, query, where,
   onSnapshot, updateDoc, doc
 } from 'firebase/firestore';
 import { db } from '../firebase/config';
@@ -38,15 +38,18 @@ export function NotifProvider({ children }) {
   useEffect(() => {
     if (!user || !profile?.email) return;
 
+    // Recipient-scoped only — NO orderBy, per the codebase convention
+    // (orderBy + where needs a composite index and was silently failing
+    // the listener). Sort newest-first in JS instead.
     const q = query(
       collection(db, 'notifications'),
-      where('toEmail', '==', profile.email),
-      orderBy('createdAt', 'desc'),
-      limit(20)
+      where('toEmail', '==', profile.email)
     );
 
     const unsubFirestore = onSnapshot(q, (snap) => {
-      const notifs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      const notifs = snap.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
       setNotifications(notifs);
       setUnreadCount(notifs.filter(n => !n.read).length);
     }, (err) => {
