@@ -30,6 +30,7 @@ function getMeta(type) {
   if (key.startsWith('followup'))   return TYPE_META.followup;
   if (key.startsWith('concern'))    return TYPE_META.concern;
   if (key.startsWith('request'))    return TYPE_META.request_update;
+  if (key.startsWith('removal'))    return TYPE_META.request_update; // removal_request / removal_reminder → /requests
   if (key.startsWith('batch'))      return TYPE_META.batch_assignment;
   if (key.startsWith('lead'))       return TYPE_META.lead;
   return DEFAULT_META;
