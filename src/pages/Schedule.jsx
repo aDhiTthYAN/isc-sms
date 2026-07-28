@@ -816,15 +816,24 @@ export default function Schedule() {
                         value={detailSearch} onChange={e => setDetailSearch(e.target.value)}/>
                     </div>
                   )}
-                  <div style={{ display:'flex', flexWrap:'wrap', gap:6, maxHeight:200, overflowY:'auto', padding:2 }}>
-                    {shown.slice(0, 300).map(p => (
-                      <span key={p.id} style={{ display:'inline-flex', alignItems:'center', gap:5, padding:'3px 9px', borderRadius:20, background:'var(--surface-2)', fontSize:11.5, fontWeight:500 }}>
-                        <span style={{ width:18, height:18, borderRadius:'50%', background:avatarColor(p.name), display:'inline-flex', alignItems:'center', justifyContent:'center', fontSize:8, fontWeight:700, color:'#fff' }}>{initials(p.name)}</span>
-                        {p.name}
-                      </span>
+                  <div style={{ display:'flex', flexDirection:'column', gap:4, maxHeight:280, overflowY:'auto', padding:2, border:'1px solid var(--border)', borderRadius:10 }}>
+                    {shown.slice(0, 300).map((p, i) => (
+                      <div key={p.id}
+                        onClick={() => { setSlotDetail(null); setDetailSearch(''); navigate(`/students/${p.id}`); }}
+                        style={{ display:'flex', alignItems:'center', gap:10, padding:'8px 10px', borderRadius:8, cursor:'pointer', transition:'background .12s' }}
+                        onMouseEnter={e => e.currentTarget.style.background='var(--surface-2)'}
+                        onMouseLeave={e => e.currentTarget.style.background='transparent'}>
+                        <span style={{ fontSize:11, color:'var(--muted)', width:22, textAlign:'right', flexShrink:0 }}>{i + 1}.</span>
+                        <span style={{ width:26, height:26, borderRadius:'50%', background:avatarColor(p.name), display:'inline-flex', alignItems:'center', justifyContent:'center', fontSize:10, fontWeight:700, color:'#fff', flexShrink:0 }}>{initials(p.name)}</span>
+                        <div style={{ flex:1, minWidth:0 }}>
+                          <div style={{ fontSize:13, fontWeight:600, color:'var(--text)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{p.name}</div>
+                          {p.phone && <div style={{ fontSize:11, color:'var(--muted)' }}>{p.phone}</div>}
+                        </div>
+                        <ChevronRight size={14} style={{ color:'var(--muted)', flexShrink:0 }}/>
+                      </div>
                     ))}
-                    {shown.length === 0 && <span style={{ fontSize:12, color:'var(--muted)' }}>No match.</span>}
-                    {shown.length > 300 && <span style={{ fontSize:11.5, color:'var(--muted)', alignSelf:'center' }}>+{shown.length - 300} more — refine search to see them</span>}
+                    {shown.length === 0 && <span style={{ fontSize:12, color:'var(--muted)', padding:8 }}>No match.</span>}
+                    {shown.length > 300 && <span style={{ fontSize:11.5, color:'var(--muted)', padding:8 }}>+{shown.length - 300} more — refine search to see them</span>}
                   </div>
                 </>
               )}
