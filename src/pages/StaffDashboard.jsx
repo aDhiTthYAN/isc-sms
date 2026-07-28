@@ -680,7 +680,7 @@ export default function StaffDashboard() {
                     style={{ cursor: 'pointer', transition: 'background 0.12s', background: idx % 2 === 0 ? '#fff' : '#FAFBFC' }}
                     onMouseEnter={e => e.currentTarget.style.background = '#F0F4FF'}
                     onMouseLeave={e => e.currentTarget.style.background = idx % 2 === 0 ? '#fff' : '#FAFBFC'}
-                    onClick={() => navigate('/batches')}
+                    onClick={() => navigate('/batches', { state: { batchId: batch.id, tab: 'students' } })}
                   >
                     <td style={{ padding: '9px 8px', fontWeight: 600 }}>{batch.name}</td>
                     <td style={{ padding: '9px 8px', color: '#6B7280' }}>{batch.course || '—'}</td>

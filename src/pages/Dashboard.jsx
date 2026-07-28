@@ -652,7 +652,7 @@ export default function Dashboard() {
                     <tr key={batch.id} style={{ cursor:'pointer', transition:'background .12s' }}
                       onMouseEnter={e => e.currentTarget.style.background='var(--brand-50)'}
                       onMouseLeave={e => e.currentTarget.style.background=''}
-                      onClick={() => navigate('/batches')}>
+                      onClick={() => navigate('/batches', { state:{ batchId: batch.id, tab: 'students' } })}>
                       <td style={{ fontWeight:600 }}>{batch.name}</td>
                       <td><span style={{ fontFamily:'var(--font-display)', fontWeight:700, fontSize:15, color:'var(--text)' }}>{count}</span></td>
                       <td>

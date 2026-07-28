@@ -1276,7 +1276,7 @@ export default function Batches() {
             { key:'onboarding',  label:'Onboarding Analytics'              },
             { key:'tasks',       label:`Assignments (${batchTasks.length})` },
             { key:'assessments', label:`Assessments (${batchAssessments.length})` },
-            { key:'staff',       label:`Staff (${batchStaffDetails.length + (selectedBatch.mentorId ? 1 : 0)})` },
+            { key:'staff',       label:`Staff (${batchStaffDetails.filter(s => s.uid !== selectedBatch.mentorId).length + (selectedBatch.mentorId ? 1 : 0)})` },
           ].map(t => (
             <div key={t.key} className={`tab ${activeTab===t.key?'active':''}`} onClick={() => { setActiveTab(t.key); setSelectedTask(null); }}>
               {t.label}
