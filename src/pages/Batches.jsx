@@ -559,8 +559,10 @@ export default function Batches() {
     // assigned (rules + staff dashboards key off staffIds). Resolve the selected
     // names into ids/details here so the assignment sticks.
     const facultyStaff = staffList.filter(s => createForm.faculties.includes(s.name) && s.role !== 'ceo');
-    const staffIds = facultyStaff.map(s => s.id);
     const staffDetails = facultyStaff.map(s => ({ uid: s.id, name: s.name, phone: s.phone || '', email: s.email || '', subjects: s.subjects || [] }));
+    // staffIds drives access + "my batches"; include the mentor so they are
+    // covered even without the separate mentorId query.
+    const staffIds = [...new Set([...facultyStaff.map(s => s.id), createForm.mentorId].filter(Boolean))];
     await addBatch({ ...createForm, staffIds, staffDetails });
     setToast({ message:`Batch "${createForm.name}" created!`, type:'success' });
     setShowCreate(false);
