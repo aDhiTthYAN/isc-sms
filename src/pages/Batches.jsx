@@ -167,7 +167,7 @@ function downloadTemplate(batchName, fields) {
 }
 
 // ─── Onboarding Step Side Panel (dynamic field types) ────────────────────────
-function OnboardingStepPanel({ step, onClose, onMarkComplete, onRevoke }) {
+function OnboardingStepPanel({ step, onClose, onMarkComplete, onRevoke, onToast }) {
   const [tab, setTab]                         = useState('not');
   const [search, setSearch]                   = useState('');
   const [fieldValues, setFieldValues]         = useState({}); // studentId captured value
@@ -194,7 +194,7 @@ function OnboardingStepPanel({ step, onClose, onMarkComplete, onRevoke }) {
   const filteredDone = localCompleted.filter(s => !search || s.name?.toLowerCase().includes(search.toLowerCase()) || s.phone?.includes(search));
 
   const doMark = async (s) => {
-    if (s.status === 'dropped') { alert(`${s.name} is a dropped student — cannot mark steps.`); return; }
+    if (s.status === 'dropped') { onToast?.({ message: `${s.name} is a dropped student — cannot mark steps.`, type: 'error' }); return; }
     const val = fieldValues[s.id] || '';
     if (needsVal && !val) return;
     setMarking(prev => ({ ...prev, [s.id]: true }));
@@ -554,7 +554,14 @@ export default function Batches() {
   // ── CRUD handlers ─────────────────────────────────────────────
   const handleCreateBatch = async (e) => {
     e.preventDefault(); setSaving(true);
-    await addBatch(createForm);
+    // The faculty chips only stored names in createForm.faculties, so the batch
+    // was saved with empty staffIds/staffDetails — meaning no staff were actually
+    // assigned (rules + staff dashboards key off staffIds). Resolve the selected
+    // names into ids/details here so the assignment sticks.
+    const facultyStaff = staffList.filter(s => createForm.faculties.includes(s.name) && s.role !== 'ceo');
+    const staffIds = facultyStaff.map(s => s.id);
+    const staffDetails = facultyStaff.map(s => ({ uid: s.id, name: s.name, phone: s.phone || '', email: s.email || '', subjects: s.subjects || [] }));
+    await addBatch({ ...createForm, staffIds, staffDetails });
     setToast({ message:`Batch "${createForm.name}" created!`, type:'success' });
     setShowCreate(false);
     setCreateForm({ name:'', course:'', mentorId:'', mentorName:'', faculties:[], startDate:'', endDate:'', status:'upcoming', maxSeats:'', courseDurationMonths:'', courseFlow:DEFAULT_COURSE_FLOW, studentFields:DEFAULT_STUDENT_FIELDS, subjects:[], staffIds:[], staffDetails:[] });
@@ -1134,7 +1141,7 @@ export default function Batches() {
         {selectedStep && (
           <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.2)', zIndex: 999 }} onClick={() => setSelectedStep(null)} />
         )}
-        <OnboardingStepPanel step={selectedStep} onClose={() => setSelectedStep(null)} onMarkComplete={handleMarkStepComplete} onRevoke={handleRevokeStep} />
+        <OnboardingStepPanel step={selectedStep} onClose={() => setSelectedStep(null)} onMarkComplete={handleMarkStepComplete} onRevoke={handleRevokeStep} onToast={setToast} />
 
         {/* Header */}
         <div className="page-header">
@@ -1445,7 +1452,7 @@ export default function Batches() {
                             </span>
                           </td>
                           <td style={{ display:'flex', gap:4, alignItems:'center' }}>
-                            <button className="btn btn-ghost btn-sm" onClick={() => navigate(`/students/${s.id}`)}>View <ChevronRight size={12}/></button>
+                            <button className="btn btn-ghost btn-sm" onClick={() => navigate(`/students/${s.id}`, { state: { fromBatchId: selectedBatch.id } })}>View <ChevronRight size={12}/></button>
                             {profile?.role === 'ceo' && (
                               <button className="btn btn-sm" style={{ background:'#FEE2E2', color:'#EF4444', border:'none', padding:'4px 8px' }}
                                 onClick={() => setDeleteStudentConfirm(s)}><Trash2 size={12}/></button>
@@ -2516,8 +2523,7 @@ export default function Batches() {
                   <label className="form-label">Assigned Faculty</label>
                   <select className="form-input" value={taskForm.assignedFaculty} onChange={e=>setTaskForm({...taskForm,assignedFaculty:e.target.value})}>
                     <option value="">Select faculty</option>
-                    {(selectedBatch.faculties||[]).map((f,i)=><option key={i}>{f}</option>)}
-                    {staffList.filter(s=>s.active!==false).map(s=><option key={s.id}>{s.name}</option>)}
+                    {staffList.filter(s=>s.active!==false&&s.role!=='ceo').map(s=><option key={s.id} value={s.name}>{s.name}{s.email?` — ${s.email}`:''}</option>)}
                   </select>
                 </div>
               </FormRow>
@@ -2762,12 +2768,12 @@ export default function Batches() {
                 }}>
                 <option value="">Select Mentor</option>
                 {staffList.filter(s=>s.role!=='ceo'&&s.active!==false).map(s=>(
-                  <option key={s.id} value={s.id}>{s.name} ({s.phone || 'no phone'})</option>
+                  <option key={s.id} value={s.id}>{s.name} — {s.email || s.phone || 'no email'}</option>
                 ))}
               </select>
             </div>
             <div className="form-group">
-              <label className="form-label">Assign Faculties / Staff</label>
+              <label className="form-label">Assign Faculties / Staff <span style={{ fontWeight:400, color:'var(--text-muted)', fontSize:12 }}>(select multiple)</span></label>
               <div style={{ display:'flex', flexWrap:'wrap', gap:8, padding:'10px', background:'var(--bg)', borderRadius:8, border:'1px solid var(--border)', minHeight:48 }}>
                 {staffList.filter(s=>s.role!=='ceo'&&s.active!==false).map(s=>(
                   <div key={s.id} onClick={() => toggleFaculty(s.name)} style={{
@@ -2777,7 +2783,7 @@ export default function Batches() {
                     border: `1px solid ${createForm.faculties.includes(s.name)?'#E53935':'var(--border)'}`,
                     transition:'all 0.12s',
                   }}>
-                    {s.name} ({s.phone || s.role})
+                    {s.name}{s.email ? ` · ${s.email}` : s.phone ? ` · ${s.phone}` : ''}
                   </div>
                 ))}
               </div>

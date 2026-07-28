@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import {
   getStudent, updateStudent, getBatches,
   getFollowUps, addFollowUp, getAssessments, addAssessment,
@@ -47,6 +47,7 @@ const ALL_SUBJECTS = [
 export default function StudentProfile() {
   const { id }       = useParams();
   const navigate     = useNavigate();
+  const location     = useLocation();
   const { profile }  = useAuth();
 
   const [student,     setStudent]     = useState(null);
@@ -294,7 +295,12 @@ export default function StudentProfile() {
       {/* Page header */}
       <div className="page-header">
         <div style={{ display:'flex', alignItems:'center', gap:12 }}>
-          <button className="btn btn-ghost btn-sm btn-icon" onClick={() => navigate(-1)}>
+          <button className="btn btn-ghost btn-sm btn-icon" onClick={() => {
+            // If we came from a batch's student list, return to that batch (its
+            // detail is state-based, so navigate(-1) alone lands on the batch list).
+            if (location.state?.fromBatchId) navigate('/batches', { state: { batchId: location.state.fromBatchId, tab: 'students' } });
+            else navigate(-1);
+          }}>
             <ArrowLeft size={16}/>
           </button>
           <div>
