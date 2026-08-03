@@ -564,6 +564,20 @@ export default function Batches() {
     // covered even without the separate mentorId query.
     const staffIds = [...new Set([...facultyStaff.map(s => s.id), createForm.mentorId].filter(Boolean))];
     await addBatch({ ...createForm, staffIds, staffDetails });
+    // Notify every faculty + mentor assigned at creation (in-app + email).
+    // This path previously assigned staff silently — no notification fired.
+    const mentorStaff = createForm.mentorId ? staffList.find(s => s.id === createForm.mentorId) : null;
+    const assignees = [...facultyStaff];
+    if (mentorStaff && !assignees.some(a => a.id === mentorStaff.id)) assignees.push(mentorStaff);
+    for (const s of assignees) {
+      if (s.email) {
+        notifyStaff({
+          toEmail: s.email, fromName: profile?.name || 'ISC SMS',
+          title: 'New Batch Assignment', type: 'batch_assignment', route: '/batches',
+          body: `You have been assigned to batch ${createForm.name}${s.id === createForm.mentorId ? ' as mentor' : ''}`,
+        }).catch(() => {});
+      }
+    }
     setToast({ message:`Batch "${createForm.name}" created!`, type:'success' });
     setShowCreate(false);
     setCreateForm({ name:'', course:'', mentorId:'', mentorName:'', faculties:[], startDate:'', endDate:'', status:'upcoming', maxSeats:'', courseDurationMonths:'', courseFlow:DEFAULT_COURSE_FLOW, studentFields:DEFAULT_STUDENT_FIELDS, subjects:[], staffIds:[], staffDetails:[] });
@@ -721,20 +735,14 @@ export default function Batches() {
       // Denormalization sync: students carry staffIds for access rules —
       // keep every student in this batch aligned with the new staffing.
       await syncBatchStaffToStudents(selectedBatch.id, { ...selectedBatch, staffIds: updatedStaffIds });
-      // Send notifications
+      // Send notifications (in-app + email together)
       for (const staff of newStaffToAdd) {
         if (staff.email) {
-          await addNotification({
-            toEmail: staff.email, title: 'New Batch Assignment',
+          await notifyStaff({
+            toEmail: staff.email, fromName: profile?.name || 'ISC SMS',
+            title: 'New Batch Assignment', type: 'batch_assignment', route: '/batches',
             body: `You have been added to batch ${selectedBatch.name}`,
-            type: 'batch_assignment', read: false,
           });
-          sendAssignmentEmail({
-            toEmail: staff.email, toName: staff.name,
-            title: 'New Batch Assignment',
-            detail: `You have been added to batch ${selectedBatch.name}`,
-            assignedBy: profile?.name || 'ISC SMS',
-          }).catch(()=>{});
         }
       }
       const updated = { ...selectedBatch, staffIds: updatedStaffIds, staffDetails: updatedStaffDetails };
